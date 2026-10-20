@@ -1119,7 +1119,9 @@ $("#qvStop").onclick = () => qvAction("estop");
 
 // ---- printer page --------------------------------------------------------------
 let pageId = null;
-const fmtClock = d => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+// 12 / 24 hour clock: Settings > Look ("auto" follows the device)
+const hour12 = () => { try { const v = JSON.parse(localStorage.getItem("pb-clock")); return v === "12" ? true : v === "24" ? false : undefined; } catch { return undefined; } };
+const fmtClock = d => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: hour12() });
 function route() {
   const m = location.hash.match(/^#printer-(\d+)$/);
   pageId = m ? +m[1] : null;
@@ -1249,7 +1251,7 @@ async function loadTimelapses() {
 
 // ---- printer page: Files tab ---------------------------------------------------
 const fmtSize = b => b == null ? "—" : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
-const fmtDate = t => t ? new Date(t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+const fmtDate = t => t ? new Date(t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: hour12() }) : "—";
 
 // ---- printer page: Console tab -------------------------------------------------
 const conLogs = new Map();          // printer id -> [{kind, text}], kept since this page was opened
@@ -1677,6 +1679,8 @@ render();
 <script src="/static/builder/panels/devices.js"></script>
 <script src="/static/builder/panels/endstops.js"></script>
 <script src="/static/builder/panels/system.js"></script>
+<script src="/static/builder/panels/sensors.js"></script>
+<script src="/static/builder/panels/explorer.js"></script>
 <script src="/static/builder/panels/spoolman.js"></script>
 <script src="/static/builder/home-panels.js"></script>
 <script src="/static/builder/builder.js"></script>

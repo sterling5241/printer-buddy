@@ -64,7 +64,7 @@ PB.panel("thermals", {
       box.innerHTML = presets.map((p, i) => `<button type="button" data-pi="${i}" title="${esc(Object.entries(p.temps || {}).map(([k, v]) => `${k}: ${v}°`).join(", "))}">${esc(p.name)}</button>`).join("")
         + `<button type="button" data-cool>Cool down</button><button type="button" data-edit title="Edit presets" aria-label="Edit presets">✎</button>`;
       for (const b of box.querySelectorAll("[data-pi]")) b.onclick = () => apply(presets[+b.dataset.pi]);
-      box.querySelector("[data-cool]").onclick = () => { const hs = heaters(); if (hs.length) gcode(hs.map(s => cmd(s, 0)).join("\n")); toast("Heaters off"); };
+      box.querySelector("[data-cool]").onclick = () => { if (PB.store.get("pb-confirm-cool", false) && !confirm("Turn all heaters off?")) return; const hs = heaters(); if (hs.length) gcode(hs.map(s => cmd(s, 0)).join("\n")); toast("Heaters off"); };
       box.querySelector("[data-edit]").onclick = editPresets;
     }
     function apply(p) {

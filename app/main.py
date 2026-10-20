@@ -45,6 +45,8 @@ STATIC = Path(__file__).parent / "static"
 
 store = Store(os.getenv("DB_PATH", "data/monitor.db"))
 manager = Manager(store, Notifier(store))
+from . import moonraker as _mr   # noqa: E402
+_mr.ETA_MODE = store.settings().get("eta_mode", "file") if store.settings().get("eta_mode") in ("file", "slicer", "filament") else "file"
 manager.timelapse = Timelapse(store, os.path.dirname(os.path.abspath(os.getenv("DB_PATH", "data/monitor.db"))),
                               manager.snapshot, manager.cam_transform)
 manager.ai = AI(store, os.path.dirname(os.path.abspath(os.getenv("DB_PATH", "data/monitor.db"))),
@@ -301,6 +303,18 @@ async def ui_layout(request: Request):
 
 
 KV_KEYS = ("presets", "notes", "maintenance", "console_filters")
+
+
+async def ui_eta(request: Request):
+    """How "time left" is worked out for every printer on this box: file | slicer | filament (Settings > Look)."""
+    mr = _mr
+    if request.method == "PUT":
+        mode = (await body(request)).get("mode")
+        if mode not in ("file", "slicer", "filament"):
+            return err("bad mode")
+        store.save_settings({"eta_mode": mode})
+        mr.ETA_MODE = mode
+    return JSONResponse({"mode": mr.ETA_MODE})
 
 
 async def printer_kv(request: Request):
@@ -767,7 +781,7 @@ RPC_ALLOW = {
     "server.spoolman.status": 15, "server.spoolman.get_spool_id": 15, "server.spoolman.post_spool_id": 15,
     "server.spoolman.proxy": 20,
     "machine.peripherals.usb": 20, "machine.peripherals.serial": 20, "machine.peripherals.video": 20, "machine.peripherals.canbus": 30,
-    "server.history.get_job": 15, "printer.query_endstops.status": 10, "server.webcams.list": 10, "server.webcams.post_item": 15, "server.webcams.delete_item": 15, "printer.objects.list": 10,
+    "server.history.get_job": 15, "printer.query_endstops.status": 10, "server.sensors.list": 10, "server.webcams.list": 10, "server.webcams.post_item": 15, "server.webcams.delete_item": 15, "printer.objects.list": 10,
     "server.info": 10, "server.announcements.list": 15, "server.announcements.dismiss": 15, "printer.info": 10,
 }
 
@@ -1115,6 +1129,7 @@ _app = Starlette(routes=[
     Route("/api/printers/{pid:int}/rpc", rpc, methods=["POST"]),
     Route("/api/printers/{pid:int}/kv", printer_kv, methods=["GET", "PUT"]),
     Route("/api/notices", notices),
+    Route("/api/ui/eta", ui_eta, methods=["GET", "PUT"]),
     Route("/api/printers/{pid:int}/file", printer_file, methods=["GET", "PUT"]),
     Route("/api/printers/{pid:int}/files/upload", upload_file, methods=["POST"]),
     Route("/api/printers/{pid:int}/{action}", printer_action, methods=["POST"]),

@@ -65,7 +65,17 @@
       <button type="button" data-tab="look">Look</button><button type="button" data-tab="about">About</button></div>
     <div data-body="alerts"></div><div data-body="ai"></div>
     <div data-body="look"><label class="field">Theme <select data-a="theme"><option value="auto">Auto (follow this device)</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
-      <label class="pb-chk pb-keysopt"><input type="checkbox" data-a="keys"> Keyboard shortcuts on printer pages (press <kbd>?</kbd> for the list)</label></div>
+      <label class="pb-chk pb-keysopt"><input type="checkbox" data-a="keys"> Keyboard shortcuts on printer pages (press <kbd>?</kbd> for the list)</label>
+      <label class="field">Clock <select data-o="pb-clock"><option value="auto">Auto (this device)</option><option value="12">12 hour (3:45 PM)</option><option value="24">24 hour (15:45)</option></select></label>
+      <label class="field">"Time left" based on <select data-a="eta"><option value="file">How far through the file (default)</option><option value="slicer">The slicer's estimate</option><option value="filament">Filament used so far</option></select></label>
+      <div class="pb-sub-h">Ask before</div>
+      <label class="pb-chk"><input type="checkbox" data-c="pb-confirm-estop" data-def="1"> Emergency stop</label>
+      <label class="pb-chk"><input type="checkbox" data-c="pb-confirm-cancel" data-def="1"> Cancelling a print</label>
+      <label class="pb-chk"><input type="checkbox" data-c="pb-confirm-cool" data-def=""> Cool down (all heaters off)</label>
+      <div class="pb-sub-h">Other</div>
+      <label class="pb-chk"><input type="checkbox" data-c="pb-lock" data-def=""> Lock sliders on touch screens (tap once to unlock, so scrolling can't change them)</label>
+      <label class="pb-chk"><input type="checkbox" data-c="pb-title" data-def="1"> Show print progress in the browser tab title</label>
+      <p class="pb-muted">These are saved in this browser. "Time left" is for everyone using this box.</p></div>
     <div data-body="about"><dl class="pb-kv pb-about"></dl></div>`;
   $(".top").after(panel);
   panel.querySelector("[data-body=alerts]").append($("#notifyPanel"));
@@ -77,12 +87,21 @@
   theme.onchange = () => PB.setTheme(theme.value);
   const keys = panel.querySelector("[data-a=keys]");
   keys.onchange = () => PB.store.set("pb-keys", keys.checked);
+  const clock = panel.querySelector("[data-o=pb-clock]");
+  clock.onchange = () => { PB.store.set("pb-clock", clock.value); render(); };
+  const eta = panel.querySelector("[data-a=eta]");
+  eta.onchange = () => api("/api/ui/eta", { method: "PUT", body: JSON.stringify({ mode: eta.value }) }).then(() => toast("Saved"), e => toast(e.message));
+  for (const c of panel.querySelectorAll("[data-c]")) c.onchange = () => PB.store.set(c.dataset.c, c.checked);
   async function tab(name) {
     for (const b of panel.querySelectorAll("[data-tab]")) b.setAttribute("aria-selected", String(b.dataset.tab === name));
     for (const d of panel.querySelectorAll("[data-body]")) d.hidden = d.dataset.body !== name;
     if (name === "alerts") { $("#notifyPanel").hidden = false; try { await loadNotify(); } catch (e) { toast(e.message); } }
     if (name === "ai") { $("#aiPanel").hidden = false; await loadAI(); if (aiCfg) fillAIForm(); }
-    if (name === "look") { theme.value = PB.store.get("pb-theme", "auto"); keys.checked = !!PB.store.get("pb-keys", false); }
+    if (name === "look") {
+      theme.value = PB.store.get("pb-theme", "auto"); keys.checked = !!PB.store.get("pb-keys", false); clock.value = PB.store.get("pb-clock", "auto");
+      for (const c of panel.querySelectorAll("[data-c]")) c.checked = !!PB.store.get(c.dataset.c, !!c.dataset.def);
+      api("/api/ui/eta").then(r => { eta.value = r.mode; }).catch(() => {});
+    }
     if (name === "about") {
       let v = {}; try { v = (await api("/api/config")).version || {}; } catch {}
       panel.querySelector(".pb-about").innerHTML = [["Version", v.commit || "?"], ["Branch", v.branch || "?"], ["Updated", v.date || "?"],

@@ -15,6 +15,7 @@ from .net import HandshakeError, WebSocket, get_json, http_get, http_post, http_
 
 log = logging.getLogger(__name__)
 VERSION = "0.1.0"
+ETA_MODE = "file"   # how "time left" is worked out: file (progress through the file), slicer (its estimate), filament (used / total)
 
 SUBSCRIBE = {
     "print_stats": None,
@@ -283,6 +284,9 @@ class MoonrakerClient:
         for n in ("manual_probe", "bed_screws", "screws_tilt_adjust"):   # calibration helper dialogs
             if n in names:
                 objects[n] = None
+        self.led_effects = [n for n in names if n.startswith("led_effect ")]   # the led_effect plugin
+        for n in self.led_effects:
+            objects[n] = ["enabled"]
         self.pause_layer = "gcode_macro SET_PAUSE_AT_LAYER" in names or "gcode_macro SET_PAUSE_NEXT_LAYER" in names
         if "gcode_macro SET_PRINT_STATS_INFO" in names:   # pause-at-layer state lives in this macro's variables
             objects["gcode_macro SET_PRINT_STATS_INFO"] = ["pause_next_layer", "pause_at_layer"]
@@ -309,6 +313,14 @@ class MoonrakerClient:
         self.macros = sorted(({"name": n.upper(), "description": desc.get(n.lower()) or desc.get(n) or None,
                                "params": params.get(n.lower()) or params.get(n) or []}
                               for n in names if not n.startswith("_")), key=lambda m: m["name"])
+
+    async def _load_meta(self, fname: str):
+        try:
+            m = await self._call("server.files.metadata", {"filename": fname}) or {}
+            if self._meta_for == fname:
+                self._meta = {k: m.get(k) for k in ("estimated_time", "filament_total")}
+        except Exception:
+            pass
 
     async def _load_webcams(self):
         try:
@@ -483,8 +495,19 @@ class MoonrakerClient:
         progress = ds.get("progress") or vs.get("progress") or 0.0
         duration = ps.get("print_duration") or 0.0
         eta = None
-        if state == "printing" and progress > 0.01 and duration > 0:
-            eta = duration / progress - duration
+        fname = ps.get("filename") or None
+        if fname and getattr(self, "_meta_for", None) != fname:   # slicer estimate + filament total, once per file
+            self._meta_for, self._meta = fname, {}
+            asyncio.ensure_future(self._load_meta(fname))
+        meta = getattr(self, "_meta", {}) or {}
+        if state == "printing" and duration > 0:
+            est, ftot, fused = meta.get("estimated_time"), meta.get("filament_total"), ps.get("filament_used") or 0
+            if ETA_MODE == "slicer" and est:
+                eta = max(0.0, est - duration)
+            elif ETA_MODE == "filament" and ftot and fused > 0:
+                eta = duration / min(1.0, fused / ftot) - duration
+            elif progress > 0.01:
+                eta = duration / progress - duration
         return {
             "connection": self.connection,
             "error": self.error,
@@ -527,6 +550,8 @@ class MoonrakerClient:
                              "lo": s.get("manual_probe", {}).get("z_position_lower"), "hi": s.get("manual_probe", {}).get("z_position_upper")} if live else None,
             "bed_screws": {"active": bool(s.get("bed_screws", {}).get("is_active")), "state": s.get("bed_screws", {}).get("state"),
                            "screw": s.get("bed_screws", {}).get("current_screw"), "accepted": s.get("bed_screws", {}).get("accepted_screws")} if live else None,
+            "led_effects": [{"name": n[len("led_effect "):], "enabled": bool(s.get(n, {}).get("enabled"))}
+                            for n in getattr(self, "led_effects", [])] if live else [],
             "pause_layer": {"next": s.get("gcode_macro SET_PRINT_STATS_INFO", {}).get("pause_next_layer") or {},
                             "at": s.get("gcode_macro SET_PRINT_STATS_INFO", {}).get("pause_at_layer") or {}}
                            if live and getattr(self, "pause_layer", False) else None,

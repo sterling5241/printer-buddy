@@ -12,18 +12,19 @@ PB.panel("console", {
   create(host, cfg) {
     host.innerHTML = `<div class="pb-ctool"><button type="button" data-a="filters" title="Hide lines that match your filters">Filters<span class="pb-fn"></span></button>
         <button type="button" data-a="scroll" title="Keep scrolling to the newest line" aria-pressed="true">Auto-scroll</button>
-        <span class="bd-sp"></span><button type="button" data-a="clear" title="Clear the console">Clear</button></div>
+        <span class="bd-sp"></span><button type="button" data-a="help" title="Every command Klipper knows, with what it does">Commands</button><button type="button" data-a="clear" title="Clear the console">Clear</button></div>
       <div class="pb-log" role="log" aria-label="Klipper console"></div>
       <form class="pb-cin"><input autocomplete="off" spellcheck="false" aria-label="G-code command" placeholder="Send G-code… (↑ ↓ history)"><button>Send</button></form>`;
     const dl = PB.el("datalist"); dl.id = "pb-cmds-" + Math.random().toString(36).slice(2, 7); host.append(dl);
     const q = s => host.querySelector(s), logEl = q(".pb-log"), input = q("input");
     input.setAttribute("list", dl.id);
     logEl.style.height = `${cfg.height}px`;
-    let filters = [], auto = true, hist = -1;
+    let filters = [], auto = true, hist = -1, help = {};
     async function commands(id) {   // autocomplete: every G-code command Klipper knows (incl. macros), with its help text
       try {
-        const help = await PB.rpc("printer.gcode.help");
-        if (id === pageId) dl.innerHTML = Object.entries(help || {}).sort().map(([c, d]) => `<option value="${esc(c)}">${esc(d || "")}</option>`).join("");
+        const h = await PB.rpc("printer.gcode.help");
+        if (id === pageId) help = h || {};
+        if (id === pageId) dl.innerHTML = Object.entries(h || {}).sort().map(([c, d]) => `<option value="${esc(c)}">${esc(d || "")}</option>`).join("");
       } catch {}
     }
     const TEMP = /^(ok\s+)?(T\d*|B|C):\s*-?\d/;
@@ -58,6 +59,22 @@ PB.panel("console", {
       };
       fd.showModal();
     };
+    // command help: search every command, click one to put it in the box
+    const hd = PB.el("dialog", "bd-lib pb-xd pb-cmdhelp"); document.body.append(hd);
+    q("[data-a=help]").onclick = () => {
+      hd.innerHTML = `<div class="pb-ptop"><h3>Commands</h3><button type="button" class="pb-px" aria-label="Close">✕</button></div>
+        <input type="search" placeholder="Search commands or what they do…" aria-label="Search commands"><div class="pb-cmdlist"></div>`;
+      const box = hd.querySelector(".pb-cmdlist"), find = hd.querySelector("input");
+      const draw = () => {
+        const t = find.value.trim().toLowerCase(), all = Object.entries(help).sort(([a], [b]) => a.localeCompare(b))
+          .filter(([c, d]) => !t || c.toLowerCase().includes(t) || (d || "").toLowerCase().includes(t));
+        box.innerHTML = all.length ? all.map(([c, d]) => `<button type="button" data-c="${esc(c)}"><b>${esc(c)}</b><span>${esc(d || "")}</span></button>`).join("")
+          : `<p class="pb-muted">${Object.keys(help).length ? "Nothing matches." : "Klipper didn't send its command list (is it running?)."}</p>`;
+        for (const b of box.querySelectorAll("[data-c]")) b.onclick = () => { input.value = b.dataset.c + " "; hd.close(); input.focus(); };
+      };
+      find.oninput = draw; hd.querySelector(".pb-px").onclick = () => hd.close();
+      draw(); hd.showModal(); find.focus();
+    };
     input.onkeydown = e => {   // the same command history as the rest of the app
       if ((e.key !== "ArrowUp" && e.key !== "ArrowDown") || !conHistory.length) return;
       e.preventDefault();
@@ -73,7 +90,7 @@ PB.panel("console", {
       },
       shown: draw, log: draw,
       update(p) { const on = p.connection === "online"; input.disabled = !on; q("form button").disabled = !on; },
-      destroy() { fd.remove(); },
+      destroy() { fd.remove(); hd.remove(); },
     };
   },
 });

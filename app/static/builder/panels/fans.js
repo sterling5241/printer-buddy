@@ -4,8 +4,19 @@ PB.panel("fans", {
   icon: PB.icon('<circle cx="12" cy="12" r="2"/><path d="M12 10c0-4 1-7 4-7 2 0 2 3 0 5M14 12c4 0 7 1 7 4 0 2-3 2-5 0M12 14c0 4-1 7-4 7-2 0-2-3 0-5M10 12c-4 0-7-1-7-4 0-2 3-2 5 0"/>'),
   settings: [{ k: "power", label: "Show power devices", type: "check", def: true }],
   create(host, cfg) {
-    host.innerHTML = `<div class="pb-ctl"></div><div class="pb-pow"></div>`;
-    const ctl = host.querySelector(".pb-ctl"), pow = host.querySelector(".pb-pow");
+    host.innerHTML = `<div class="pb-ctl"></div><div class="pb-fx"></div><div class="pb-pow"></div>`;
+    const ctl = host.querySelector(".pb-ctl"), pow = host.querySelector(".pb-pow"), fx = host.querySelector(".pb-fx");
+    let fxKey = "";
+    function effects(p) {   // led_effect plugin: one toggle per effect, plus stop all
+      const list = p.led_effects || [], k = list.map(e => `${e.name}:${e.enabled}`).join("|");
+      if (k === fxKey) return; fxKey = k;
+      fx.innerHTML = list.length ? `<div class="pb-sub-h">LED effects</div><div class="pb-fxrow">${list.map(e =>
+          `<button type="button" data-fx="${esc(e.name)}" aria-pressed="${e.enabled}">${esc(e.name.replaceAll("_", " "))}</button>`).join("")}
+          <button type="button" data-fxstop>Stop all</button></div>` : "";
+      for (const b of fx.querySelectorAll("[data-fx]")) b.onclick = () => gcode(b.getAttribute("aria-pressed") === "true"
+        ? `SET_LED_EFFECT EFFECT=${b.dataset.fx} STOP=1` : `SET_LED_EFFECT EFFECT=${b.dataset.fx}`);
+      fx.querySelector("[data-fxstop]")?.addEventListener("click", () => gcode("STOP_LED_EFFECTS"));
+    }
     let key = "", busy = new Set();
     const fanName = id => id.split(" ").slice(1).join(" ");
     const settable = f => f.id === "fan" || f.id.startsWith("fan_generic ");
@@ -52,12 +63,13 @@ PB.panel("fans", {
       } catch { pow.innerHTML = ""; }   // no [power] devices set up in moonraker.conf
     }
     return {
-      open() { key = ""; },
+      open() { key = ""; fxKey = ""; fx.innerHTML = ""; },
       shown: loadPower,
       update(p) {
         const fans = (p.sensors || []).filter(s => s.kind === "fan"), outs = p.outputs || [];
         const k = fans.map(f => f.id).concat(outs.map(o => o.id)).join("|");
         if (k !== key) { key = k; build(p); }
+        effects(p);
         const live = p.connection === "online" && p.klippy_state === "ready";
         for (const f of fans) {
           const row = ctl.querySelector(`[data-id="${CSS.escape(f.id)}"]`); if (!row || busy.has(f.id)) continue;
