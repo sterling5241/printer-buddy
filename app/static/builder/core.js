@@ -74,6 +74,25 @@ window.PB = (() => {
     dlg.showModal();
   }
 
-  return { defs, panel, mount, settings, unmount, shown, el, icon, store, current, take, park: n => n && parking.append(n),
+  // "Start this print?" box with the file's picture, used by Files and History
+  const pdlg = el("dialog", "bd-lib bd-print");
+  document.body.append(pdlg);
+  const thumbUrl = (pid, file) => `/api/printers/${pid}/thumbnail?file=${encodeURIComponent(file)}`;
+  function printFile(path) {
+    const p = current(); if (!p) return;
+    pdlg.innerHTML = `<h3>Start this print?</h3><div class="bd-pp"><img alt="" src="${thumbUrl(p.id, path)}"><div><b>${esc(path)}</b>
+      <div class="pb-muted">on ${esc(p.name)}</div></div></div>
+      <div class="bd-libfoot"><button type="button" data-a="no">Cancel</button><button type="button" class="bd-primary" data-a="go">Print</button></div>`;
+    const img = pdlg.querySelector("img"); img.onerror = () => { img.hidden = true; };
+    pdlg.querySelector("[data-a=no]").onclick = () => pdlg.close();
+    pdlg.querySelector("[data-a=go]").onclick = async () => {
+      pdlg.close();
+      try { await api(`/api/printers/${p.id}/files/print`, { method: "POST", body: JSON.stringify({ path }) }); toast(`Started ${path}`); }
+      catch (e) { toast(`${p.name}: ${e.message}`); }
+    };
+    pdlg.showModal();
+  }
+
+  return { defs, panel, mount, settings, printFile, thumbUrl, unmount, shown, el, icon, store, current, take, park: n => n && parking.append(n),
            onRoute: f => routeHooks.push(f) };
 })();
