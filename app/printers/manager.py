@@ -33,7 +33,7 @@ class Manager:
         self._offline_timers: dict[int, asyncio.Task] = {}
         self._milestone: dict[int, int] = {}         # last progress % announced per printer
         self.timelapse = None                         # set by main.py (app/timelapse.py)
-        self.ai = None                                # set by main.py (app/ai.py)
+        self.ai = None                                # set by main.py (app/ai/detector.py)
         self.collect = None                           # set by main.py (app/collect.py)
         self._subs: set[asyncio.Queue] = set()
 

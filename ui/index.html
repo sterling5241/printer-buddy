@@ -306,6 +306,36 @@
   .qv-btns .stop { background: var(--red); color: #fff; }
 </style>
 <link rel="stylesheet" href="/static/styles/builder.css">
+<link rel="stylesheet" href="/static/panels/print/status/status.css">
+<link rel="stylesheet" href="/static/panels/print/files/files.css">
+<link rel="stylesheet" href="/static/panels/print/queue/queue.css">
+<link rel="stylesheet" href="/static/panels/print/history/history.css">
+<link rel="stylesheet" href="/static/panels/print/gcodeview/gcodeview.css">
+<link rel="stylesheet" href="/static/panels/print/exclude/exclude.css">
+<link rel="stylesheet" href="/static/panels/print/timelapse/timelapse.css">
+<link rel="stylesheet" href="/static/panels/print/spoolman/spoolman.css">
+<link rel="stylesheet" href="/static/panels/print/ai/ai.css">
+<link rel="stylesheet" href="/static/panels/control/toolhead/toolhead.css">
+<link rel="stylesheet" href="/static/panels/control/zoffset/zoffset.css">
+<link rel="stylesheet" href="/static/panels/control/extruder/extruder.css">
+<link rel="stylesheet" href="/static/panels/control/thermals/thermals.css">
+<link rel="stylesheet" href="/static/panels/control/fans/fans.css">
+<link rel="stylesheet" href="/static/panels/control/macros/macros.css">
+<link rel="stylesheet" href="/static/panels/control/limits/limits.css">
+<link rel="stylesheet" href="/static/panels/control/actions/actions.css">
+<link rel="stylesheet" href="/static/panels/control/endstops/endstops.css">
+<link rel="stylesheet" href="/static/panels/control/bedmesh/bedmesh.css">
+<link rel="stylesheet" href="/static/panels/control/fsensors/fsensors.css">
+<link rel="stylesheet" href="/static/panels/camera/camera/camera.css">
+<link rel="stylesheet" href="/static/panels/machine/machine/machine.css">
+<link rel="stylesheet" href="/static/panels/machine/system/system.css">
+<link rel="stylesheet" href="/static/panels/machine/config/config.css">
+<link rel="stylesheet" href="/static/panels/machine/updates/updates.css">
+<link rel="stylesheet" href="/static/panels/machine/devices/devices.css">
+<link rel="stylesheet" href="/static/panels/machine/sensors/sensors.css">
+<link rel="stylesheet" href="/static/panels/machine/explorer/explorer.css">
+<link rel="stylesheet" href="/static/panels/machine/console/console.css">
+<link rel="stylesheet" href="/static/core/extras/extras.css">
 </head>
 <body>
 <main>
@@ -1652,40 +1682,64 @@ connectEvents();
 render();
 </script>
 <script src="/static/vendor/echarts.min.js"></script>
-<script src="/static/builder/core.js"></script>
-<script src="/static/builder/panels/camera.js"></script>
-<script src="/static/builder/panels/status.js"></script>
-<script src="/static/builder/panels/thermals.js"></script>
-<script src="/static/builder/panels/toolhead.js"></script>
-<script src="/static/builder/panels/macros.js"></script>
-<script src="/static/builder/panels/console.js"></script>
-<script src="/static/builder/panels/ai.js"></script>
-<script src="/static/builder/panels/files.js"></script>
-<script src="/static/builder/panels/history.js"></script>
-<script src="/static/builder/panels/timelapse.js"></script>
-<script src="/static/builder/panels/exclude.js"></script>
-<script src="/static/builder/panels/queue.js"></script>
-<script src="/static/builder/panels/zoffset.js"></script>
-<script src="/static/builder/panels/extruder.js"></script>
-<script src="/static/builder/panels/fans.js"></script>
-<script src="/static/builder/panels/limits.js"></script>
-<script src="/static/builder/panels/fsensors.js"></script>
-<script src="/static/builder/panels/config.js"></script>
-<script src="/static/builder/panels/machine.js"></script>
-<script src="/static/builder/panels/updates.js"></script>
-<script src="/static/builder/panels/bedmesh.js"></script>
-<script src="/static/builder/panels/actions.js"></script>
-<script src="/static/builder/panels/gcodeview.js"></script>
-<script src="/static/builder/panels/devices.js"></script>
-<script src="/static/builder/panels/endstops.js"></script>
-<script src="/static/builder/panels/system.js"></script>
-<script src="/static/builder/panels/sensors.js"></script>
-<script src="/static/builder/panels/explorer.js"></script>
-<script src="/static/builder/panels/spoolman.js"></script>
-<script src="/static/builder/home-panels.js"></script>
-<script src="/static/builder/builder.js"></script>
-<script src="/static/builder/home.js"></script>
-<script src="/static/builder/extras.js"></script>
+<script src="/static/core/core.js"></script>
+<script src="/static/panels/print/status/status.js"></script>
+<script src="/static/panels/print/files/search.js"></script>
+<script src="/static/panels/print/files/select.js"></script>
+<script src="/static/panels/print/files/preview.js"></script>
+<script src="/static/panels/print/files/files.js"></script>
+<script src="/static/panels/print/queue/queue.js"></script>
+<script src="/static/panels/print/history/details.js"></script>
+<script src="/static/panels/print/history/charts.js"></script>
+<script src="/static/panels/print/history/csv.js"></script>
+<script src="/static/panels/print/history/maintenance.js"></script>
+<script src="/static/panels/print/history/history.js"></script>
+<script src="/static/panels/print/gcodeview/parse.js"></script>
+<script src="/static/panels/print/gcodeview/orbit.js"></script>
+<script src="/static/panels/print/gcodeview/view2d.js"></script>
+<script src="/static/panels/print/gcodeview/view3d.js"></script>
+<script src="/static/panels/print/gcodeview/gcodeview.js"></script>
+<script src="/static/panels/print/exclude/exclude.js"></script>
+<script src="/static/panels/print/timelapse/timelapse.js"></script>
+<script src="/static/panels/print/spoolman/spoolman.js"></script>
+<script src="/static/panels/print/ai/ai.js"></script>
+<script src="/static/panels/control/toolhead/toolhead.js"></script>
+<script src="/static/panels/control/zoffset/zoffset.js"></script>
+<script src="/static/panels/control/extruder/extruder.js"></script>
+<script src="/static/panels/control/thermals/presets.js"></script>
+<script src="/static/panels/control/thermals/thermals.js"></script>
+<script src="/static/panels/control/fans/fans.js"></script>
+<script src="/static/panels/control/macros/params.js"></script>
+<script src="/static/panels/control/macros/macros.js"></script>
+<script src="/static/panels/control/limits/limits.js"></script>
+<script src="/static/panels/control/actions/actions.js"></script>
+<script src="/static/panels/control/endstops/endstops.js"></script>
+<script src="/static/panels/control/bedmesh/bedmesh.js"></script>
+<script src="/static/panels/control/fsensors/fsensors.js"></script>
+<script src="/static/panels/camera/camera/camera.js"></script>
+<script src="/static/panels/machine/machine/machine.js"></script>
+<script src="/static/panels/machine/system/system.js"></script>
+<script src="/static/panels/machine/config/highlight.js"></script>
+<script src="/static/panels/machine/config/editor.js"></script>
+<script src="/static/panels/machine/config/config.js"></script>
+<script src="/static/panels/machine/updates/updates.js"></script>
+<script src="/static/panels/machine/devices/devices.js"></script>
+<script src="/static/panels/machine/sensors/sensors.js"></script>
+<script src="/static/panels/machine/explorer/explorer.js"></script>
+<script src="/static/panels/machine/console/filters.js"></script>
+<script src="/static/panels/machine/console/help.js"></script>
+<script src="/static/panels/machine/console/console.js"></script>
+<script src="/static/core/home-panels.js"></script>
+<script src="/static/core/builder.js"></script>
+<script src="/static/core/home.js"></script>
+<script src="/static/core/extras/ui-options.js"></script>
+<script src="/static/core/extras/error-card.js"></script>
+<script src="/static/core/extras/drop-upload.js"></script>
+<script src="/static/core/extras/shortcuts.js"></script>
+<script src="/static/core/extras/prompts.js"></script>
+<script src="/static/core/extras/calibration.js"></script>
+<script src="/static/core/extras/pause-layer.js"></script>
+<script src="/static/core/extras/camera-editor.js"></script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script>
 </body>
 </html>
