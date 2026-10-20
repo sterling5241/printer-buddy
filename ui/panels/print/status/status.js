@@ -11,7 +11,6 @@ PB.panel("status", {
       <div class="pb-prog"><i></i></div><div class="pb-pct"><span></span><span></span></div>
       <div class="pb-pal" hidden><span class="pb-palstate pb-muted"></span><span class="bd-sp"></span><button type="button" data-a="pal">Pause at layer…</button></div>
       <dl class="pb-kv">
-        <div><dt>Nozzle</dt><dd data-k="nozzle"></dd></div><div><dt>Bed</dt><dd data-k="bed"></dd></div>
         <div><dt>Elapsed</dt><dd data-k="elapsed"></dd></div><div><dt>Done around</dt><dd data-k="done"></dd></div>
         <div><dt>Layer</dt><dd data-k="layer"></dd></div><div><dt>Speed / flow</dt><dd data-k="speed"></dd></div>
       </dl>`;
@@ -22,7 +21,6 @@ PB.panel("status", {
     thumb.onerror = () => { thumb.hidden = true; };
     let thumbFile;
     q("[data-a=pal]").onclick = () => PB.pauseAtLayer?.();
-    const temp = (t, tg) => t == null ? "—" : `${t.toFixed(1)}°` + (tg > 0 ? ` / ${tg.toFixed(0)}°` : "");
     return {
       open() { thumbFile = undefined; },
       update(p) {
@@ -44,8 +42,6 @@ PB.panel("status", {
         const [a, b] = host.querySelectorAll(".pb-pct span");
         a.innerHTML = showPct ? `<b>${Math.floor(pct * 100)}%</b> printed` : "";
         b.textContent = active && p.eta != null ? `${fmtDur(p.eta)} left` : "";
-        k("nozzle").textContent = live ? temp(p.nozzle, p.nozzle_target) : "—";
-        k("bed").textContent = live ? temp(p.bed, p.bed_target) : "—";
         k("elapsed").textContent = active && p.print_duration ? fmtDur(p.print_duration) : "—";
         k("done").textContent = active && p.eta != null ? fmtClock(new Date(Date.now() + p.eta * 1000)) : "—";
         k("layer").textContent = p.layer != null && p.total_layers ? `${p.layer} / ${p.total_layers}` : "—";
