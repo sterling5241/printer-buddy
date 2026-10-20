@@ -263,6 +263,9 @@ class MoonrakerClient:
         self.extruders = sorted(n for n in names if n == "extruder" or (n.startswith("extruder") and n[8:].isdigit()))
         for n in self.outputs + self.fsensors:
             objects[n] = None
+        for n in ("manual_probe", "bed_screws", "screws_tilt_adjust"):   # calibration helper dialogs
+            if n in names:
+                objects[n] = None
         for n in ("bed_mesh", "firmware_retraction", "quad_gantry_level", "z_tilt"):
             if n in names:
                 objects[n] = ["profile_name", "profiles"] if n == "bed_mesh" else None
@@ -497,6 +500,12 @@ class MoonrakerClient:
             "fsensors": [{"id": n, "name": _pretty(n), "enabled": s.get(n, {}).get("enabled"),
                           "detected": s.get(n, {}).get("filament_detected")} for n in getattr(self, "fsensors", [])] if live else [],
             "features": getattr(self, "features", {}),
+            "manual_probe": {"active": bool(s.get("manual_probe", {}).get("is_active")), "z": s.get("manual_probe", {}).get("z_position"),
+                             "lo": s.get("manual_probe", {}).get("z_position_lower"), "hi": s.get("manual_probe", {}).get("z_position_upper")} if live else None,
+            "bed_screws": {"active": bool(s.get("bed_screws", {}).get("is_active")), "state": s.get("bed_screws", {}).get("state"),
+                           "screw": s.get("bed_screws", {}).get("current_screw"), "accepted": s.get("bed_screws", {}).get("accepted_screws")} if live else None,
+            "screws_tilt": {"error": s.get("screws_tilt_adjust", {}).get("error"),
+                            "results": s.get("screws_tilt_adjust", {}).get("results") or {}} if live and "screws_tilt_adjust" in s else None,
             "mesh": {"profile": s.get("bed_mesh", {}).get("profile_name"),
                      "profiles": sorted((s.get("bed_mesh", {}).get("profiles") or {}).keys())} if "bed_mesh" in s else None,
             "retraction": s.get("firmware_retraction"),

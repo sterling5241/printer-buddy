@@ -29,7 +29,7 @@
     { id: "tuning", name: "Tuning", rows: [{ s: "2-1", cols: [[P("tuning", "bedmesh")], [P("tuning", "actions"), P("tuning", "fsensors")]] }] },
     { id: "console", name: "Console", rows: [{ s: "2-1", cols: [[P("console", "console", { height: 320 })], [P("console", "macros")]] }] },
     { id: "timelapse", name: "Timelapses", rows: [{ s: "1", cols: [[P("timelapse", "timelapse")]] }] },
-    { id: "machine", name: "Machine", rows: [{ s: "1-1-1", cols: [[P("machine", "machine")], [P("machine", "updates")], [P("machine", "spoolman")]] },
+    { id: "machine", name: "Machine", rows: [{ s: "1-1-1", cols: [[P("machine", "machine")], [P("machine", "updates")], [P("machine", "spoolman"), P("machine", "devices")]] },
                                             { s: "1", cols: [[P("machine", "config", { height: 640 })]] }] },
   ] };
   // base layout of the home page: the fleet at a glance, then the printers

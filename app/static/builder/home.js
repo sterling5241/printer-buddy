@@ -61,7 +61,8 @@
     <div class="pb-settabs" role="tablist"><button type="button" data-tab="alerts">Alerts</button><button type="button" data-tab="ai" class="ai">AI</button>
       <button type="button" data-tab="look">Look</button><button type="button" data-tab="about">About</button></div>
     <div data-body="alerts"></div><div data-body="ai"></div>
-    <div data-body="look"><label class="field">Theme <select data-a="theme"><option value="auto">Auto (follow this device)</option><option value="light">Light</option><option value="dark">Dark</option></select></label></div>
+    <div data-body="look"><label class="field">Theme <select data-a="theme"><option value="auto">Auto (follow this device)</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+      <label class="pb-chk pb-keysopt"><input type="checkbox" data-a="keys"> Keyboard shortcuts on printer pages (press <kbd>?</kbd> for the list)</label></div>
     <div data-body="about"><dl class="pb-kv pb-about"></dl></div>`;
   $(".top").after(panel);
   panel.querySelector("[data-body=alerts]").append($("#notifyPanel"));
@@ -71,12 +72,14 @@
   $("#notifyClose").onclick = close; $("#aiClose").onclick = close;
   const theme = panel.querySelector("[data-a=theme]");
   theme.onchange = () => PB.setTheme(theme.value);
+  const keys = panel.querySelector("[data-a=keys]");
+  keys.onchange = () => PB.store.set("pb-keys", keys.checked);
   async function tab(name) {
     for (const b of panel.querySelectorAll("[data-tab]")) b.setAttribute("aria-selected", String(b.dataset.tab === name));
     for (const d of panel.querySelectorAll("[data-body]")) d.hidden = d.dataset.body !== name;
     if (name === "alerts") { $("#notifyPanel").hidden = false; try { await loadNotify(); } catch (e) { toast(e.message); } }
     if (name === "ai") { $("#aiPanel").hidden = false; await loadAI(); if (aiCfg) fillAIForm(); }
-    if (name === "look") theme.value = PB.store.get("pb-theme", "auto");
+    if (name === "look") { theme.value = PB.store.get("pb-theme", "auto"); keys.checked = !!PB.store.get("pb-keys", false); }
     if (name === "about") {
       let v = {}; try { v = (await api("/api/config")).version || {}; } catch {}
       panel.querySelector(".pb-about").innerHTML = [["Version", v.commit || "?"], ["Branch", v.branch || "?"], ["Updated", v.date || "?"],

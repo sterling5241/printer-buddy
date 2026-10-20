@@ -35,6 +35,7 @@ class Timelapse:
         self.snapshot = snapshot          # pid -> JPEG bytes from the printer's main camera
         self.transform = transform        # pid -> (flip_h, flip_v, rotation) as shown in the app
         self.active: dict[int, dict] = {}
+        self.skip: set[int] = set()       # printers whose next print shouldn't be recorded (start-print dialog)
 
     # settings -------------------------------------------------------------
     def settings(self) -> dict:
@@ -63,6 +64,9 @@ class Timelapse:
                 asyncio.get_running_loop().create_task(self._capture(pid))
 
     def _start(self, pid: int, v: dict):
+        if pid in self.skip:
+            self.skip.discard(pid)
+            return
         cfg = self.settings()
         tid = str(int(time.time()))
         frames_dir = self.root / str(pid) / f"{tid}.frames"

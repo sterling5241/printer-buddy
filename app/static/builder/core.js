@@ -85,21 +85,49 @@ window.PB = (() => {
   const pdlg = el("dialog", "bd-lib bd-print");
   document.body.append(pdlg);
   const thumbUrl = (pid, file) => `/api/printers/${pid}/thumbnail?file=${encodeURIComponent(file)}`;
-  function printFile(path) {
+  // start-print dialog: thumbnail, time + filament, the spool to use (Spoolman) and timelapse on / off (if this box records)
+  let tlOn = null;
+  const dur = s => { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m`; };
+  async function printFile(path) {
     const p = current(); if (!p) return;
     pdlg.innerHTML = `<h3>Start this print?</h3><div class="bd-pp"><img alt="" src="${thumbUrl(p.id, path)}"><div><b>${esc(path)}</b>
-      <div class="pb-muted">on ${esc(p.name)}</div></div></div>
+      <div class="pb-muted">on ${esc(p.name)}</div><div class="pb-muted bd-ppmeta"></div></div></div>
+      <div class="bd-ppopts"></div>
       <div class="bd-libfoot"><button type="button" data-a="no">Cancel</button><button type="button" class="bd-primary" data-a="go">Print</button></div>`;
     const img = pdlg.querySelector("img"); img.onerror = () => { img.hidden = true; };
+    const opts = pdlg.querySelector(".bd-ppopts");
+    let spool = null, spools = [];
     pdlg.querySelector("[data-a=no]").onclick = () => pdlg.close();
     pdlg.querySelector("[data-a=go]").onclick = async () => {
+      const sel = opts.querySelector("[data-o=spool]"), tl = opts.querySelector("[data-o=tl]");
       pdlg.close();
-      try { await api(`/api/printers/${p.id}/files/print`, { method: "POST", body: JSON.stringify({ path }) }); toast(`Started ${path}`); }
-      catch (e) { toast(`${p.name}: ${e.message}`); }
+      try {
+        if (sel && sel.value !== String(spool ?? "")) await rpc("server.spoolman.post_spool_id", { spool_id: sel.value ? +sel.value : null });
+        await api(`/api/printers/${p.id}/files/print`, { method: "POST", body: JSON.stringify({ path, ...(tl ? { timelapse: tl.checked } : {}) }) });
+        toast(`Started ${path}`);
+      } catch (e) { toast(`${p.name}: ${e.message}`); }
     };
     pdlg.showModal();
+    // the extras load after the dialog is open, so it never waits on a slow printer
+    rpc("server.files.metadata", { filename: path }).then(m => {
+      const bits = [m?.estimated_time && `about ${dur(m.estimated_time)}`, m?.filament_total && `${(m.filament_total / 1000).toFixed(1)} m filament`,
+                    m?.filament_type, m?.layer_height && `${m.layer_height} mm layers`].filter(Boolean);
+      pdlg.querySelector(".bd-ppmeta").textContent = bits.join(" · ");
+    }).catch(() => {});
+    if (tlOn === null) { try { tlOn = !!(await api("/api/timelapse/settings")).enabled; } catch { tlOn = false; } }
+    if (tlOn) opts.insertAdjacentHTML("beforeend", `<label class="bd-check"><input type="checkbox" data-o="tl" checked> Record a timelapse of this print</label>`);
+    try {
+      const st = await rpc("server.spoolman.status");
+      if (!st?.spoolman_connected) return;
+      spool = st.spool_id ?? null;
+      const r = await rpc("server.spoolman.proxy", { request_method: "GET", path: "/v1/spool", use_v2_response: true });
+      spools = (Array.isArray(r) ? r : r?.response || []).filter(s => !s.archived);
+      const nm = s => [s.filament?.vendor?.name, s.filament?.name, s.filament?.material].filter(Boolean).join(" · ") || `Spool ${s.id}`;
+      const left = s => s.remaining_weight != null ? ` (${Math.round(s.remaining_weight)} g left)` : "";
+      opts.insertAdjacentHTML("afterbegin", `<label class="bd-field">Spool <select data-o="spool"><option value="">No spool</option>
+        ${spools.map(s => `<option value="${s.id}"${s.id === spool ? " selected" : ""}>#${s.id} ${esc(nm(s))}${left(s)}</option>`).join("")}</select></label>`);
+    } catch {}
   }
-
   // call an allowed Moonraker method for the open printer (see RPC_ALLOW in main.py)
   const rpc = async (method, params) => {
     if (pageId === null) throw new Error("no printer open");
@@ -108,7 +136,12 @@ window.PB = (() => {
   const fileUrl = (root, path, download) => `/api/printers/${pageId}/file?root=${root}&path=${encodeURIComponent(path)}${download ? "&download=1" : ""}`;
   const reveal = host => host.dispatchEvent(new CustomEvent("pb-reveal", { bubbles: true }));   // builder switches to its tab
   const confirmGcode = (text, script, done) => { if (confirm(text)) { gcode(script); if (done) toast(done); } };
+  // small per-printer lists saved on the box (presets, notes, maintenance, console filters) - see printer_kv in main.py
+  const kv = {
+    get: async (key, pid = pageId) => (await api(`/api/printers/${pid}/kv?key=${key}`)).value,
+    set: (key, value, pid = pageId) => api(`/api/printers/${pid}/kv?key=${key}`, { method: "PUT", body: JSON.stringify({ value }) }),
+  };
 
-  return { defs, homeDefs, homePanel, panel, mount, settings, printFile, thumbUrl, rpc, fileUrl, confirmGcode, reveal, unmount, shown, el, icon, store, current, take, park: n => n && parking.append(n),
+  return { defs, homeDefs, homePanel, panel, mount, settings, printFile, thumbUrl, rpc, fileUrl, confirmGcode, kv, gcode: script => gcode(script), reveal, unmount, shown, el, icon, store, current, take, park: n => n && parking.append(n),
            onRoute: f => routeHooks.push(f) };
 })();

@@ -299,6 +299,24 @@ async def ui_layout(request: Request):
     return JSONResponse({"layout": store.settings().get(key)})
 
 
+KV_KEYS = ("presets", "notes", "maintenance", "console_filters")
+
+
+async def printer_kv(request: Request):
+    """Small per-printer lists saved on this box (temperature presets, history notes, maintenance, console filters).
+    GET/PUT /api/printers/{pid}/kv?key=presets  body {value: ...}"""
+    pid, key = request.path_params["pid"], request.query_params.get("key", "")
+    if key not in KV_KEYS:
+        return err("unknown key", 404)
+    name = f"kv_{pid}_{key}"
+    if request.method == "PUT":
+        b = await body(request)
+        if "value" not in b or len(json.dumps(b["value"])) > 200_000:
+            return err("bad value")
+        store.save_settings({name: b["value"]})
+    return JSONResponse({"value": store.settings().get(name)})
+
+
 _news = {"at": 0.0, "items": []}
 
 
@@ -634,9 +652,15 @@ async def print_file(request: Request):
     client, e = _online_client(request)
     if e:
         return e
-    name = str((await body(request)).get("path", "")).strip()
+    b = await body(request)
+    name = str(b.get("path", "")).strip()
     if not name:
         return err("path is required")
+    pid = request.path_params["pid"]
+    if b.get("timelapse") is False:     # start-print dialog: don't record this one
+        manager.timelapse.skip.add(pid)
+    else:
+        manager.timelapse.skip.discard(pid)
     try:
         await client.start_print(name)
     except Exception as ex:
@@ -658,6 +682,8 @@ async def job_queue(request: Request):
             if not names:
                 return err("filenames is required")
             params = {"filenames": names}
+            if b.get("reset"):   # replace the whole queue (the Queue panel's copies / reorder)
+                params["reset"] = True
         elif action == "remove":
             params = {"job_ids": [str(j) for j in b.get("job_ids") or []]}
             if not params["job_ids"]:
@@ -689,6 +715,8 @@ RPC_ALLOW = {
     "machine.device_power.devices": 15, "machine.device_power.post_device": 30,
     "server.spoolman.status": 15, "server.spoolman.get_spool_id": 15, "server.spoolman.post_spool_id": 15,
     "server.spoolman.proxy": 20,
+    "machine.peripherals.usb": 20, "machine.peripherals.serial": 20, "machine.peripherals.video": 20, "machine.peripherals.canbus": 30,
+    "server.history.get_job": 15,
 }
 
 
@@ -1030,6 +1058,7 @@ _app = Starlette(routes=[
     Route("/api/printers/{pid:int}/files/print", print_file, methods=["POST"]),
     Route("/api/printers/{pid:int}/queue", job_queue, methods=["GET", "POST"]),
     Route("/api/printers/{pid:int}/rpc", rpc, methods=["POST"]),
+    Route("/api/printers/{pid:int}/kv", printer_kv, methods=["GET", "PUT"]),
     Route("/api/printers/{pid:int}/file", printer_file, methods=["GET", "PUT"]),
     Route("/api/printers/{pid:int}/files/upload", upload_file, methods=["POST"]),
     Route("/api/printers/{pid:int}/{action}", printer_action, methods=["POST"]),

@@ -68,7 +68,7 @@ PB.panel("files", {
               ${PB.previewFile ? `<button type="button" data-prev="${esc(f.filename)}" title="Preview the G-code">Preview</button>` : ""}` : ""}
               ${root === "config" && PB.openConfig ? `<button type="button" data-edit="${esc(f.filename)}">Edit</button>` : ""}
               <a class="pb-dl" href="${PB.fileUrl(root, full(f.filename), true)}" title="Download" aria-label="Download">⬇</a>
-              ${root !== "logs" ? `<button type="button" data-ren="${esc(f.filename)}" title="Rename">✎</button><button type="button" data-del="${esc(f.filename)}" title="Delete">✕</button>` : ""}
+              ${root !== "logs" ? `<button type="button" data-ren="${esc(f.filename)}" title="Rename">✎</button><button type="button" data-dup="${esc(f.filename)}" title="Duplicate">⧉</button><button type="button" data-del="${esc(f.filename)}" title="Delete">✕</button>` : ""}
             </div></div>`).join("");
       for (const img of list.querySelectorAll("img.pb-lthumb")) img.onerror = () => img.classList.add("none");
       list.querySelector("[data-up]")?.addEventListener("click", () => { dir = dir.split("/").slice(0, -1).join("/"); showAll = false; load(); });
@@ -83,6 +83,12 @@ PB.panel("files", {
         const old = b.dataset.ren, name = prompt("New name:", old);
         if (!name || name === old || name.includes("/")) return;
         try { await PB.rpc("server.files.move", { source: `${root}/${full(old)}`, dest: `${root}/${full(name)}` }); load(); } catch (e) { toast(e.message); }
+      };
+      for (const b of list.querySelectorAll("[data-dup]")) b.onclick = async () => {
+        const old = b.dataset.dup, dot = old.lastIndexOf("."), def = dot > 0 ? `${old.slice(0, dot)}_copy${old.slice(dot)}` : `${old}_copy`;
+        const name = prompt("Name of the copy:", def);
+        if (!name || name === old || name.includes("/")) return;
+        try { await PB.rpc("server.files.copy", { source: `${root}/${full(old)}`, dest: `${root}/${full(name)}` }); toast(`Copied to ${name}`); load(); } catch (e) { toast(e.message); }
       };
       for (const b of list.querySelectorAll("[data-del]")) b.onclick = async () => {
         if (!confirm(`Delete ${b.dataset.del}?`)) return;
@@ -104,8 +110,14 @@ PB.panel("files", {
       try { await PB.rpc("server.files.post_directory", { path: `${root}/${full(name)}` }); load(); } catch (e) { toast(e.message); }
     };
     more.onclick = () => { showAll = true; draw(); };
-    q("input[type=file]").onchange = async e => {
-      const picked = [...e.target.files], id = pageId, start = q(".pb-chk input").checked && picked.length === 1; e.target.value = "";
+    q("input[type=file]").onchange = e => {
+      const picked = [...e.target.files], start = q(".pb-chk input").checked && picked.length === 1; e.target.value = "";
+      uploadAll(picked, start, dir);
+    };
+    // drag & drop anywhere on the printer page (extras.js) lands here: into the G-code folder that's open in this panel
+    PB.uploadFiles = picked => uploadAll(picked, false, root === "gcodes" ? dir : "");
+    async function uploadAll(picked, start, dir) {
+      const id = pageId;
       for (const [n, file] of picked.entries()) {
         if (id !== pageId) return;
         await new Promise(done => {
@@ -123,7 +135,7 @@ PB.panel("files", {
         });
       }
       if (id === pageId) load();
-    };
+    }
     return {
       open() { files = []; dirs = []; dir = ""; loaded = false; showAll = false; list.innerHTML = ""; msg.textContent = ""; },
       shown() { if (!loaded) load(); },
