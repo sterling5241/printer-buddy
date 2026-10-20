@@ -1,6 +1,6 @@
 // History panel: totals, then past prints with thumbnails, result, time, filament and Reprint.
 PB.panel("history", {
-  title: "History", cls: "adv",
+  title: "History", desc: "Past prints, totals and reprint", cls: "adv",
   icon: PB.icon('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 3"/>'),
   settings: [
     { k: "thumbs", label: "Show thumbnails", type: "check", def: true },

@@ -1,6 +1,6 @@
 // Extruder panel: tool switch, extrude / retract, load / unload, flow %, pressure advance, firmware retraction.
 PB.panel("extruder", {
-  title: "Extruder", cls: "adv",
+  title: "Extruder", desc: "Extrude, retract, load, flow and pressure advance", cls: "adv",
   icon: PB.icon('<path d="M8 3h8v6l-2 3h-4L8 9z"/><path d="M11 12v4l1 3 1-3v-4"/>'),
   create(host) {
     host.innerHTML = `<div class="pb-row pb-tools-t" hidden></div>

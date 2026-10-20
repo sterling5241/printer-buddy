@@ -1,6 +1,6 @@
 // Macros panel: every macro on the printer as a button (Klipper's _HIDDEN ones skipped); hide the ones you don't use.
 PB.panel("macros", {
-  title: "Macros", cls: "adv",
+  title: "Macros", desc: "Your printer's macros as buttons", cls: "adv",
   icon: PB.icon('<path d="M13 2L3 14h9l-1 8 10-12h-9z"/>'),
   create(host) {
     host.innerHTML = `<div class="pb-macs"><span class="pb-muted">Loading…</span></div>

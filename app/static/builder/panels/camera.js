@@ -1,6 +1,6 @@
 // Camera panel: the page's own camera box (live stream, camera switcher, grid, full screen all keep working).
 PB.panel("camera", {
-  title: "Camera", single: true, flush: true,
+  title: "Camera", desc: "Live camera with grid and full screen", single: true, flush: true,
   settings: [
     { k: "cam", label: "Camera", type: "select", def: "main", options: [["main", "Main camera"], [0, "Camera 1"], [1, "Camera 2"], [2, "Camera 3"], [3, "Camera 4"], ["grid", "All (grid)"]] },
     { k: "aspect", label: "Shape", type: "select", def: "16/9", options: [["16/9", "16:9"], ["4/3", "4:3"], ["1/1", "Square"]] },

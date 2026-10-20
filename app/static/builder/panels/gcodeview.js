@@ -1,6 +1,6 @@
 // G-code preview panel: a top-down layer view of the print file, following the live print position.
 PB.panel("gcodeview", {
-  title: "G-code preview", cls: "adv",
+  title: "G-code preview", desc: "Top-down layer view that follows the print", cls: "adv",
   icon: PB.icon('<path d="M4 7l8-4 8 4-8 4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/>'),
   settings: [
     { k: "travel", label: "Show travel moves", type: "check", def: false },

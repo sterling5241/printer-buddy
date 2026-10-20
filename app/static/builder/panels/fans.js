@@ -1,6 +1,6 @@
 // Fans & outputs panel: fan speeds, output pins, LED colours, and Moonraker power devices (smart plugs etc).
 PB.panel("fans", {
-  title: "Fans & outputs", cls: "adv",
+  title: "Fans & outputs", desc: "Fan speeds, pins, LEDs and power devices", cls: "adv",
   icon: PB.icon('<circle cx="12" cy="12" r="2"/><path d="M12 10c0-4 1-7 4-7 2 0 2 3 0 5M14 12c4 0 7 1 7 4 0 2-3 2-5 0M12 14c0 4-1 7-4 7-2 0-2-3 0-5M10 12c-4 0-7-1-7-4 0-2 3-2 5 0"/>'),
   settings: [{ k: "power", label: "Show power devices", type: "check", def: true }],
   create(host, cfg) {

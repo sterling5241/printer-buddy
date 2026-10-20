@@ -1,6 +1,6 @@
 // Queue panel: Moonraker's job queue - prints lined up to run one after another. Add files from the Files panel (+ Queue).
 PB.panel("queue", {
-  title: "Queue", cls: "adv",
+  title: "Queue", desc: "Line up prints to run one after another", cls: "adv",
   icon: PB.icon('<path d="M4 6h16M4 12h16M4 18h10"/><path d="M18 16l3 2-3 2z"/>'),
   settings: [{ k: "thumbs", label: "Show thumbnails", type: "check", def: true }],
   create(host, cfg) {

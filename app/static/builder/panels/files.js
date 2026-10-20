@@ -1,7 +1,7 @@
 // Files panel: G-code / config / log files with folders, details (print time, filament, layer height), thumbnails,
 // search, sort, multi-upload, print, queue, rename, download, delete.
 PB.panel("files", {
-  title: "Files", cls: "adv",
+  title: "Files", desc: "G-code, config and log files with folders", cls: "adv",
   icon: PB.icon('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>'),
   settings: [
     { k: "thumbs", label: "Show thumbnails", type: "check", def: true },

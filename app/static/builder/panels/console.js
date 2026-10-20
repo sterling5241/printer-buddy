@@ -1,6 +1,6 @@
 // Console panel: Klipper's replies and your commands, with a G-code input under it.
 PB.panel("console", {
-  title: "Console", cls: "adv", flush: true,
+  title: "Console", desc: "Klipper replies and a G-code input", cls: "adv", flush: true,
   icon: PB.icon('<path d="M4 17l6-5-6-5M12 19h8"/>'),
   settings: [{ k: "height", label: "Height", type: "select", def: 180, options: [[120, "Small"], [180, "Medium"], [320, "Tall"]] }],
   create(host, cfg) {

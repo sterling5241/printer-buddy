@@ -1,6 +1,6 @@
 // Machine panel: host load / temperature / memory / disk, restart Klipper / Moonraker, reboot or shut down, logs.
 PB.panel("machine", {
-  title: "Machine", cls: "adv",
+  title: "Machine", desc: "Host load, restarts, reboot and logs", cls: "adv",
   icon: PB.icon('<rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'),
   create(host) {
     host.innerHTML = `<dl class="pb-kv pb-mach"></dl>

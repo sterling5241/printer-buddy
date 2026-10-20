@@ -1,6 +1,6 @@
 // Toolhead panel: position, home, jog with a step size, and live print speed (M220).
 PB.panel("toolhead", {
-  title: "Toolhead", cls: "adv",
+  title: "Toolhead", desc: "Position, home, jog and print speed", cls: "adv",
   icon: PB.icon('<path d="M12 2v20M2 12h20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"/>'),
   settings: [
     { k: "jog", label: "Show home + jog buttons", type: "check", def: true },

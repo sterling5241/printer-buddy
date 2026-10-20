@@ -1,6 +1,6 @@
 // Bed mesh panel: the mesh as a colour map (ECharts heatmap), range, profiles (load / save / remove), calibrate, clear.
 PB.panel("bedmesh", {
-  title: "Bed mesh", cls: "adv",
+  title: "Bed mesh", desc: "Bed mesh map, profiles and calibrate", cls: "adv",
   icon: PB.icon('<path d="M3 17l9 4 9-4M3 12l9 4 9-4M3 7l9 4 9-4-9-4z"/>'),
   settings: [{ k: "probed", label: "Show the probed points (not the smoothed mesh)", type: "check", def: false }],
   create(host, cfg) {

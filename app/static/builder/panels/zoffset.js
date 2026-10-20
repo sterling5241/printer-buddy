@@ -1,6 +1,6 @@
 // Z offset panel: babystep Z up / down (also mid-print), reset, and save it to the config.
 PB.panel("zoffset", {
-  title: "Z offset", cls: "adv",
+  title: "Z offset", desc: "Babystep Z up / down and save it", cls: "adv",
   icon: PB.icon('<path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/><path d="M3 12h4M17 12h4"/>'),
   create(host) {
     host.innerHTML = `<div class="pb-big"><span>Z offset</span><b>0.000</b><small>mm</small></div>

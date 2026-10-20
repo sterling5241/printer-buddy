@@ -1,6 +1,6 @@
 // Spoolman panel: the active filament spool (colour, material, what's left) and switching spools. Needs [spoolman] in moonraker.conf.
 PB.panel("spoolman", {
-  title: "Spools", cls: "adv",
+  title: "Spools", desc: "Active filament spool (Spoolman)", cls: "adv",
   icon: PB.icon('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6"/>'),
   create(host) {
     host.innerHTML = `<div class="pb-tool"><span class="pb-msg pb-muted"></span><span class="bd-sp"></span><button type="button" data-a="ref" aria-label="Refresh">↻</button></div>

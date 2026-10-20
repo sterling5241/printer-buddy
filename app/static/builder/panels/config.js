@@ -1,6 +1,6 @@
 // Config editor panel: edit printer.cfg, moonraker.conf and the rest; Save, or Save & restart.
 PB.panel("config", {
-  title: "Config editor", cls: "adv",
+  title: "Config editor", desc: "Edit printer.cfg and other config files", cls: "adv",
   icon: PB.icon('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>'),
   settings: [{ k: "height", label: "Editor height", type: "select", def: 420, options: [[280, "Small"], [420, "Medium"], [640, "Tall"]] }],
   create(host, cfg) {
