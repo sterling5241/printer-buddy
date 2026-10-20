@@ -25,12 +25,12 @@ cd printer-buddy && ./update.sh     # git pull + restart
 ```
 
 Logs: `journalctl -u printer-buddy -f`.
-Docker is still supported if you want it: `docker compose up -d --build`.
+Docker is still supported if you want it: `docker compose -f docker/docker-compose.yml up -d --build`.
 
 ## AI failure detection
 
 Printer Buddy's own model scores camera snapshots for spaghetti, warping, first-layer problems,
-stringing, blobs and cracks. See **[AI.md](AI.md)** for how it works, test results, limits and
+stringing, blobs and cracks. See **[docs/AI.md](docs/AI.md)** for how it works, test results, limits and
 dataset credits. Models: [releases tagged `ai-`](https://github.com/sterling5241/printer-buddy/releases?q=ai-&expanded=true).
 
 ## How it works
@@ -66,15 +66,17 @@ For mDNS discovery, enable `[zeroconf]` in `moonraker.conf`; the subnet sweep wo
 ## Layout
 
 ```
-app/net.py         stdlib async HTTP GET + WebSocket client (no heavy deps, Pi-friendly)
-app/discovery.py   mDNS + subnet sweep + /server/info probe (lists only, never subscribes)
-app/moonraker.py   per-printer JSON-RPC client: identify, subscribe, reconnect, state merge
-app/manager.py     selected printers, event detection, fan-out to the UI
-app/store.py       SQLite
-app/notify.py      ntfy / Discord
-app/main.py        HTTP API + SSE
-app/static/        web UI
+app/main.py              HTTP API + SSE
+app/core/                SQLite store, stdlib async HTTP + WebSocket client, ntfy / Discord alerts
+app/printers/            Moonraker client, printer manager (events, fan-out), mDNS + subnet discovery
+app/ai/                  failure detection, photo collection, model downloads
+app/media/               timelapse recording
+ui/                      web UI (served at /static/): core/ builder, panels/ one folder per panel
+docs/                    AI.md
+docker/                  Dockerfile + docker-compose.yml
+relay/                   Cloudflare worker (share links + news)
 ```
+Each folder has a README.txt saying what's in it.
 
 ## API
 

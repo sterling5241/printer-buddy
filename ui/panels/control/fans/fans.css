@@ -1,0 +1,6 @@
+/* fans panel */
+.pb-lab { min-width: 92px; color: var(--text); font-size: 13px; }
+.pb-bar { flex: 1; height: 6px; background: var(--bd-hover); border-radius: 3px; overflow: hidden; }
+.pb-bar i { display: block; height: 100%; width: 0; background: #8f8b99; }
+.pb-fxrow { display: flex; flex-wrap: wrap; gap: 6px; }
+:is(#page, #home).bd .pb-fxrow button[aria-pressed="true"] { color: var(--orange); border-color: var(--orange); }

@@ -259,7 +259,7 @@ ensure_ai() {   # AI detection = basic: libraries + newest model from this repo'
   "$DIR/.venv/bin/pip" install -r "$DIR/requirements-ai.txt" -q \
     || { echo "Couldn't install the AI libraries. Skipping AI; everything else works."; return 0; }
   mkdir -p "$DIR/data/ai"
-  "$DIR/.venv/bin/python" "$DIR/app/model_download.py" --dir "$DIR/data/ai" \
+  "$DIR/.venv/bin/python" "$DIR/app/ai/model_download.py" --dir "$DIR/data/ai" \
     || echo "No AI model yet. AI stays off until one downloads (try 3) Update later)."
   return 0
 }

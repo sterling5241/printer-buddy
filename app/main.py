@@ -17,17 +17,17 @@ from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, R
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import discovery
-from .manager import Manager
-from .net import get_json, http_get, http_stream
-from .notify import ALL_EVENTS, PROGRESS_STEPS, SERVICES, Notifier, advanced as notify_advanced
-from .store import Store
-from . import timelapse as tl
-from .timelapse import Timelapse
-from . import ai as ai_mod
-from .ai import AI
-from . import collect as collect_mod
-from .collect import Collector
+from .printers import discovery
+from .printers.manager import Manager
+from .core.net import get_json, http_get, http_stream
+from .core.notify import ALL_EVENTS, PROGRESS_STEPS, SERVICES, Notifier, advanced as notify_advanced
+from .core.store import Store
+from .media import timelapse as tl
+from .media.timelapse import Timelapse
+from .ai import detector as ai_mod
+from .ai.detector import AI
+from .ai import collect as collect_mod
+from .ai.collect import Collector
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -41,11 +41,11 @@ class _QuietShutdown(logging.Filter):
 
 
 logging.getLogger("uvicorn.error").addFilter(_QuietShutdown())
-STATIC = Path(__file__).parent / "static"
+STATIC = Path(__file__).resolve().parent.parent / "ui"   # the web app (served at /static/)
 
 store = Store(os.getenv("DB_PATH", "data/monitor.db"))
 manager = Manager(store, Notifier(store))
-from . import moonraker as _mr   # noqa: E402
+from .printers import moonraker as _mr   # noqa: E402
 _mr.ETA_MODE = store.settings().get("eta_mode", "file") if store.settings().get("eta_mode") in ("file", "slicer", "filament") else "file"
 manager.timelapse = Timelapse(store, os.path.dirname(os.path.abspath(os.getenv("DB_PATH", "data/monitor.db"))),
                               manager.snapshot, manager.cam_transform)
@@ -79,8 +79,8 @@ async def manifest(request: Request):
     return JSONResponse({
         "name": "Printer Buddy", "short_name": "Printer Buddy", "start_url": "/", "scope": "/", "display": "standalone",
         "background_color": "#0B0B0D", "theme_color": "#0B0B0D",
-        "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
-                  {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}],
+        "icons": [{"src": "/static/assets/icon-192.png", "sizes": "192x192", "type": "image/png"},
+                  {"src": "/static/assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}],
     }, media_type="application/manifest+json")
 
 

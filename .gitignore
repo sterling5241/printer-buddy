@@ -5,3 +5,4 @@ data/
 .venv/
 printer-buddy.env
 backups/
+Claude outputs/
