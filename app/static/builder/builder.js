@@ -20,7 +20,19 @@
   const head = page.querySelector(".pg-head");
   const top = el("div", "bd-top"), actions = el("div", "bd-actions");
   const editBtn = el("button", "adv bd-ghost", "Edit layout"); editBtn.type = "button";
-  actions.append(editBtn, $("#pgPause"), $("#pgCancel"), $("#pgStop"));
+  // theme: auto (follow the computer) -> light -> dark, remembered in this browser
+  const themeBtn = el("button", "bd-theme"); themeBtn.type = "button";
+  const THEMES = ["auto", "light", "dark"], dark = matchMedia("(prefers-color-scheme: dark)");
+  const applyTheme = () => {
+    const t = PB.store.get("pb-theme", "auto");
+    document.documentElement.dataset.theme = t === "auto" ? (dark.matches ? "dark" : "light") : t;
+    themeBtn.textContent = t === "auto" ? "◐" : t === "light" ? "☀" : "☾";
+    themeBtn.title = `Theme: ${t} (click to change)`;
+  };
+  themeBtn.onclick = () => { const t = PB.store.get("pb-theme", "auto"); PB.store.set("pb-theme", THEMES[(THEMES.indexOf(t) + 1) % 3]); applyTheme(); };
+  dark.addEventListener("change", applyTheme);
+  applyTheme();
+  actions.append(themeBtn, editBtn, $("#pgPause"), $("#pgCancel"), $("#pgStop"));
   top.append(head.querySelector(".pg-back"), $("#pgName"), $("#pgTag"), el("span", "bd-sp"), actions);
   head.replaceWith(top);
   page.querySelector(".pg-tabs").hidden = true;
@@ -254,6 +266,11 @@
   }
   editBtn.onclick = () => { page.classList.toggle("bd-editing"); build(); };
   phone.addEventListener("change", build);
+  main.addEventListener("pb-reveal", e => {   // a panel asked to be shown (e.g. Files -> Edit opens the config editor's tab)
+    const sec = e.target.closest(".bd-tab"), i = [...main.children].indexOf(sec);
+    if (i >= 0 && layout.tabs[i] && layout.tabs[i].id !== active) showTab(layout.tabs[i].id);
+    e.target.closest(".pb-card")?.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
   PB.onRoute(p => { if (p) PB.shown(insts.get(tabOf().id) || []); });
 
   build();

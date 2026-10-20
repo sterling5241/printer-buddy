@@ -93,6 +93,15 @@ window.PB = (() => {
     pdlg.showModal();
   }
 
-  return { defs, panel, mount, settings, printFile, thumbUrl, unmount, shown, el, icon, store, current, take, park: n => n && parking.append(n),
+  // call an allowed Moonraker method for the open printer (see RPC_ALLOW in main.py)
+  const rpc = async (method, params) => {
+    if (pageId === null) throw new Error("no printer open");
+    return (await api(`/api/printers/${pageId}/rpc`, { method: "POST", body: JSON.stringify({ method, params }) })).result;
+  };
+  const fileUrl = (root, path, download) => `/api/printers/${pageId}/file?root=${root}&path=${encodeURIComponent(path)}${download ? "&download=1" : ""}`;
+  const reveal = host => host.dispatchEvent(new CustomEvent("pb-reveal", { bubbles: true }));   // builder switches to its tab
+  const confirmGcode = (text, script, done) => { if (confirm(text)) { gcode(script); if (done) toast(done); } };
+
+  return { defs, panel, mount, settings, printFile, thumbUrl, rpc, fileUrl, confirmGcode, reveal, unmount, shown, el, icon, store, current, take, park: n => n && parking.append(n),
            onRoute: f => routeHooks.push(f) };
 })();

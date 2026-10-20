@@ -71,6 +71,27 @@ def _pid(request: Request) -> int | None:
 
 
 # ---- pages -------------------------------------------------------------------
+async def manifest(request: Request):
+    """Lets phones and computers install Printer Buddy as an app ("Add to home screen" / "Install")."""
+    return JSONResponse({
+        "name": "Printer Buddy", "short_name": "Printer Buddy", "start_url": "/", "scope": "/", "display": "standalone",
+        "background_color": "#0B0B0D", "theme_color": "#0B0B0D",
+        "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+                  {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}],
+    }, media_type="application/manifest+json")
+
+
+SW = """// Printer Buddy service worker: only here so it can be installed as an app. Everything always comes from the network.
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
+self.addEventListener("fetch", () => {});
+"""
+
+
+async def service_worker(request: Request):
+    return Response(SW, media_type="text/javascript", headers={"Cache-Control": "no-cache"})
+
+
 async def index(request: Request):
     # no-cache: the browser always checks for a newer page after an update
     return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
@@ -622,6 +643,93 @@ async def job_queue(request: Request):
         return err(text, 502)
 
 
+# Moonraker methods the dashboard panels may call directly (LAN only: the tunnel only reaches /share/).
+# method -> timeout in seconds. Updates can take many minutes.
+RPC_ALLOW = {
+    "server.files.get_directory": 20, "server.files.list": 20, "server.files.move": 30, "server.files.copy": 60, "server.files.post_directory": 15,
+    "server.files.delete_directory": 30, "server.files.delete_file": 15, "server.files.metadata": 15,
+    "machine.proc_stats": 10, "machine.system_info": 10, "machine.services.restart": 30, "machine.services.stop": 30,
+    "machine.services.start": 30, "machine.reboot": 15, "machine.shutdown": 15,
+    "printer.restart": 15, "printer.firmware_restart": 15, "printer.gcode.help": 15, "printer.objects.query": 15,
+    "machine.update.status": 60, "machine.update.refresh": 300, "machine.update.upgrade": 1800, "machine.update.full": 3600,
+    "machine.update.client": 1800, "machine.update.klipper": 1800, "machine.update.moonraker": 1800,
+    "machine.update.system": 3600, "machine.update.recover": 1800,
+    "machine.device_power.devices": 15, "machine.device_power.post_device": 30,
+    "server.spoolman.status": 15, "server.spoolman.get_spool_id": 15, "server.spoolman.post_spool_id": 15,
+    "server.spoolman.proxy": 20,
+}
+
+
+async def rpc(request: Request):
+    """POST {method, params}: one of the allowed Moonraker methods above, for the dashboard panels."""
+    client, e = _online_client(request)
+    if e:
+        return e
+    b = await body(request)
+    method, params = b.get("method"), b.get("params")
+    if method not in RPC_ALLOW:
+        return err("method not allowed", 403)
+    if params is not None and not isinstance(params, dict):
+        return err("params must be an object")
+    try:
+        return JSONResponse({"result": await client.rpc(method, params, timeout=RPC_ALLOW[method])})
+    except Exception as ex:
+        text = str(ex) or type(ex).__name__
+        return err(text, 404 if "not found" in text.lower() else 502)
+
+
+FILE_ROOTS = ("gcodes", "config", "logs")
+
+
+def _root_path(request: Request):
+    root, path = request.query_params.get("root", "gcodes"), request.query_params.get("path", "").strip().lstrip("/")
+    if root not in FILE_ROOTS or not path or ".." in path.split("/"):
+        return None, None
+    return root, path
+
+
+async def printer_file(request: Request):
+    """GET: stream a file (G-code preview, config editor, log download). PUT: save a config file (the editor)."""
+    client, e = _online_client(request)
+    if e:
+        return e
+    root, path = _root_path(request)
+    if not root:
+        return err("bad root or path")
+    if request.method == "PUT":
+        if root != "config":
+            return err("only config files can be saved here")
+        data = await request.body()
+        if len(data) > 5_000_000:
+            return err("file is too big", 413)
+        folder, _, name = path.rpartition("/")
+        try:
+            await client.upload(name, data, root="config", folder=folder)
+        except Exception as ex:
+            return err(str(ex) or type(ex).__name__, 502)
+        return JSONResponse({"ok": True})
+    try:
+        upstream = await client.read_file(root, path)
+    except Exception as ex:
+        return err(str(ex) or type(ex).__name__, 502)
+    if upstream.status != 200:
+        upstream.close()
+        return err(f"Moonraker said HTTP {upstream.status}", 404 if upstream.status == 404 else 502)
+
+    async def relay():
+        try:
+            async for chunk in upstream.chunks():
+                yield chunk
+        finally:
+            upstream.close()
+    name = path.rsplit("/", 1)[-1].replace('"', "")
+    headers = {"Cache-Control": "no-store"}
+    if request.query_params.get("download") == "1":
+        headers["Content-Disposition"] = f'attachment; filename="{name}"'
+    ctype = "text/plain; charset=utf-8" if root != "gcodes" or request.query_params.get("download") != "1" else "application/octet-stream"
+    return StreamingResponse(relay(), media_type=ctype, headers=headers)
+
+
 async def delete_file(request: Request):
     client, e = _online_client(request)
     if e:
@@ -651,7 +759,10 @@ async def upload_file(request: Request):
     if not data:
         return err("the file is empty")
     try:
-        await client.upload(name, bytes(data), start=request.query_params.get("print") == "1")
+        folder = request.query_params.get("dir", "").strip().strip("/")
+        if ".." in folder.split("/"):
+            return err("bad folder")
+        await client.upload(name, bytes(data), start=request.query_params.get("print") == "1", folder=folder)
     except Exception as ex:
         return err(str(ex) or type(ex).__name__, 502)
     return JSONResponse({"ok": True, "name": name})
@@ -839,6 +950,8 @@ class TunnelGuard:
 
 _app = Starlette(routes=[
     Route("/", index),
+    Route("/manifest.webmanifest", manifest),
+    Route("/sw.js", service_worker),
     Route("/healthz", health),
     Route("/api/config", get_config),
     Route("/api/scan", scan, methods=["POST"]),
@@ -882,6 +995,8 @@ _app = Starlette(routes=[
     Route("/api/printers/{pid:int}/files", delete_file, methods=["DELETE"]),
     Route("/api/printers/{pid:int}/files/print", print_file, methods=["POST"]),
     Route("/api/printers/{pid:int}/queue", job_queue, methods=["GET", "POST"]),
+    Route("/api/printers/{pid:int}/rpc", rpc, methods=["POST"]),
+    Route("/api/printers/{pid:int}/file", printer_file, methods=["GET", "PUT"]),
     Route("/api/printers/{pid:int}/files/upload", upload_file, methods=["POST"]),
     Route("/api/printers/{pid:int}/{action}", printer_action, methods=["POST"]),
     Route("/api/events", events),

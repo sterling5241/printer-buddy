@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Printer Buddy</title>
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0B0B0D">
+<link rel="icon" href="/static/icon-192.png"><link rel="apple-touch-icon" href="/static/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
@@ -1661,6 +1663,19 @@ render();
 <script src="/static/builder/panels/timelapse.js"></script>
 <script src="/static/builder/panels/exclude.js"></script>
 <script src="/static/builder/panels/queue.js"></script>
+<script src="/static/builder/panels/zoffset.js"></script>
+<script src="/static/builder/panels/extruder.js"></script>
+<script src="/static/builder/panels/fans.js"></script>
+<script src="/static/builder/panels/limits.js"></script>
+<script src="/static/builder/panels/fsensors.js"></script>
+<script src="/static/builder/panels/config.js"></script>
+<script src="/static/builder/panels/machine.js"></script>
+<script src="/static/builder/panels/updates.js"></script>
+<script src="/static/builder/panels/bedmesh.js"></script>
+<script src="/static/builder/panels/actions.js"></script>
+<script src="/static/builder/panels/gcodeview.js"></script>
+<script src="/static/builder/panels/spoolman.js"></script>
 <script src="/static/builder/builder.js"></script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script>
 </body>
 </html>

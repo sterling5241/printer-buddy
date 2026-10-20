@@ -56,8 +56,8 @@ PB.panel("exclude", {
       open() { key = null; },
       update(p) {
         printing = p.state === "printing" || p.state === "paused";
-        const o = p.objects, k = JSON.stringify([o?.list?.map(x => x.name), o?.excluded, o?.current, printing, p.bed]);
-        if (k !== key) { key = k; draw(o, p.bed); }
+        const o = p.objects, k = JSON.stringify([o?.list?.map(x => x.name), o?.excluded, o?.current, printing, p.bed_area]);
+        if (k !== key) { key = k; draw(o, p.bed_area); }
       },
     };
   },

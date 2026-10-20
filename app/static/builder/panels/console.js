@@ -6,6 +6,14 @@ PB.panel("console", {
   create(host, cfg) {
     host.innerHTML = `<div class="pb-log" role="log" aria-label="Klipper console"></div>
       <form class="pb-cin"><input autocomplete="off" spellcheck="false" aria-label="G-code command" placeholder="Send G-code…"><button>Send</button></form>`;
+    const dl = PB.el("datalist"); dl.id = "pb-cmds-" + Math.random().toString(36).slice(2, 7); host.append(dl);
+    host.querySelector("input").setAttribute("list", dl.id);
+    async function commands(id) {   // autocomplete: every G-code command Klipper knows (incl. macros), with its help text
+      try {
+        const help = await PB.rpc("printer.gcode.help");
+        if (id === pageId) dl.innerHTML = Object.entries(help || {}).sort().map(([c, d]) => `<option value="${esc(c)}">${esc(d || "")}</option>`).join("");
+      } catch {}
+    }
     const logEl = host.querySelector(".pb-log"), input = host.querySelector("input");
     logEl.style.height = `${cfg.height}px`;
     function draw() {
@@ -16,7 +24,7 @@ PB.panel("console", {
     }
     host.querySelector("form").onsubmit = e => { e.preventDefault(); const v = input.value; input.value = ""; if (v.trim()) conSend(v); };
     return {
-      open: draw, shown: draw, log: draw,
+      open(id) { draw(); commands(id); }, shown: draw, log: draw,
       update(p) { const on = p.connection === "online"; input.disabled = !on; host.querySelector("form button").disabled = !on; },
     };
   },

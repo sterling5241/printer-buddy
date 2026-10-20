@@ -10,26 +10,31 @@ from typing import Callable
 
 import uuid
 
-from .net import HandshakeError, WebSocket, get_json, http_get, http_post
+from .net import HandshakeError, WebSocket, get_json, http_get, http_post, http_stream
 
 log = logging.getLogger(__name__)
 VERSION = "0.1.0"
 
 SUBSCRIBE = {
     "print_stats": None,
-    "extruder": ["temperature", "target"],
-    "heater_bed": ["temperature", "target"],
+    "extruder": ["temperature", "target", "power", "pressure_advance", "smooth_time", "can_extrude"],
+    "heater_bed": ["temperature", "target", "power"],
     "display_status": ["progress", "message"],
-    "virtual_sdcard": ["progress", "is_active"],
+    "virtual_sdcard": ["progress", "is_active", "file_position", "file_size"],
     "webhooks": ["state", "state_message"],
-    "gcode_move": ["speed_factor", "extrude_factor"],
-    "toolhead": ["homed_axes", "position", "axis_minimum", "axis_maximum"],
+    "gcode_move": ["speed_factor", "extrude_factor", "homing_origin"],
+    "toolhead": ["homed_axes", "position", "axis_minimum", "axis_maximum", "extruder",
+                 "max_velocity", "max_accel", "square_corner_velocity", "minimum_cruise_ratio", "max_accel_to_decel"],
 }
 
 # Extra Klipper objects shown on the printer dashboard (found per printer on connect).
 SENSOR_PREFIXES = ("temperature_sensor ", "temperature_fan ", "heater_generic ")
 FAN_PREFIXES = ("heater_fan ", "controller_fan ", "fan_generic ")
 EXTRA_HEATERS = ("extruder1", "extruder2", "extruder3")
+OUTPUT_PREFIXES = ("output_pin ", "led ", "neopixel ", "dotstar ", "pca9533 ", "pca9632 ")
+FSENSOR_PREFIXES = ("filament_switch_sensor ", "filament_motion_sensor ")
+FEATURES = ("quad_gantry_level", "z_tilt", "bed_mesh", "exclude_object", "firmware_retraction", "probe", "bltouch",
+            "safe_z_home", "screws_tilt_adjust")
 
 
 def _pretty(obj: str) -> str:
@@ -252,6 +257,15 @@ class MoonrakerClient:
             objects[n] = None
         if "exclude_object" in names:            # slicer-labelled objects in the print (skip one mid-print)
             objects["exclude_object"] = None
+        self.outputs = [n for n in names if n.startswith(OUTPUT_PREFIXES)]
+        self.fsensors = [n for n in names if n.startswith(FSENSOR_PREFIXES)]
+        self.features = {f: f in names for f in FEATURES}
+        self.extruders = sorted(n for n in names if n == "extruder" or (n.startswith("extruder") and n[8:].isdigit()))
+        for n in self.outputs + self.fsensors:
+            objects[n] = None
+        for n in ("bed_mesh", "firmware_retraction", "quad_gantry_level", "z_tilt"):
+            if n in names:
+                objects[n] = ["profile_name", "profiles"] if n == "bed_mesh" else None
         await self._load_macros([n[len("gcode_macro "):] for n in names if n.startswith("gcode_macro ")])
         res = await self._call("printer.objects.subscribe", {"objects": objects})
         self.status = (res or {}).get("status", {})
@@ -308,10 +322,10 @@ class MoonrakerClient:
     async def delete_file(self, path: str):
         return await self._call("server.files.delete_file", {"path": f"gcodes/{path}"})
 
-    async def upload(self, filename: str, data: bytes, start: bool = False):
-        """Upload a G-code file to the printer's gcodes folder (Moonraker HTTP upload)."""
+    async def upload(self, filename: str, data: bytes, start: bool = False, root: str = "gcodes", folder: str = ""):
+        """Upload a file to one of the printer's folders (Moonraker HTTP upload): G-code, or a config file from the editor."""
         boundary = uuid.uuid4().hex
-        parts = [("root", "gcodes")] + ([("print", "true")] if start else [])
+        parts = [("root", root)] + ([("path", folder)] if folder else []) + ([("print", "true")] if start else [])
         body = b"".join(
             f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode() for k, v in parts)
         body += (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{filename}"\r\n'
@@ -471,8 +485,45 @@ class MoonrakerClient:
             "sensors": self.sensors() if live else [],
             "macro_count": len(self.macros),
             "objects": self.print_objects() if live else None,
-            "bed": self.bed_area(),
+            "file_position": vs.get("file_position"),
+            "z_offset": ((s.get("gcode_move", {}).get("homing_origin") or [0, 0, 0])[2:3] or [None])[0],
+            "pa": {k: s.get("extruder", {}).get(k) for k in ("pressure_advance", "smooth_time")},
+            "can_extrude": s.get("extruder", {}).get("can_extrude"),
+            "active_extruder": s.get("toolhead", {}).get("extruder"),
+            "extruders": getattr(self, "extruders", []),
+            "limits": {k: s.get("toolhead", {}).get(k) for k in
+                       ("max_velocity", "max_accel", "square_corner_velocity", "minimum_cruise_ratio", "max_accel_to_decel")},
+            "outputs": self.output_view() if live else [],
+            "fsensors": [{"id": n, "name": _pretty(n), "enabled": s.get(n, {}).get("enabled"),
+                          "detected": s.get(n, {}).get("filament_detected")} for n in getattr(self, "fsensors", [])] if live else [],
+            "features": getattr(self, "features", {}),
+            "mesh": {"profile": s.get("bed_mesh", {}).get("profile_name"),
+                     "profiles": sorted((s.get("bed_mesh", {}).get("profiles") or {}).keys())} if "bed_mesh" in s else None,
+            "retraction": s.get("firmware_retraction"),
+            "leveled": {k: s.get(k, {}).get("applied") for k in ("quad_gantry_level", "z_tilt") if k in s},
+            "bed_area": self.bed_area(),
         }
+
+    def output_view(self) -> list[dict]:
+        """output_pin values (0-1) and LED colours, for the Fans & outputs panel."""
+        out = []
+        for n in getattr(self, "outputs", []):
+            st = self.status.get(n, {})
+            if n.startswith("output_pin "):
+                out.append({"id": n, "name": _pretty(n), "kind": "pin", "value": st.get("value")})
+            else:
+                c = (st.get("color_data") or [[0, 0, 0, 0]])[0]
+                out.append({"id": n, "name": _pretty(n), "kind": "led", "color": list(c)})
+        return out
+
+    async def rpc(self, method: str, params: dict | None = None, timeout: float = 15.0):
+        return await self._call(method, params, timeout=timeout)
+
+    async def read_file(self, root: str, path: str):
+        """Stream a file from Moonraker's file roots (gcodes / config / logs)."""
+        from urllib.parse import quote
+        url = f"http://{self.host}:{self.port}/server/files/{root}/{quote(path)}"
+        return await http_stream(url, {"X-Api-Key": self.api_key} if self.api_key else {}, timeout=15)
 
     def print_objects(self) -> dict | None:
         """Objects in the current print (Klipper exclude_object): outlines, which are skipped, which is printing now."""
