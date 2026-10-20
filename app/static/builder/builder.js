@@ -11,12 +11,18 @@
   const phone = matchMedia("(max-width: 760px)");   // phones: one column per tab, in the tab's own phone order
   const P = (tab, t, o) => ({ id: `${tab}-${t}`, t, o: o || {} });
 
-  // base layout of the printer page (Fluidd-style dashboard: controls left, temperatures / camera / console right)
-  const PAGE_DEFAULT = { v: 3, tabs: [
+  // base layout of the printer page: Dashboard follows Fluidd's default card order (left: status, spoolman, camera,
+  // toolhead, macros, outputs, runout sensors (off), limits; right: temperatures, console, jobs, queue (off), preview,
+  // bed mesh (off)). Hidden (h) = off by default, like Fluidd. Exclude + AI are ours, at the end of the right column.
+  const H = (tab, t, o) => ({ ...P(tab, t, o), h: true });
+  const PAGE_DEFAULT = { v: 4, tabs: [
     { id: "dash", name: "Dashboard", rows: [{ s: "1-1", cols: [
-        [P("dash", "status"), P("dash", "toolhead"), P("dash", "zoffset"), P("dash", "extruder"), P("dash", "macros"), P("dash", "fans"), P("dash", "limits")],
-        [P("dash", "thermals"), P("dash", "camera"), P("dash", "console"), P("dash", "exclude"), P("dash", "ai")]] }],
-      phone: ["status", "camera", "thermals", "toolhead", "zoffset", "extruder", "fans", "macros", "exclude", "ai", "console", "limits"].map(t => `dash-${t}`) },
+        [P("dash", "status"), P("dash", "spoolman"), P("dash", "camera"), P("dash", "toolhead"), P("dash", "zoffset"), P("dash", "extruder"),
+         P("dash", "macros"), P("dash", "fans"), H("dash", "fsensors"), P("dash", "limits")],
+        [P("dash", "thermals"), P("dash", "console"), P("dash", "files"), H("dash", "queue"), P("dash", "gcodeview"), H("dash", "bedmesh"),
+         P("dash", "exclude"), P("dash", "ai")]] }],
+      phone: ["status", "camera", "thermals", "toolhead", "zoffset", "extruder", "macros", "fans", "console", "files", "gcodeview",
+              "exclude", "ai", "spoolman", "limits", "fsensors", "queue", "bedmesh"].map(t => `dash-${t}`) },
     { id: "jobs", name: "Jobs", rows: [{ s: "2-1", cols: [[P("jobs", "files")], [P("jobs", "queue")]] },
                                       { s: "1", cols: [[P("jobs", "gcodeview")]] }] },
     { id: "history", name: "History", rows: [{ s: "1", cols: [[P("history", "history")]] }] },
