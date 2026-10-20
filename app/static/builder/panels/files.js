@@ -64,7 +64,8 @@ PB.panel("files", {
             <div class="pb-lmain"><div class="pb-lname">${esc(f.filename)}</div>
               <div class="pb-lsub">${[fmtSize(f.size), fmtDate(f.modified), ...(g ? meta(f) : [])].join(" · ")}</div></div>
             <div class="pb-lbtn">${g ? `<button type="button" class="pb-pri" data-print="${esc(f.filename)}"${busy ? " disabled" : ""}>Print</button>
-              <button type="button" data-queue="${esc(f.filename)}" title="Add to the job queue">+ Queue</button>` : ""}
+              <button type="button" data-queue="${esc(f.filename)}" title="Add to the job queue">+ Queue</button>
+              ${PB.previewFile ? `<button type="button" data-prev="${esc(f.filename)}" title="Preview the G-code">Preview</button>` : ""}` : ""}
               ${root === "config" && PB.openConfig ? `<button type="button" data-edit="${esc(f.filename)}">Edit</button>` : ""}
               <a class="pb-dl" href="${PB.fileUrl(root, full(f.filename), true)}" title="Download" aria-label="Download">⬇</a>
               ${root !== "logs" ? `<button type="button" data-ren="${esc(f.filename)}" title="Rename">✎</button><button type="button" data-del="${esc(f.filename)}" title="Delete">✕</button>` : ""}
@@ -77,6 +78,7 @@ PB.panel("files", {
         : api(`/api/printers/${pageId}/queue`, { method: "POST", body: JSON.stringify({ action: "add", filenames: [full(b.dataset.queue)] }) })
             .then(r => toast(`Queued ${b.dataset.queue} (${r.jobs.length} in the queue)`), e => toast(e.message));
       for (const b of list.querySelectorAll("[data-edit]")) b.onclick = () => PB.openConfig(full(b.dataset.edit));
+      for (const b of list.querySelectorAll("[data-prev]")) b.onclick = () => PB.previewFile(full(b.dataset.prev));
       for (const b of list.querySelectorAll("[data-ren]")) b.onclick = async () => {
         const old = b.dataset.ren, name = prompt("New name:", old);
         if (!name || name === old || name.includes("/")) return;

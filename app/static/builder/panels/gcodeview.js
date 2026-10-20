@@ -7,7 +7,8 @@ PB.panel("gcodeview", {
     { k: "height", label: "Height", type: "select", def: 320, options: [[220, "Small"], [320, "Medium"], [480, "Tall"]] },
   ],
   create(host, cfg) {
-    host.innerHTML = `<div class="pb-tool"><button type="button" data-a="load">Load current print</button>
+    host.innerHTML = `<div class="pb-tool"><select data-a="pick" aria-label="Preview a file"><option value="">Preview a file…</option></select>
+        <button type="button" data-a="load">Current print</button>
         <label class="pb-chk"><input type="checkbox" data-a="follow" checked> Follow print</label><span class="bd-sp"></span>
         <span class="pb-gmsg pb-muted"></span></div>
       <canvas class="pb-gcv"></canvas>
@@ -83,17 +84,29 @@ PB.panel("gcodeview", {
       let i = 0; while (i + 1 < layers.length && layers[i + 1].start <= pos) i++;
       if (i !== +range.value) setLayer(i); else draw();
     }
-    let cur = null;
-    q("[data-a=load]").onclick = () => load(cur);
+    let cur = null, manual = false, listed = false;
+    async function listFiles() {   // any G-code file on the printer, newest first
+      try {
+        const files = (await PB.rpc("server.files.list", { root: "gcodes" })) || [];
+        const sel = q("[data-a=pick]");
+        sel.innerHTML = `<option value="">Preview a file…</option>` + files.filter(f => /\.(gcode|gco|g)$/i.test(f.path || ""))
+          .sort((a, b) => (b.modified || 0) - (a.modified || 0)).slice(0, 300).map(f => `<option>${esc(f.path)}</option>`).join("");
+        listed = true;
+      } catch {}
+    }
+    const pick = name => { manual = true; q("[data-a=follow]").checked = false; load(name); };
+    q("[data-a=pick]").onchange = e => { if (e.target.value) pick(e.target.value); };
+    q("[data-a=load]").onclick = () => { manual = false; q("[data-a=follow]").checked = true; load(cur); };
+    PB.previewFile = name => { PB.reveal(host); pick(name); };   // Files panel: "Preview"
     range.oninput = () => { q("[data-a=follow]").checked = false; setLayer(+range.value); };
     new ResizeObserver(draw).observe(cv);
     return {
-      open() { layers = []; file = null; pos = null; gmsg.textContent = ""; out.textContent = "—"; range.max = 0; draw(); },
-      shown() { draw(); },
+      open() { layers = []; file = null; pos = null; manual = false; listed = false; gmsg.textContent = ""; out.textContent = "—"; range.max = 0; draw(); },
+      shown() { draw(); if (!listed) listFiles(); },
       update(p) {
         bed = p.bed_area; cur = (p.state === "printing" || p.state === "paused" || p.state === "complete") ? p.filename : null;
         q("[data-a=load]").disabled = !cur || loading;
-        if (cur && file !== cur && !loading && host.offsetParent && (p.state === "printing" || p.state === "paused")) load(cur);
+        if (!manual && cur && file !== cur && !loading && host.offsetParent && (p.state === "printing" || p.state === "paused")) load(cur);
         if (p.file_position !== pos) { pos = p.file_position; if (file === cur) follow(); }
       },
     };

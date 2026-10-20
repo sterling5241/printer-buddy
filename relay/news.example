@@ -1,0 +1,52 @@
+News for every Printer Buddy box: the bell (🔔) on the home page and the News panel.
+
+HOW IT WORKS
+  1. Edit relay/news.json (a list, newest first). This file is only the example + help; it is never served.
+  2. Commit + push. Cloudflare redeploys the Worker; it serves the list at https://www.printerbuddy.stream/api/news
+  3. Boxes check about every 6 hours (and when the page opens). New items show an unread dot on the bell.
+  Keep news.json valid JSON (no comments, no trailing commas) or the Worker build fails.
+
+ONE NEWS ITEM, with every option:
+
+  {
+    "id": "2026-10-21-v2",
+    "date": "2026-10-21",
+    "title": "Printer Buddy v2.0 is out 🎉",
+    "body": "New dashboard you can rearrange, 20+ new panels, job queue, config editor and more. Please enjoy!",
+    "link": "https://github.com/sterling5241/printer-buddy/releases",
+    "level": "info"
+  }
+
+OPTIONS
+  id     required. Unique and never reused: it's how boxes remember what's been read. Tip: date + a short word.
+  date   required. YYYY-MM-DD, shown next to the title.
+  title  required. One short line.
+  body   optional. A few sentences. Plain text (no HTML).
+  link   optional. Shows a "Read more →" link (opens in a new tab).
+  level  optional, default "info":
+           info       a normal news item
+           update     a new version / model is available (shown with an update tag)
+           important  also shows a slim banner at the top of the page, once per browser, with ✕ to dismiss
+                      (use sparingly: e.g. a security fix you want everyone to install)
+
+FULL news.json EXAMPLE (two items, newest first):
+
+  [
+    {
+      "id": "2026-11-02-fix",
+      "date": "2026-11-02",
+      "title": "Please update: share links fix",
+      "body": "Fixes share links that stopped loading after 24 hours. Update from the installer menu (option 3).",
+      "level": "important"
+    },
+    {
+      "id": "2026-10-21-v2",
+      "date": "2026-10-21",
+      "title": "Printer Buddy v2.0 is out 🎉",
+      "body": "New dashboard you can rearrange, 20+ new panels, job queue, config editor and more. Please enjoy!",
+      "link": "https://github.com/sterling5241/printer-buddy/releases",
+      "level": "info"
+    }
+  ]
+
+REMOVING AN ITEM: just delete it from news.json. Boxes drop it on their next check.

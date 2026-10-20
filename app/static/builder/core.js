@@ -9,7 +9,7 @@
 //   log(kind, t)  a console line arrived for the open printer
 //   destroy()     the panel was removed from the layout
 window.PB = (() => {
-  const defs = {}, live = new Set(), routeHooks = [];
+  const defs = {}, homeDefs = {}, live = new Set(), routeHooks = [];   // printer-page panels, home-page panels
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   const icon = path => `<svg class="pb-ic" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
   const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
@@ -21,16 +21,20 @@ window.PB = (() => {
   const take = sel => { const n = document.querySelector(sel); if (n) n.hidden = false; return n; };
 
   function panel(type, def) { defs[type] = { type, title: type, icon: "", cls: "", single: false, ...def }; }
+  // home panels get update(listOfAllPrinters) whenever any printer changes
+  function homePanel(type, def) { homeDefs[type] = { type, title: type, icon: "", cls: "", single: false, home: true, ...def }; }
+  const page = i => !i.def.home, home = i => i.def.home;
+  const all = () => [...printers.values()];
 
   const config = (def, cfg) => Object.fromEntries((def.settings || []).map(s => [s.k, cfg?.[s.k] ?? s.def]));
 
-  function mount(type, host, cfg) {
-    const def = defs[type];
+  function mount(type, host, cfg, reg = defs) {
+    const def = reg[type];
     if (!def) { host.innerHTML = `<p class="pb-muted">Unknown panel "${esc(type)}"</p>`; return null; }
     const inst = Object.assign(def.create(host, config(def, cfg)) || {}, { type, def, host });
     live.add(inst);
-    const p = current();
-    if (p) each(i => { i.open?.(p.id); i.update?.(p); }, [inst]);
+    if (def.home) each(i => i.update?.(all()), [inst]);
+    else { const p = current(); if (p) each(i => { i.open?.(p.id); i.update?.(p); }, [inst]); }
     return inst;
   }
   function unmount(inst) { if (!inst) return; each(i => i.destroy?.(), [inst]); live.delete(inst); }
@@ -38,12 +42,14 @@ window.PB = (() => {
 
   // one feed: the page's own render / route / console hooks fan out to every mounted panel
   const baseRender = renderPage;
-  renderPage = () => { baseRender(); const p = current(); if (p) each(i => i.update?.(p)); };
+  renderPage = () => { baseRender(); const p = current(); if (p) each(i => i.update?.(p), [...live].filter(page)); };
+  const baseHome = render;
+  render = () => { baseHome(); const a = all(); each(i => i.update?.(a), [...live].filter(home)); };
   const baseRoute = route;
   route = () => {
     baseRoute();
     const p = current();
-    if (p) each(i => i.open?.(p.id));
+    if (p) each(i => i.open?.(p.id), [...live].filter(page));
     for (const f of routeHooks) f(p);
     if (p) renderPage();
   };
@@ -102,6 +108,6 @@ window.PB = (() => {
   const reveal = host => host.dispatchEvent(new CustomEvent("pb-reveal", { bubbles: true }));   // builder switches to its tab
   const confirmGcode = (text, script, done) => { if (confirm(text)) { gcode(script); if (done) toast(done); } };
 
-  return { defs, panel, mount, settings, printFile, thumbUrl, rpc, fileUrl, confirmGcode, reveal, unmount, shown, el, icon, store, current, take, park: n => n && parking.append(n),
+  return { defs, homeDefs, homePanel, panel, mount, settings, printFile, thumbUrl, rpc, fileUrl, confirmGcode, reveal, unmount, shown, el, icon, store, current, take, park: n => n && parking.append(n),
            onRoute: f => routeHooks.push(f) };
 })();

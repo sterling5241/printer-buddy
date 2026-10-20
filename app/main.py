@@ -18,7 +18,7 @@ from starlette.staticfiles import StaticFiles
 
 from . import discovery
 from .manager import Manager
-from .net import http_get, http_stream
+from .net import get_json, http_get, http_stream
 from .notify import ALL_EVENTS, PROGRESS_STEPS, SERVICES, Notifier, advanced as notify_advanced
 from .store import Store
 from . import timelapse as tl
@@ -287,14 +287,46 @@ async def ai_settings(request: Request):
 
 
 async def ui_layout(request: Request):
-    """The dashboard builder's layout (tabs, rows, columns, panels), saved on this box so every device shows the same."""
+    """The builder's layout (tabs, rows, columns, panels), saved on this box so every device shows the same.
+    ?scope=home is the home (all printers) page; otherwise the printer page."""
+    key = "ui_layout_home" if request.query_params.get("scope") == "home" else "ui_layout"
     if request.method == "PUT":
         b = await body(request)
         layout = b.get("layout")
         if not isinstance(layout, dict) or not isinstance(layout.get("tabs"), list) or len(json.dumps(layout)) > 200_000:
             return err("bad layout")
-        store.save_settings({"ui_layout": layout})
-    return JSONResponse({"layout": store.settings().get("ui_layout")})
+        store.save_settings({key: layout})
+    return JSONResponse({"layout": store.settings().get(key)})
+
+
+_news = {"at": 0.0, "items": []}
+
+
+async def news(request: Request):
+    """Printer Buddy news (the bell): fetched from printerbuddy.stream at most every 6 hours, nothing about this box is sent."""
+    if time.time() - _news["at"] > 6 * 3600 or request.query_params.get("refresh") == "1":
+        domain = os.getenv("PB_SHARE_DOMAIN", "").strip().strip("/") or "printerbuddy.stream"
+        try:
+            status, data = await get_json(f"https://www.{domain}/api/news", timeout=8)
+            if status == 200 and isinstance(data, dict) and isinstance(data.get("items"), list):
+                _news["items"] = [n for n in data["items"] if isinstance(n, dict) and n.get("id") and n.get("title")][:50]
+            _news["at"] = time.time()
+        except Exception:
+            _news["at"] = time.time() - 5.5 * 3600   # offline: try again in ~30 minutes
+    return JSONResponse({"items": _news["items"]})
+
+
+def _git(*args) -> str:
+    import subprocess
+    try:
+        return subprocess.run(["git", "-C", str(Path(__file__).resolve().parent.parent), *args],
+                              capture_output=True, text=True, timeout=5).stdout.strip()
+    except Exception:
+        return ""
+
+
+VERSION_INFO = {"commit": _git("rev-parse", "--short", "HEAD"), "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
+                "date": _git("log", "-1", "--format=%cs")}
 
 
 async def ai_check(request: Request):
@@ -914,7 +946,8 @@ STARTED = str(time.time())  # changes on every restart; open pages reload when i
 
 async def get_config(request: Request):
     chosen = setup()
-    return JSONResponse({"started": STARTED, "setup": chosen, "not_built": [k for k, v in chosen.items() if f"{k}.{v}" not in BUILT]})
+    return JSONResponse({"started": STARTED, "setup": chosen, "not_built": [k for k, v in chosen.items() if f"{k}.{v}" not in BUILT],
+                         "version": VERSION_INFO})
 
 
 async def health(request: Request):
@@ -975,6 +1008,7 @@ _app = Starlette(routes=[
     Route("/api/timelapse/settings", timelapse_settings, methods=["GET", "PUT"]),
     Route("/api/ai/settings", ai_settings, methods=["GET", "PUT"]),
     Route("/api/ui/layout", ui_layout, methods=["GET", "PUT"]),
+    Route("/api/news", news),
     Route("/api/ai/reload", ai_reload, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/check", ai_check, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/save", ai_save, methods=["POST"]),

@@ -1,3 +1,4 @@
+import NEWS from "./news.json";
 // Printer Buddy share relay: a Cloudflare Worker for www.printerbuddy.stream
 //
 // Viewers open   https://www.printerbuddy.stream/share/user/<ID>/printer/<printer>/<code>
@@ -27,12 +28,21 @@ h1{margin:0 0 8px;font-size:26px}p{margin:0;color:#8E8A99}b{color:#FF8A1F}</styl
 <body><div><p>Printer <b>Buddy</b></p><h1>${title}</h1><p>${text}</p></div></body></html>`,
   { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
 
+// News for every Printer Buddy box (the bell on the home page). Edit relay/news.json; see relay/news.example.
+function newsApi() {
+  const items = (Array.isArray(NEWS) ? NEWS : []).filter(n => n && n.id && n.title).slice(0, 50);
+  return new Response(JSON.stringify({ items }), {
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=600", "access-control-allow-origin": "*" },
+  });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname === "/api/tunnel") return tunnelApi(request, env, ctx, url);
     if (url.pathname === "/api/contribute") return contributeApi(request, env);
     if (url.pathname === "/api/ai-stats") return statsApi(env);
+    if (url.pathname === "/api/news") return newsApi();
     const m = url.pathname.match(SHARE);
     if (!m) {
       if (url.pathname === "/") return page("Printer Buddy", "Self-hosted 3D printer monitoring. Open a share link to watch a printer.", 200);
