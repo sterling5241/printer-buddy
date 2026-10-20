@@ -2,7 +2,11 @@
 PB.panel("status", {
   title: "Status",
   icon: PB.icon('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
-  create(host) {
+  settings: [
+    { k: "thumb", label: "Show the print's picture", type: "check", def: true },
+    { k: "list", label: "Show the numbers list", type: "check", def: true },
+  ],
+  create(host, cfg) {
     host.innerHTML = `<div class="pb-st"><img class="pb-thumb" alt="" hidden><div class="pb-st-txt"><div class="pb-file"></div><div class="pb-state"></div></div></div>
       <div class="pb-prog"><i></i></div><div class="pb-pct"><span></span><span></span></div>
       <dl class="pb-kv">
@@ -12,6 +16,7 @@ PB.panel("status", {
       </dl>`;
     const q = s => host.querySelector(s), k = n => host.querySelector(`[data-k=${n}]`);
     const thumb = q(".pb-thumb");
+    if (!cfg.list) q(".pb-kv").hidden = true;
     thumb.onload = () => { thumb.hidden = false; };
     thumb.onerror = () => { thumb.hidden = true; };
     let thumbFile;
@@ -23,7 +28,7 @@ PB.panel("status", {
         const live = p.connection === "online", active = p.state === "printing" || p.state === "paused";
         const showPct = active || p.state === "complete", pct = showPct ? p.progress || 0 : 0;
         const file = showPct && p.filename ? p.filename : null;
-        if (file !== thumbFile) {
+        if (file !== thumbFile && cfg.thumb) {
           thumbFile = file; thumb.hidden = true;
           if (file) thumb.src = `/api/printers/${p.id}/thumbnail?file=${encodeURIComponent(file)}`; else thumb.removeAttribute("src");
         }

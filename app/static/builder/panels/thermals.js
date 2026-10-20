@@ -2,16 +2,28 @@
 PB.panel("thermals", {
   title: "Thermals",
   icon: PB.icon('<path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/>'),
-  create(host) {
+  settings: [
+    { k: "table", label: "Show the table", type: "check", def: true },
+    { k: "presets", label: "Show presets (PLA / PETG / ABS)", type: "check", def: true },
+    { k: "chart", label: "Show the chart", type: "check", def: true },
+    { k: "span", label: "Chart length", type: "select", def: 20, options: [[10, "10 minutes"], [20, "20 minutes"], [60, "1 hour"]] },
+    { k: "height", label: "Chart height", type: "select", def: 180, options: [[120, "Small"], [180, "Medium"], [280, "Tall"]] },
+  ],
+  create(host, cfg) {
     host.innerHTML = `<table class="pb-temps"><thead><tr><th>Name</th><th class="r">Power</th><th class="r">Actual</th><th class="r">Target</th></tr></thead><tbody></tbody></table>
       <div class="pb-pres adv"><button data-pre="210,60">PLA</button><button data-pre="240,80">PETG</button><button data-pre="250,100">ABS</button><button data-pre="0,0">Cool down</button></div>
       <div class="pb-chart"></div>`;
     const body = host.querySelector("tbody"), chartEl = host.querySelector(".pb-chart");
+    host.querySelector(".pb-temps").hidden = !cfg.table;
+    if (!cfg.presets) host.querySelector(".pb-pres").remove();
+    chartEl.style.height = `${cfg.height}px`;
+    if (!cfg.chart) chartEl.remove();
     const COLORS = { extruder: "#FF8A1F", heater_bed: "#8B5CF6" }, EXTRA = ["#4FD1C5", "#F6E05E", "#FC8181", "#90CDF4", "#68D391", "#C4A7FF"];
-    const SPAN = 20 * 60 * 1000;
+    const SPAN = cfg.span * 60 * 1000;
     let chart = null, series = {}, lastPush = 0, key = "", order = [];
     const colorOf = id => COLORS[id] || EXTRA[Math.max(0, order.indexOf(id) - (order.includes("extruder") ? 1 : 0) - (order.includes("heater_bed") ? 1 : 0)) % EXTRA.length];
-    if (window.echarts) {
+    if (!cfg.chart) { /* no chart */ }
+    else if (window.echarts) {
       chart = echarts.init(chartEl, null, { renderer: "canvas" });
       new ResizeObserver(() => chart.resize()).observe(chartEl);
     } else chartEl.innerHTML = `<p class="pb-muted">Chart unavailable (vendor/echarts.min.js missing).</p>`;
@@ -54,7 +66,8 @@ PB.panel("thermals", {
           if (id !== pageId) return;
           const now = Date.now();
           for (const s of sensors.filter(s => s.kind !== "fan")) {
-            const h = history[s.id] || {}, temps = h.temperatures || [], targets = h.targets || [], t0 = now - (temps.length - 1) * 1000;
+            const h = history[s.id] || {}, keep = SPAN / 1000;   // Moonraker keeps ~20 min at 1 per second
+            const temps = (h.temperatures || []).slice(-keep), targets = (h.targets || []).slice(-keep), t0 = now - (temps.length - 1) * 1000;
             series[s.id] = { name: s.name, hasTarget: s.target != null, temp: temps.map((v, i) => [t0 + i * 1000, v]),
                              target: targets.map((v, i) => [t0 + i * 1000, v]) };
           }

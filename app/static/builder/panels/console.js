@@ -2,10 +2,12 @@
 PB.panel("console", {
   title: "Console", cls: "adv", flush: true,
   icon: PB.icon('<path d="M4 17l6-5-6-5M12 19h8"/>'),
-  create(host) {
+  settings: [{ k: "height", label: "Height", type: "select", def: 180, options: [[120, "Small"], [180, "Medium"], [320, "Tall"]] }],
+  create(host, cfg) {
     host.innerHTML = `<div class="pb-log" role="log" aria-label="Klipper console"></div>
       <form class="pb-cin"><input autocomplete="off" spellcheck="false" aria-label="G-code command" placeholder="Send G-code…"><button>Send</button></form>`;
     const logEl = host.querySelector(".pb-log"), input = host.querySelector("input");
+    logEl.style.height = `${cfg.height}px`;
     function draw() {
       const log = (conLogs.get(pageId) || []).slice(-80);
       logEl.innerHTML = log.length ? "" : `<div class="pb-muted">Klipper's replies show up here.</div>`;

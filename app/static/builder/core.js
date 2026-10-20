@@ -1,7 +1,8 @@
 // Printer Buddy - dashboard builder core: the panel registry and one shared live feed for every panel.
 // Loaded after the main page script; builds on its globals (printers, pageId, renderPage, route, conAdd, gcode...).
-// A panel file calls  PB.panel("name", { title, icon, cls, single, create(host) -> { open, update, shown, log, destroy } })
-//   create(host)  build your HTML inside host (the panel body)
+// A panel file calls  PB.panel("name", { title, icon, cls, single, settings, create(host, cfg) -> { open, update, shown, log, destroy } })
+//   settings      [{ k, label, type: "check" | "select", options: [[value, label], ...], def }] - shown under the panel's gear
+//   create(host, cfg)  build your HTML inside host (the panel body); cfg = this panel's settings (defaults filled in)
 //   open(id)      a printer page was opened (reset per-printer state)
 //   update(p)     new data for the open printer (several times a second)
 //   shown()       the panel's tab just became visible (load lists, resize charts)
@@ -21,10 +22,12 @@ window.PB = (() => {
 
   function panel(type, def) { defs[type] = { type, title: type, icon: "", cls: "", single: false, ...def }; }
 
-  function mount(type, host) {
+  const config = (def, cfg) => Object.fromEntries((def.settings || []).map(s => [s.k, cfg?.[s.k] ?? s.def]));
+
+  function mount(type, host, cfg) {
     const def = defs[type];
     if (!def) { host.innerHTML = `<p class="pb-muted">Unknown panel "${esc(type)}"</p>`; return null; }
-    const inst = Object.assign(def.create(host) || {}, { type, def, host });
+    const inst = Object.assign(def.create(host, config(def, cfg)) || {}, { type, def, host });
     live.add(inst);
     const p = current();
     if (p) each(i => { i.open?.(p.id); i.update?.(p); }, [inst]);
@@ -50,6 +53,27 @@ window.PB = (() => {
   conAdd = (id, kind, text) => { baseConAdd(id, kind, text); if (id === pageId) each(i => i.log?.(kind, text)); };
   showTab = () => {};   // the old tab strip is gone; panels that need loading do it in shown()
 
-  return { defs, panel, mount, unmount, shown, el, icon, store, current, take, park: n => n && parking.append(n),
+  // the gear's settings box: one form for any panel's settings list
+  const dlg = el("dialog", "bd-lib bd-set");
+  document.body.append(dlg);
+  function settings(def, cfg, save) {
+    const c = config(def, cfg);
+    dlg.innerHTML = `<h3>${esc(def.title)} settings</h3><form method="dialog" class="bd-setform">${def.settings.map(s => s.type === "check"
+      ? `<label class="bd-check"><input type="checkbox" name="${s.k}"${c[s.k] ? " checked" : ""}> ${esc(s.label)}</label>`
+      : `<label>${esc(s.label)} <select name="${s.k}">${s.options.map(([v, l]) => `<option value="${esc(v)}"${String(v) === String(c[s.k]) ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`).join("")}
+      <div class="bd-libfoot"><button type="button" data-a="cancel">Cancel</button><button class="bd-primary">Save</button></div></form>`;
+    dlg.querySelector("[data-a=cancel]").onclick = () => dlg.close();
+    dlg.querySelector("form").onsubmit = () => {
+      const f = dlg.querySelector("form"), out = {};
+      for (const s of def.settings) {
+        const v = s.type === "check" ? f[s.k].checked : f[s.k].value;
+        out[s.k] = s.type === "check" ? v : (s.options.find(([o]) => String(o) === v) || [s.def])[0];   // keep numbers as numbers
+      }
+      save(out);
+    };
+    dlg.showModal();
+  }
+
+  return { defs, panel, mount, settings, unmount, shown, el, icon, store, current, take, park: n => n && parking.append(n),
            onRoute: f => routeHooks.push(f) };
 })();

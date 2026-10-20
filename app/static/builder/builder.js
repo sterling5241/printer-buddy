@@ -40,7 +40,7 @@
       id: String(t.id), name: String(t.name || "Tab"),
       rows: t.rows.filter(r => r && SPLITS[r.s] && Array.isArray(r.cols)).map(r => ({
         s: r.s, cols: SPLITS[r.s].map((_, i) => (r.cols[i] || []).filter(it => it && typeof it.t === "string")
-          .map(it => ({ id: String(it.id || rid()), t: it.t, c: !!it.c }))),
+          .map(it => ({ id: String(it.id || rid()), t: it.t, c: !!it.c, o: it.o && typeof it.o === "object" && !Array.isArray(it.o) ? it.o : {} }))),
       })),
       phone: Array.isArray(t.phone) ? t.phone.map(String) : [],
     }));
@@ -206,11 +206,14 @@
     const head = el("header", "", `${def.icon || ""}<button type="button" class="pb-title">${esc(def.title)}</button>
       <span class="pb-tools"><button type="button" data-a="up" title="Move up">↑</button><button type="button" data-a="down" title="Move down">↓</button>
       <button type="button" data-a="left" title="Move to the column on the left">←</button><button type="button" data-a="right" title="Move to the column on the right">→</button>
-      <button type="button" data-a="del" title="Remove panel">✕</button></span>
+      <button type="button" data-a="set" title="Panel settings">⚙</button><button type="button" data-a="del" title="Remove panel">✕</button></span>
       <button type="button" class="pb-tog" aria-label="Collapse">${icon('<path d="M6 9l6 6 6-6"/>')}</button>`);
     const body = el("div", "pb-body");
     card.append(head, body);
-    const inst = PB.mount(item.t, body);
+    const inst = PB.mount(item.t, body, item.o);
+    const gear = head.querySelector("[data-a=set]");
+    if (def.settings?.length) gear.onclick = () => PB.settings(def, item.o, o => { item.o = o; changed(); });
+    else gear.remove();
     if (inst) list.push(inst);
     const toggle = () => { item.c = !item.c; card.classList.toggle("collapsed", item.c); save(); if (!item.c && inst) PB.shown([inst]); };
     head.querySelector(".pb-title").onclick = toggle;

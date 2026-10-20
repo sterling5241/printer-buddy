@@ -162,3 +162,15 @@
   .bd-row { grid-template-columns: minmax(0, 1fr) !important; gap: 8px; }
   .bd-tab, .bd-col { gap: 8px; }
 }
+
+/* panel settings box */
+.bd-setform { display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
+.bd-setform label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bd-setform .bd-check { justify-content: flex-start; }
+.bd-setform select { height: 30px; background: #0f0f11; color: var(--text); border: 1px solid #2c2c31; border-radius: 4px; padding: 0 6px; }
+.bd-libfoot { gap: 8px; }
+.bd-set .bd-primary { background: var(--orange); border-color: var(--orange); color: #1a1005; }
+/* camera aspect setting */
+#page.bd .pb-body[data-aspect="4/3"] .pg-cam { aspect-ratio: 4 / 3; }
+#page.bd .pb-body[data-aspect="1/1"] .pg-cam { aspect-ratio: 1 / 1; }
+#page.bd .pb-body[data-fit="cover"] .pg-cam img { object-fit: cover; }

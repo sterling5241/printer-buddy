@@ -2,7 +2,11 @@
 PB.panel("toolhead", {
   title: "Toolhead", cls: "adv",
   icon: PB.icon('<path d="M12 2v20M2 12h20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"/>'),
-  create(host) {
+  settings: [
+    { k: "jog", label: "Show home + jog buttons", type: "check", def: true },
+    { k: "speed", label: "Show the speed slider", type: "check", def: true },
+  ],
+  create(host, cfg) {
     host.innerHTML = `<div class="pb-pos">X <b>—</b> · Y <b>—</b> · Z <b>—</b> <span></span></div>
       <div class="pb-row"><button data-home="">Home all</button><button data-home="X">X</button><button data-home="Y">Y</button><button data-home="Z">Z</button></div>
       <div class="pb-seg">${[0.1, 1, 10, 50].map(s => `<button data-step="${s}" aria-pressed="${s === 10}">${s}</button>`).join("")}</div>
@@ -10,6 +14,8 @@ PB.panel("toolhead", {
       <label class="pb-speed">Speed <input type="range" min="10" max="300" step="5" value="100"><output>100%</output></label>
       <div class="pb-note"></div>`;
     let step = 10, dragging = false;
+    if (!cfg.jog) for (const e of host.querySelectorAll(".pb-row, .pb-seg")) e.hidden = true;
+    if (!cfg.speed) host.querySelector(".pb-speed").hidden = true;
     const range = host.querySelector("input[type=range]"), out = host.querySelector("output");
     for (const b of host.querySelectorAll("[data-home]")) b.onclick = () => gcode(`G28 ${b.dataset.home}`.trim());
     for (const b of host.querySelectorAll("[data-step]")) b.onclick = () => {
