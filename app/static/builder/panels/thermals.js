@@ -1,0 +1,104 @@
+// Thermals panel: a dense table (name, power, actual, target), presets, then the temperature chart (ECharts).
+PB.panel("thermals", {
+  title: "Thermals",
+  icon: PB.icon('<path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/>'),
+  create(host) {
+    host.innerHTML = `<table class="pb-temps"><thead><tr><th>Name</th><th class="r">Power</th><th class="r">Actual</th><th class="r">Target</th></tr></thead><tbody></tbody></table>
+      <div class="pb-pres adv"><button data-pre="210,60">PLA</button><button data-pre="240,80">PETG</button><button data-pre="250,100">ABS</button><button data-pre="0,0">Cool down</button></div>
+      <div class="pb-chart"></div>`;
+    const body = host.querySelector("tbody"), chartEl = host.querySelector(".pb-chart");
+    const COLORS = { extruder: "#FF8A1F", heater_bed: "#8B5CF6" }, EXTRA = ["#4FD1C5", "#F6E05E", "#FC8181", "#90CDF4", "#68D391", "#C4A7FF"];
+    const SPAN = 20 * 60 * 1000;
+    let chart = null, series = {}, lastPush = 0, key = "", order = [];
+    const colorOf = id => COLORS[id] || EXTRA[Math.max(0, order.indexOf(id) - (order.includes("extruder") ? 1 : 0) - (order.includes("heater_bed") ? 1 : 0)) % EXTRA.length];
+    if (window.echarts) {
+      chart = echarts.init(chartEl, null, { renderer: "canvas" });
+      new ResizeObserver(() => chart.resize()).observe(chartEl);
+    } else chartEl.innerHTML = `<p class="pb-muted">Chart unavailable (vendor/echarts.min.js missing).</p>`;
+
+    function draw() {
+      if (!chart) return;
+      const out = [], legend = [];
+      for (const [id, s] of Object.entries(series)) {
+        const color = colorOf(id);
+        legend.push(s.name);
+        out.push({ name: s.name, type: "line", showSymbol: false, data: s.temp, lineStyle: { width: 2, color }, itemStyle: { color } });
+        if (s.hasTarget) out.push({ name: s.name + " target", type: "line", showSymbol: false, data: s.target,
+                                    lineStyle: { width: 1, type: "dashed", color, opacity: .6 }, itemStyle: { color } });
+      }
+      chart.setOption({
+        backgroundColor: "transparent", animation: false, textStyle: { color: "#8F8B99", fontFamily: "inherit", fontSize: 11 },
+        grid: { left: 38, right: 8, top: 26, bottom: 22 },
+        legend: { data: legend, top: 0, textStyle: { color: "#C9C6D1", fontSize: 11 }, icon: "roundRect", itemHeight: 6, itemWidth: 12 },
+        tooltip: { trigger: "axis", backgroundColor: "#232327", borderColor: "#2C2C31", textStyle: { color: "#E8E6EC" },
+                   valueFormatter: v => v == null ? "—" : `${v.toFixed(1)}°` },
+        xAxis: { type: "time", axisLine: { lineStyle: { color: "#2C2C31" } }, splitLine: { show: false },
+                 axisLabel: { formatter: v => new Date(v).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) } },
+        yAxis: { type: "value", min: 0, axisLabel: { formatter: "{value}°" }, splitLine: { lineStyle: { color: "#2C2C31" } } },
+        series: out,
+      }, { replaceMerge: ["series"] });
+    }
+    const cmd = (s, v) => s.id.startsWith("temperature_fan ")
+      ? `SET_TEMPERATURE_FAN_TARGET TEMPERATURE_FAN=${s.id.slice(16)} TARGET=${v}`
+      : `SET_HEATER_TEMPERATURE HEATER=${s.id.startsWith("heater_generic ") ? s.id.slice(15) : s.id} TARGET=${v}`;
+    for (const b of host.querySelectorAll("[data-pre]")) b.onclick = () => {
+      const [n, bed] = b.dataset.pre.split(",").map(Number);
+      gcode(`SET_HEATER_TEMPERATURE HEATER=extruder TARGET=${n}\nSET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=${bed}`);
+      toast(n ? `Heating: nozzle ${n}°, bed ${bed}°` : "Heaters off");
+    };
+    return {
+      async open(id) {
+        series = {}; lastPush = 0; key = "";
+        try {
+          const { history, sensors } = await api(`/api/printers/${id}/temps`);
+          if (id !== pageId) return;
+          const now = Date.now();
+          for (const s of sensors.filter(s => s.kind !== "fan")) {
+            const h = history[s.id] || {}, temps = h.temperatures || [], targets = h.targets || [], t0 = now - (temps.length - 1) * 1000;
+            series[s.id] = { name: s.name, hasTarget: s.target != null, temp: temps.map((v, i) => [t0 + i * 1000, v]),
+                             target: targets.map((v, i) => [t0 + i * 1000, v]) };
+          }
+        } catch {}
+        draw();
+      },
+      shown() { chart?.resize(); },
+      update(p) {
+        const list = p.sensors || [], live = p.connection === "online" && p.klippy_state === "ready";
+        const k = list.map(s => s.id).join("|");
+        if (k !== key) {
+          key = k; order = list.filter(s => s.kind !== "fan").map(s => s.id);
+          body.innerHTML = list.length ? list.map(s => `<tr data-s="${esc(s.id)}"><td><span class="dot" style="background:${s.kind === "fan" ? "#555" : colorOf(s.id)}"></span>${esc(s.name)}</td>
+            <td class="r pb-muted" data-f="pw"></td><td class="r" data-f="now"></td>
+            <td class="r">${s.target != null ? `<input type="number" min="0" max="400" inputmode="numeric" aria-label="${esc(s.name)} target °C">` : `<span class="pb-muted">—</span>`}</td></tr>`).join("")
+            : `<tr><td colspan="4" class="pb-muted">No temperatures (printer offline?)</td></tr>`;
+          for (const row of body.querySelectorAll("tr[data-s]")) {
+            const inp = row.querySelector("input"); if (!inp) continue;
+            inp.onkeydown = e => {
+              if (e.key !== "Enter" || inp.value === "") return;
+              const s = (PB.current()?.sensors || []).find(x => x.id === row.dataset.s);
+              if (s) { gcode(cmd(s, Math.max(0, Math.round(+inp.value)))); inp.value = ""; inp.blur(); }
+            };
+          }
+        }
+        for (const s of list) {
+          const row = body.querySelector(`tr[data-s="${CSS.escape(s.id)}"]`); if (!row) continue;
+          row.querySelector("[data-f=now]").textContent = !live ? "—" : s.kind === "fan" ? `${Math.round((s.speed || 0) * 100)}%` : s.temp != null ? `${s.temp.toFixed(1)}°` : "—";
+          row.querySelector("[data-f=pw]").textContent = live && s.kind === "heater" && s.power != null ? `${Math.round(s.power * 100)}%` : "";
+          const inp = row.querySelector("input");
+          if (inp) { if (document.activeElement !== inp) inp.placeholder = s.target ? `${Math.round(s.target)}` : "off"; inp.disabled = !live || isBasic(); }
+        }
+        if (!chart || Date.now() - lastPush < 1000 || !live) return;
+        const now = lastPush = Date.now();
+        for (const s of list) {
+          if (s.kind === "fan" || s.temp == null) continue;
+          const ser = series[s.id] ||= { name: s.name, hasTarget: s.target != null, temp: [], target: [] };
+          ser.temp.push([now, s.temp]); if (ser.hasTarget) ser.target.push([now, s.target ?? 0]);
+          while (ser.temp.length && ser.temp[0][0] < now - SPAN) ser.temp.shift();
+          while (ser.target.length && ser.target[0][0] < now - SPAN) ser.target.shift();
+        }
+        if (chartEl.offsetParent) draw();
+      },
+      destroy() { chart?.dispose(); },
+    };
+  },
+});

@@ -265,6 +265,17 @@ async def ai_settings(request: Request):
                          "model": manager.ai.info(), "ai_contribute": manager.collect.sharing()})
 
 
+async def ui_layout(request: Request):
+    """The dashboard builder's layout (tabs, rows, columns, panels), saved on this box so every device shows the same."""
+    if request.method == "PUT":
+        b = await body(request)
+        layout = b.get("layout")
+        if not isinstance(layout, dict) or not isinstance(layout.get("tabs"), list) or len(json.dumps(layout)) > 200_000:
+            return err("bad layout")
+        store.save_settings({"ui_layout": layout})
+    return JSONResponse({"layout": store.settings().get("ui_layout")})
+
+
 async def ai_check(request: Request):
     pid = _pid(request)
     if pid is None:
@@ -819,6 +830,7 @@ _app = Starlette(routes=[
     Route("/share/printer/{pid:int}/{code}/stream", share_stream),
     Route("/api/timelapse/settings", timelapse_settings, methods=["GET", "PUT"]),
     Route("/api/ai/settings", ai_settings, methods=["GET", "PUT"]),
+    Route("/api/ui/layout", ui_layout, methods=["GET", "PUT"]),
     Route("/api/ai/reload", ai_reload, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/check", ai_check, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/save", ai_save, methods=["POST"]),

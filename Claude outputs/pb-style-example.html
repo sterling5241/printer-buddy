@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Printer Buddy style example</title>
+<style>
+  :root {
+    --bg: #121214; --panel: #1c1c1f; --head: #232327; --line: #2c2c31; --hover: #2a2a2f;
+    --text: #e8e6ec; --muted: #8f8b99; --orange: #ff8a1f; --purple: #8b5cf6; --red: #e5484d; --green: #3fb950;
+    --mono: ui-monospace, "SF Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .num { font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: var(--text); background: var(--hover); border: 1px solid var(--line); border-radius: 4px;
+           height: 32px; padding: 0 12px; cursor: pointer; font-weight: 600; font-size: 13px; }
+  button:hover { background: #34343a; }
+  button.accent { background: var(--orange); border-color: var(--orange); color: #1a1005; }
+  button.ghost { background: transparent; }
+  button.danger { background: var(--red); border-color: var(--red); color: #fff; }
+  button.outline-o { background: transparent; border-color: var(--orange); color: var(--orange); }
+
+  /* app bar */
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 16px;
+         background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar .back { color: var(--muted); text-decoration: none; font-size: 13px; }
+  .bar h1 { font-size: 16px; margin: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chip { font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 2px 8px; border-radius: 10px;
+          background: rgba(255,138,31,.15); color: var(--orange); border: 1px solid rgba(255,138,31,.4); }
+  .bar .sp { flex: 1; }
+  .bar .acts { display: flex; gap: 6px; }
+
+  /* rail + grid */
+  .wrap { display: flex; }
+  nav { width: 64px; flex: none; background: var(--panel); border-right: 1px solid var(--line); min-height: calc(100vh - 52px);
+        display: flex; flex-direction: column; padding-top: 6px; }
+  nav a { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 0; color: var(--muted);
+          text-decoration: none; font-size: 10.5px; border-left: 2px solid transparent; }
+  nav a.on { color: var(--text); border-left-color: var(--orange); background: var(--hover); }
+  nav svg { width: 20px; height: 20px; }
+  main { flex: 1; min-width: 0; padding: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 12px; align-content: start; }
+  .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+  /* panels */
+  .p { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .p > header { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 8px 0 12px; background: var(--head);
+                border-bottom: 1px solid var(--line); font-weight: 600; font-size: 13.5px; }
+  .p > header svg { width: 16px; height: 16px; color: var(--muted); }
+  .p > header .t { flex: 1; }
+  .p > header .tog { background: none; border: 0; height: 28px; padding: 0 6px; color: var(--muted); }
+  .p .b { padding: 10px 12px; }
+
+  /* status */
+  .st { display: flex; gap: 12px; align-items: center; }
+  .thumb { width: 64px; height: 64px; border-radius: 4px; background: #2a2a30; display: grid; place-items: center; flex: none; }
+  .thumb i { width: 34px; height: 34px; border-radius: 50%; background: var(--orange); display: block; }
+  .file { font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12.5px; }
+  .prog { height: 4px; background: var(--hover); border-radius: 2px; margin: 10px 0 4px; overflow: hidden; }
+  .prog i { display: block; height: 100%; width: 35%; background: var(--orange); }
+  .pct { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); }
+  .pct b { color: var(--text); font-size: 13px; }
+  .kv { display: grid; grid-template-columns: 1fr 1fr; margin-top: 8px; border-top: 1px solid var(--line); }
+  .kv div { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .kv div:nth-child(odd) { padding-right: 12px; border-right: 1px solid var(--line); }
+  .kv div:nth-child(even) { padding-left: 12px; }
+  .kv span { color: var(--muted); }
+
+  /* thermals */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+  td { padding: 5px 4px; border-bottom: 1px solid var(--line); }
+  td.r, th.r { text-align: right; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 8px; }
+  td input { width: 64px; height: 26px; background: #141416; border: 1px solid var(--line); border-radius: 3px; color: var(--text);
+             padding: 0 6px; font: inherit; text-align: right; }
+  .pw { color: var(--muted); }
+  .pres { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .pres button { height: 28px; padding: 0 10px; }
+  .chart { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+  .chart svg { width: 100%; height: 150px; display: block; }
+
+  /* toolhead */
+  .pos { font-family: var(--mono); font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+  .pos b { color: var(--text); font-weight: 600; }
+  .row { display: flex; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+  .row button { flex: 1; min-width: 0; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; flex: 1; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: rgba(255,138,31,.15); color: var(--orange); }
+  .note { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* macros */
+  .macs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .macs button { height: 28px; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+
+  /* console */
+  .log { font-family: var(--mono); font-size: 12px; background: #0e0e10; height: 150px; overflow: auto; padding: 8px 10px; color: #c9c6d1; }
+  .log .s { color: var(--orange); }
+  .log .m { color: var(--muted); }
+  .cin { display: flex; border-top: 1px solid var(--line); }
+  .cin input { flex: 1; background: #0e0e10; border: 0; color: var(--text); padding: 0 10px; height: 36px; font-family: var(--mono); font-size: 12.5px; }
+  .cin button { border: 0; border-left: 1px solid var(--line); border-radius: 0; height: 36px; }
+
+  /* camera */
+  .cam { aspect-ratio: 16/9; background: #000; display: grid; place-items: center; color: var(--muted); position: relative; }
+  .cam .ov { position: absolute; left: 8px; bottom: 8px; font-size: 12px; background: rgba(0,0,0,.6); padding: 3px 8px; border-radius: 3px; }
+
+  @media (max-width: 760px) {
+    .wrap { flex-direction: column; }
+    nav { width: auto; min-height: 0; flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); padding: 0; overflow-x: auto; }
+    nav a { flex: 1; border-left: 0; border-bottom: 2px solid transparent; }
+    nav a.on { border-bottom-color: var(--orange); }
+    main { grid-template-columns: 1fr; padding: 8px; gap: 8px; }
+    .bar { flex-wrap: wrap; height: auto; padding: 8px 12px; }
+    .bar .sp { display: none; }
+    .bar .acts { width: 100%; }
+    .bar .acts button { flex: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="bar">
+  <a class="back" href="#">‹ Printers</a>
+  <h1>Voron Trident 300</h1>
+  <span class="chip">PRINTING</span>
+  <span class="sp"></span>
+  <div class="acts">
+    <button class="ghost">Layout</button>
+    <button class="accent">Pause</button>
+    <button class="outline-o">Cancel</button>
+    <button class="danger">E-Stop</button>
+  </div>
+</div>
+<div class="wrap">
+  <nav>
+    <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Dashboard</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-5-6-5M12 19h8"/></svg>Console</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>Files</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 3"/></svg>History</a>
+  </nav>
+  <main>
+    <div class="col">
+      <section class="p">
+        <header><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg><span class="t">Camera</span><button class="tog">▾</button></header>
+        <div class="cam">No camera<span class="ov num">35% · layer 42/120</span></div>
+      </section>
+      <section class="p">
+        <header><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/></svg><span class="t">Thermals</span><button class="tog">▾</button></header>
+        <div class="b">
+          <table class="num">
+            <tr><th>Name</th><th class="r">Power</th><th class="r">Actual</th><th class="r">Target</th></tr>
+            <tr><td><span class="dot" style="background:var(--orange)"></span>Nozzle</td><td class="r pw">45%</td><td class="r">209.8°</td><td class="r"><input value="210"></td></tr>
+            <tr><td><span class="dot" style="background:var(--purple)"></span>Bed</td><td class="r pw">20%</td><td class="r">60.3°</td><td class="r"><input value="60"></td></tr>
+            <tr><td><span class="dot" style="background:#4fd1c5"></span>Chamber</td><td class="r pw"></td><td class="r">34.2°</td><td class="r pw">—</td></tr>
+            <tr><td><span class="dot" style="background:#555"></span>Part fan</td><td class="r pw"></td><td class="r">80%</td><td class="r pw">—</td></tr>
+          </table>
+          <div class="pres"><button>PLA</button><button>PETG</button><button>ABS</button><button>Cool down</button></div>
+          <div class="chart">
+            <svg viewBox="0 0 400 150" preserveAspectRatio="none">
+              <g stroke="#2c2c31" stroke-width="1"><line x1="0" y1="30" x2="400" y2="30"/><line x1="0" y1="70" x2="400" y2="70"/><line x1="0" y1="110" x2="400" y2="110"/></g>
+              <path d="M0 40 L400 34" stroke="#ff8a1f" stroke-width="1" stroke-dasharray="4 3" fill="none" opacity=".6"/>
+              <path d="M0 52 C80 46 160 40 240 36 S360 34 400 35" stroke="#ff8a1f" stroke-width="2" fill="none"/>
+              <path d="M0 118 L400 116" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4 3" fill="none" opacity=".6"/>
+              <path d="M0 124 C100 121 200 118 400 117" stroke="#8b5cf6" stroke-width="2" fill="none"/>
+              <path d="M0 136 L400 132" stroke="#4fd1c5" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+        </div>
+      </section>
+      <section class="p">
+        <header><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-5-6-5M12 19h8"/></svg><span class="t">Console</span><button class="tog">▾</button></header>
+        <div class="log"><div class="s">&gt; M117 Printing benchy</div><div class="m">// Klipper state: Ready</div><div>ok</div><div class="s">&gt; M220 S100</div><div>ok</div></div>
+        <div class="cin"><input placeholder="Send G-code…"><button>Send</button></div>
+      </section>
+    </div>
+    <div class="col">
+      <section class="p">
+        <header><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="t">Status</span><button class="tog">▾</button></header>
+        <div class="b">
+          <div class="st"><div class="thumb"><i></i></div><div><div class="file">benchy.gcode</div><div class="sub num">Started 10:00 PM · done around 10:33 PM</div></div></div>
+          <div class="prog"><i></i></div>
+          <div class="pct num"><span><b>35%</b> printed</span><span>21m left</span></div>
+          <div class="kv num">
+            <div><span>Nozzle</span>209.8 / 210°</div><div><span>Bed</span>60.3 / 60°</div>
+            <div><span>Elapsed</span>11m</div><div><span>Layer</span>42 / 120</div>
+            <div><span>Speed</span>100%</div><div><span>Flow</span>98%</div>
+          </div>
+        </div>
+      </section>
+      <section class="p">
+        <header><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg><span class="t">Toolhead</span><button class="tog">▾</button></header>
+        <div class="b">
+          <div class="pos">X <b>120.5</b> · Y <b>98.2</b> · Z <b>8.40</b> · homed XYZ</div>
+          <div class="row"><button>Home all</button><button>X</button><button>Y</button><button>Z</button></div>
+          <div class="seg" style="margin-bottom:6px"><button>0.1</button><button>1</button><button class="on">10</button><button>50</button></div>
+          <div class="row"><button>X−</button><button>X+</button><button>Y−</button><button>Y+</button><button>Z−</button><button>Z+</button></div>
+          <div class="note">Moving is off while printing.</div>
+        </div>
+      </section>
+      <section class="p">
+        <header><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9z"/></svg><span class="t">Macros</span><button class="tog">▾</button></header>
+        <div class="b macs"><button>Bed mesh quick</button><button>Load filament</button><button>Unload filament</button><button>Park</button><button>Print start</button></div>
+      </section>
+    </div>
+  </main>
+</div>
+</body>
+</html>
