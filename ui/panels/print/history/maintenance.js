@@ -21,7 +21,7 @@ PB.parts.historyMaint = c => {
       for (const b of box.querySelectorAll("[data-done]")) b.onclick = async () => { c.maint[+b.dataset.done].last = nowTotals(); drawMaint(); saveMaint(); };
     }
     const saveMaint = () => PB.kv.set("maintenance", c.maint).catch(e => toast(`Couldn't save: ${e.message}`));
-    c.q("[data-a=c.maint]").onclick = () => {
+    c.q("[data-a=maint]").onclick = () => {
       let list = c.maint.map(m => ({ ...m }));
       const read = () => { list = [...dlg.querySelectorAll(".pb-prow")].map((r, i) => ({ ...list[i], name: r.querySelector("[data-k=name]").value.trim() || "Maintenance",
         hours: +r.querySelector("[data-k=hours]").value || 0, fil: +r.querySelector("[data-k=fil]").value || 0, days: +r.querySelector("[data-k=days]").value || 0 })); };
