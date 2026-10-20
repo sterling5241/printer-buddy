@@ -23,7 +23,7 @@ SUBSCRIBE = {
     "virtual_sdcard": ["progress", "is_active"],
     "webhooks": ["state", "state_message"],
     "gcode_move": ["speed_factor", "extrude_factor"],
-    "toolhead": ["homed_axes", "position"],
+    "toolhead": ["homed_axes", "position", "axis_minimum", "axis_maximum"],
 }
 
 # Extra Klipper objects shown on the printer dashboard (found per printer on connect).
@@ -250,6 +250,8 @@ class MoonrakerClient:
                        if n.startswith(SENSOR_PREFIXES + FAN_PREFIXES) or n == "fan" or n in EXTRA_HEATERS]
         for n in self.extras:
             objects[n] = None
+        if "exclude_object" in names:            # slicer-labelled objects in the print (skip one mid-print)
+            objects["exclude_object"] = None
         await self._load_macros([n[len("gcode_macro "):] for n in names if n.startswith("gcode_macro ")])
         res = await self._call("printer.objects.subscribe", {"objects": objects})
         self.status = (res or {}).get("status", {})
@@ -456,7 +458,24 @@ class MoonrakerClient:
             "position": (s.get("toolhead", {}).get("position") or [None] * 4)[:4],
             "sensors": self.sensors() if live else [],
             "macro_count": len(self.macros),
+            "objects": self.print_objects() if live else None,
+            "bed": self.bed_area(),
         }
+
+    def print_objects(self) -> dict | None:
+        """Objects in the current print (Klipper exclude_object): outlines, which are skipped, which is printing now."""
+        eo = self.status.get("exclude_object")
+        if not isinstance(eo, dict) or not eo.get("objects"):
+            return None
+        return {"list": [{"name": o.get("name"), "center": o.get("center"), "polygon": o.get("polygon")}
+                         for o in eo["objects"] if o.get("name")],
+                "excluded": eo.get("excluded_objects") or [], "current": eo.get("current_object")}
+
+    def bed_area(self) -> list | None:
+        """[min x, min y, max x, max y] the toolhead can reach, for drawing the objects map."""
+        th = self.status.get("toolhead", {})
+        lo, hi = th.get("axis_minimum"), th.get("axis_maximum")
+        return [lo[0], lo[1], hi[0], hi[1]] if lo and hi and len(lo) > 1 and len(hi) > 1 else None
 
     def sensors(self) -> list[dict]:
         """Every heater / temperature sensor / fan, for the dashboard's Thermals card and chart."""

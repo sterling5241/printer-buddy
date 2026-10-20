@@ -10,7 +10,7 @@
   const P = t => ({ t });
   const phone = matchMedia("(max-width: 760px)");   // phones: one column per tab, in the tab's own phone order
   const DEFAULT = { v: 1, tabs: [
-    { id: "dash", name: "Dashboard", rows: [{ s: "1-1", cols: [[P("camera"), P("thermals"), P("console")], [P("status"), P("ai"), P("toolhead"), P("macros")]] }] },
+    { id: "dash", name: "Dashboard", rows: [{ s: "1-1", cols: [[P("camera"), P("thermals"), P("console")], [P("status"), P("ai"), P("exclude"), P("toolhead"), P("macros")]] }] },
     { id: "files", name: "Files", rows: [{ s: "1", cols: [[P("files")]] }] },
     { id: "history", name: "History", rows: [{ s: "1", cols: [[P("history")]] }] },
     { id: "timelapse", name: "Timelapses", rows: [{ s: "1", cols: [[P("timelapse")]] }] },

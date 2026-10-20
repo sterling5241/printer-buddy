@@ -264,15 +264,6 @@
   .con-quick button { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; }
   .con-form { display: flex; gap: 8px; }
   .con-form input { flex-grow: 1; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .files { border-radius: 12px; background: var(--card); border: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-  .files-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
-  .files-bar .upload { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 8px;
-                       background: var(--purple); color: #fff; font-weight: 900; cursor: pointer; }
-  .files-bar .upload:focus-within { outline: 2px solid var(--orange); outline-offset: 2px; }
-  .files-bar .upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-  .files-bar .check { display: flex; align-items: center; gap: 8px; min-height: 44px; }
-  .files-bar .check input { min-height: 0; width: 18px; height: 18px; accent-color: var(--orange); }
-  .files-bar .spacer { flex-grow: 1; }
   .files-msg { font-size: 14px; color: var(--muted); }
   .files-list { overflow-x: auto; }
   .files-list table { width: 100%; border-collapse: collapse; min-width: 560px; }
@@ -283,11 +274,6 @@
   .files-list td.btns { white-space: nowrap; text-align: right; }
   .files-list td.btns button { margin-left: 6px; font-weight: 900; }
   .files-list td.btns .del { background: transparent; color: var(--red-text); }
-  .hist { display: flex; flex-direction: column; gap: 14px; }
-  .hist-totals { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
-  .hist-totals div { border-radius: 12px; background: var(--card); border: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
-  .hist-totals dt { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
-  .hist-totals dd { margin: 0; font-size: 24px; font-weight: 900; }
   .hist-box { border-radius: 12px; background: var(--card); border: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
   .res { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; background: var(--track); color: var(--muted); }
   .res.done { background: var(--purple); color: #fff; }
@@ -459,8 +445,6 @@
     <button role="tab" id="tabStatus" aria-selected="true" aria-controls="pgStatus">Status</button>
     <button role="tab" class="adv" id="tabControl" aria-selected="false" aria-controls="pgControl">Control</button>
     <button role="tab" class="adv" id="tabConsole" aria-selected="false" aria-controls="pgConsole">Console</button>
-    <button role="tab" class="adv" id="tabFiles" aria-selected="false" aria-controls="pgFiles">Files</button>
-    <button role="tab" class="adv" id="tabHistory" aria-selected="false" aria-controls="pgHistory">History</button>
     <button role="tab" class="vtl" id="tabTimelapse" aria-selected="false" aria-controls="pgTimelapse">Timelapses</button>
   </div>
   <div class="pg-body" id="pgStatus" role="tabpanel" aria-labelledby="tabStatus">
@@ -558,31 +542,6 @@
       <input id="conInput" autocomplete="off" spellcheck="false" aria-label="G-code command" placeholder="Type G-code, e.g. G28 — Enter to send, ↑ for history">
       <button class="primary">Send</button>
     </form>
-  </div>
-
-  <div class="files" id="pgFiles" role="tabpanel" aria-labelledby="tabFiles" hidden>
-    <div class="files-bar">
-      <label class="upload">Upload G-code<input type="file" id="fileInput" accept=".gcode,.gco,.g"></label>
-      <label class="check"><input type="checkbox" id="filePrint"> Start printing after upload</label>
-      <span class="spacer"></span>
-      <button id="fileRefresh">Refresh</button>
-    </div>
-    <div class="files-msg" id="filesMsg" aria-live="polite"></div>
-    <div class="files-list" id="filesList"></div>
-  </div>
-
-  <div class="hist" id="pgHistory" role="tabpanel" aria-labelledby="tabHistory" hidden>
-    <dl class="hist-totals">
-      <div><dt>Jobs</dt><dd id="htJobs">—</dd></div>
-      <div><dt>Print time</dt><dd id="htTime">—</dd></div>
-      <div><dt>Filament</dt><dd id="htFil">—</dd></div>
-      <div><dt>Longest print</dt><dd id="htLong">—</dd></div>
-    </dl>
-    <div class="hist-box">
-      <div class="files-msg" id="histMsg" aria-live="polite"></div>
-      <div class="files-list" id="histList"></div>
-      <button id="histMore" hidden>Load more</button>
-    </div>
   </div>
 
   <div class="tl" id="pgTimelapse" role="tabpanel" aria-labelledby="tabTimelapse" hidden>
@@ -1209,7 +1168,6 @@ function renderPage() {
   renderPageAI(p);
   const conLive = p.connection === "online";
   for (const el of $("#pgConsole").querySelectorAll("button, input")) el.disabled = !conLive;
-  for (const el of $("#pgFiles").querySelectorAll(".files-bar button, .files-bar input")) el.disabled = !conLive;
 }
 $("#pgPause").onclick = () => doAction(pageId, printers.get(pageId)?.state === "paused" ? "resume" : "pause");
 $("#pgCancel").onclick = () => doAction(pageId, "cancel");
@@ -1218,7 +1176,7 @@ $("#pgFull").onclick = () => $("#pgCam").requestFullscreen?.();
 window.addEventListener("hashchange", route);
 
 // ---- printer page: Control tab -------------------------------------------------
-const TABS = { status: ["#tabStatus", "#pgStatus"], control: ["#tabControl", "#pgControl"], console: ["#tabConsole", "#pgConsole"], files: ["#tabFiles", "#pgFiles"], history: ["#tabHistory", "#pgHistory"], timelapse: ["#tabTimelapse", "#pgTimelapse"] };
+const TABS = { status: ["#tabStatus", "#pgStatus"], control: ["#tabControl", "#pgControl"], console: ["#tabConsole", "#pgConsole"], timelapse: ["#tabTimelapse", "#pgTimelapse"] };
 function showTab(name) {
   if (name === "timelapse" && SETUP.video !== "timelapse") name = "status";
   if (isBasic() && name !== "timelapse") name = "status";
@@ -1227,57 +1185,17 @@ function showTab(name) {
     $(panel).hidden = key !== name;
   }
   if (name === "console") { drawConsole(); $("#conInput").focus(); }
-  if (name === "files") loadFiles();
-  if (name === "history") loadHistory(true);
   if (name === "timelapse") loadTimelapses();
 }
 $("#tabStatus").onclick = () => showTab("status");
 $("#tabControl").onclick = () => showTab("control");
 $("#tabConsole").onclick = () => showTab("console");
-$("#tabFiles").onclick = () => showTab("files");
-$("#tabHistory").onclick = () => showTab("history");
 
 // ---- printer page: History tab -------------------------------------------------
 const RESULT = { completed: ["Done", "done"], cancelled: ["Cancelled", ""], error: ["Failed", "failed"],
                  klippy_shutdown: ["Failed", "failed"], klippy_disconnect: ["Failed", "failed"],
                  interrupted: ["Interrupted", "failed"], in_progress: ["Printing", "running"], server_exit: ["Interrupted", "failed"] };
 const fmtFil = mm => mm == null ? "—" : mm >= 1000 ? `${(mm / 1000).toFixed(1)} m` : `${Math.round(mm)} mm`;
-let histJobs = [], histCount = 0, histId = null;
-async function loadHistory(reset) {
-  const id = pageId; if (id === null) return;
-  if (reset) {
-    histJobs = []; histCount = 0; histId = id; $("#histList").innerHTML = "";
-    api(`/api/printers/${id}/history/totals`).then(t => {
-      if (id !== pageId) return;
-      $("#htJobs").textContent = t.total_jobs ?? "—";
-      $("#htTime").textContent = t.total_print_time != null ? fmtDur(t.total_print_time) : "—";
-      $("#htFil").textContent = fmtFil(t.total_filament_used);
-      $("#htLong").textContent = t.longest_print != null ? fmtDur(t.longest_print) : "—";
-    }).catch(() => {});
-  }
-  $("#histMsg").textContent = "Loading…";
-  try {
-    const r = await api(`/api/printers/${id}/history?start=${histJobs.length}&limit=30`);
-    if (id !== pageId || id !== histId) return;
-    histJobs = histJobs.concat(r.jobs); histCount = r.count;
-    drawHistory();
-  } catch (e) { if (id === pageId) $("#histMsg").textContent = e.message.includes("history") ? "This printer's Moonraker has no print history turned on." : e.message; }
-}
-function drawHistory() {
-  const p = printers.get(pageId), busy = p && (p.state === "printing" || p.state === "paused");
-  $("#histMsg").textContent = histJobs.length ? `Showing ${histJobs.length} of ${histCount} prints` : "No prints recorded yet.";
-  $("#histList").innerHTML = histJobs.length ? `<table><thead><tr><th>File</th><th>Date</th><th>Time</th><th>Filament</th><th>Result</th><th></th></tr></thead><tbody>${
-    histJobs.map((j, i) => {
-      const [label, cls] = RESULT[j.status] || [j.status || "—", ""];
-      return `<tr><td class="name">${esc(j.filename)}</td><td class="num">${fmtDate(j.start_time)}</td><td class="num">${j.print_duration ? fmtDur(j.print_duration) : "—"}</td>
-        <td class="num">${fmtFil(j.filament_used)}</td><td><span class="res ${cls}">${esc(label)}</span></td>
-        <td class="btns">${j.exists ? `<button class="primary" data-reprint="${i}" ${busy ? "disabled" : ""}>Reprint</button>` : ""}</td></tr>`;
-    }).join("")
-  }</tbody></table>` : "";
-  for (const b of $("#histList").querySelectorAll("[data-reprint]")) b.onclick = () => printFile(histJobs[+b.dataset.reprint].filename);
-  $("#histMore").hidden = histJobs.length >= histCount;
-}
-$("#histMore").onclick = () => loadHistory(false);
 $("#tabTimelapse").onclick = () => showTab("timelapse");
 
 // ---- printer page: Timelapses tab ------------------------------------------------
@@ -1330,49 +1248,6 @@ async function loadTimelapses() {
 // ---- printer page: Files tab ---------------------------------------------------
 const fmtSize = b => b == null ? "—" : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
 const fmtDate = t => t ? new Date(t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
-async function loadFiles() {
-  const id = pageId; if (id === null) return;
-  $("#filesMsg").textContent = "Loading…";
-  try {
-    const { files } = await api(`/api/printers/${id}/files`);
-    if (id !== pageId) return;
-    $("#filesMsg").textContent = files.length ? `${files.length} file${files.length > 1 ? "s" : ""} on the printer` : "No G-code files on the printer yet.";
-    const p = printers.get(id), busy = p && (p.state === "printing" || p.state === "paused");
-    $("#filesList").innerHTML = files.length ? `<table><thead><tr><th>File</th><th>Size</th><th>Uploaded</th><th></th></tr></thead><tbody>${
-      files.map((f, i) => `<tr><td class="name">${esc(f.path)}</td><td class="num">${fmtSize(f.size)}</td><td class="num">${fmtDate(f.modified)}</td>
-        <td class="btns"><button class="primary" data-print="${i}" ${busy ? "disabled" : ""}>Print</button><button class="del" data-del="${i}">Delete</button></td></tr>`).join("")
-    }</tbody></table>` : "";
-    for (const b of $("#filesList").querySelectorAll("[data-print]")) b.onclick = () => printFile(files[+b.dataset.print].path);
-    for (const b of $("#filesList").querySelectorAll("[data-del]")) b.onclick = () => deleteFile(files[+b.dataset.del].path);
-  } catch (e) { if (id === pageId) { $("#filesMsg").textContent = e.message; $("#filesList").innerHTML = ""; } }
-}
-async function printFile(path) {
-  const p = printers.get(pageId); if (!p || !confirm(`Start printing ${path} on ${p.name}?`)) return;
-  try { await api(`/api/printers/${p.id}/files/print`, { method: "POST", body: JSON.stringify({ path }) }); toast(`Started ${path}`); showTab("status"); }
-  catch (e) { toast(`${p.name}: ${e.message}`); }
-}
-async function deleteFile(path) {
-  const p = printers.get(pageId); if (!p || !confirm(`Delete ${path} from ${p.name}?`)) return;
-  try { await api(`/api/printers/${p.id}/files?path=${encodeURIComponent(path)}`, { method: "DELETE" }); loadFiles(); }
-  catch (e) { toast(`${p.name}: ${e.message}`); }
-}
-$("#fileRefresh").onclick = loadFiles;
-$("#fileInput").onchange = () => {
-  const file = $("#fileInput").files[0], id = pageId; $("#fileInput").value = "";
-  if (!file || id === null) return;
-  const start = $("#filePrint").checked;
-  const xhr = new XMLHttpRequest();
-  xhr.open("POST", `/api/printers/${id}/files/upload?name=${encodeURIComponent(file.name)}&print=${start ? 1 : 0}`);
-  xhr.upload.onprogress = e => { if (e.lengthComputable) $("#filesMsg").textContent = `Uploading ${file.name}… ${Math.round(e.loaded / e.total * 100)}%`; };
-  xhr.onload = () => {
-    let msg = null; try { msg = JSON.parse(xhr.responseText).error; } catch {}
-    if (xhr.status >= 200 && xhr.status < 300) { toast(start ? `Uploaded and started ${file.name}` : `Uploaded ${file.name}`); if (id === pageId) loadFiles(); }
-    else { $("#filesMsg").textContent = `Upload failed: ${msg || `HTTP ${xhr.status}`}`; }
-  };
-  xhr.onerror = () => { $("#filesMsg").textContent = "Upload failed: network error"; };
-  $("#filesMsg").textContent = `Uploading ${file.name}…`;
-  xhr.send(file);
-};
 
 // ---- printer page: Console tab -------------------------------------------------
 const conLogs = new Map();          // printer id -> [{kind, text}], kept since this page was opened
@@ -1784,6 +1659,7 @@ render();
 <script src="/static/builder/panels/files.js"></script>
 <script src="/static/builder/panels/history.js"></script>
 <script src="/static/builder/panels/timelapse.js"></script>
+<script src="/static/builder/panels/exclude.js"></script>
 <script src="/static/builder/builder.js"></script>
 </body>
 </html>

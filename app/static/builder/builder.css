@@ -205,3 +205,12 @@
 .bd-pp img { width: 96px; height: 96px; object-fit: contain; border-radius: 4px; background: #2a2a2f; }
 .bd-print .bd-primary { background: var(--orange); border-color: var(--orange); color: #1a1005; }
 @media (max-width: 760px) { .pb-chip { display: none; } }
+
+/* objects (exclude object) */
+.pb-objmap svg { width: 100%; max-height: 260px; display: block; margin-bottom: 8px; }
+.pb-objmap .bed { fill: var(--bd-deep); stroke: var(--bd-line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.pb-objmap .obj > * { fill: rgba(143, 139, 153, .35); stroke: #8f8b99; stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: pointer; }
+.pb-objmap .obj:hover > * { fill: rgba(255, 138, 31, .35); stroke: var(--orange); }
+.pb-objmap .obj.now > * { fill: rgba(255, 138, 31, .45); stroke: var(--orange); }
+.pb-objmap .obj.skipped > * { fill: rgba(229, 72, 77, .25); stroke: var(--red); stroke-dasharray: 4 3; cursor: default; }
+.pb-msg code { font-family: var(--bd-mono); font-size: 12px; }
