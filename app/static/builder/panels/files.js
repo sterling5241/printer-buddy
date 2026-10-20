@@ -35,9 +35,13 @@ PB.panel("files", {
           ${cfg.thumbs ? `<img class="pb-lthumb" loading="lazy" alt="" src="${PB.thumbUrl(pageId, f.path)}">` : ""}
           <div class="pb-lmain"><div class="pb-lname">${esc(f.path)}</div><div class="pb-lsub">${fmtSize(f.size)} · ${fmtDate(f.modified)}</div></div>
           <div class="pb-lbtn"><button type="button" class="pb-pri" data-print="${esc(f.path)}"${busy ? " disabled" : ""}>Print</button>
+          <button type="button" data-queue="${esc(f.path)}" title="Add to the job queue">+ Queue</button>
           <button type="button" data-del="${esc(f.path)}" title="Delete" aria-label="Delete ${esc(f.path)}">✕</button></div></div>`).join("");
       for (const img of list.querySelectorAll(".pb-lthumb")) img.onerror = () => img.classList.add("none");
       for (const b of list.querySelectorAll("[data-print]")) b.onclick = () => PB.printFile(b.dataset.print);
+      for (const b of list.querySelectorAll("[data-queue]")) b.onclick = () => PB.queueAdd ? PB.queueAdd(b.dataset.queue)
+        : api(`/api/printers/${pageId}/queue`, { method: "POST", body: JSON.stringify({ action: "add", filenames: [b.dataset.queue] }) })
+            .then(r => toast(`Queued ${b.dataset.queue} (${r.jobs.length} in the queue)`), e => toast(e.message));
       for (const b of list.querySelectorAll("[data-del]")) b.onclick = async () => {
         const p = PB.current(); if (!p || !confirm(`Delete ${b.dataset.del} from ${p.name}?`)) return;
         try { await api(`/api/printers/${p.id}/files?path=${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }); load(); }

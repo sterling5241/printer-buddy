@@ -293,6 +293,18 @@ class MoonrakerClient:
     async def start_print(self, path: str):
         return await self._call("printer.print.start", {"filename": path}, timeout=30)
 
+    QUEUE = {"status": "server.job_queue.status", "add": "server.job_queue.post_job", "remove": "server.job_queue.delete_job",
+             "start": "server.job_queue.start", "pause": "server.job_queue.pause", "jump": "server.job_queue.jump"}
+
+    async def job_queue(self, action: str, params: dict | None = None) -> dict:
+        """Moonraker's job queue ([job_queue] in moonraker.conf). Every action answers with the queue as it is now."""
+        res = await self._call(self.QUEUE[action], params or None, timeout=15) or {}
+        if action != "status" and "queued_jobs" not in res:
+            res = await self._call(self.QUEUE["status"]) or {}
+        return {"jobs": [{"id": j.get("job_id"), "filename": j.get("filename"), "added": j.get("time_added")}
+                         for j in res.get("queued_jobs") or []],
+                "state": res.get("queue_state")}
+
     async def delete_file(self, path: str):
         return await self._call("server.files.delete_file", {"path": f"gcodes/{path}"})
 

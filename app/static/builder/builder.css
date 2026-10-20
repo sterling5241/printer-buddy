@@ -214,3 +214,5 @@
 .pb-objmap .obj.now > * { fill: rgba(255, 138, 31, .45); stroke: var(--orange); }
 .pb-objmap .obj.skipped > * { fill: rgba(229, 72, 77, .25); stroke: var(--red); stroke-dasharray: 4 3; cursor: default; }
 .pb-msg code { font-family: var(--bd-mono); font-size: 12px; }
+.pb-qstate { font-size: 12.5px; }
+@media (max-width: 760px) { .pb-qstate { flex-basis: 100%; } }

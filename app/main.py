@@ -591,6 +591,37 @@ async def print_file(request: Request):
     return JSONResponse({"ok": True})
 
 
+async def job_queue(request: Request):
+    """GET: the printer's job queue. POST {action: add|remove|start|pause|jump, filenames|job_ids|job_id}."""
+    client, e = _online_client(request)
+    if e:
+        return e
+    action, params = "status", None
+    if request.method == "POST":
+        b = await body(request)
+        action = b.get("action")
+        if action == "add":
+            names = [str(n).strip() for n in b.get("filenames") or [] if str(n).strip() and ".." not in str(n).split("/")]
+            if not names:
+                return err("filenames is required")
+            params = {"filenames": names}
+        elif action == "remove":
+            params = {"job_ids": [str(j) for j in b.get("job_ids") or []]}
+            if not params["job_ids"]:
+                return err("job_ids is required")
+        elif action == "jump":
+            params = {"job_id": str(b.get("job_id") or "")}
+        elif action not in ("start", "pause"):
+            return err("bad action")
+    try:
+        return JSONResponse(await client.job_queue(action, params))
+    except Exception as ex:
+        text = str(ex) or type(ex).__name__
+        if "not found" in text.lower() or "-32601" in text:
+            return err("The job queue isn't turned on for this printer: add [job_queue] to moonraker.conf and restart Moonraker.", 404)
+        return err(text, 502)
+
+
 async def delete_file(request: Request):
     client, e = _online_client(request)
     if e:
@@ -850,6 +881,7 @@ _app = Starlette(routes=[
     Route("/api/printers/{pid:int}/history/totals", history_totals),
     Route("/api/printers/{pid:int}/files", delete_file, methods=["DELETE"]),
     Route("/api/printers/{pid:int}/files/print", print_file, methods=["POST"]),
+    Route("/api/printers/{pid:int}/queue", job_queue, methods=["GET", "POST"]),
     Route("/api/printers/{pid:int}/files/upload", upload_file, methods=["POST"]),
     Route("/api/printers/{pid:int}/{action}", printer_action, methods=["POST"]),
     Route("/api/events", events),
