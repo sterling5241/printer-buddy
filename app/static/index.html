@@ -317,6 +317,7 @@
   .qv-btns .outline { background: transparent; border: 1.5px solid var(--orange); color: var(--orange); }
   .qv-btns .stop { background: var(--red); color: #fff; }
 </style>
+<link rel="stylesheet" href="/static/printer.css">
 </head>
 <body>
 <main>
@@ -1449,8 +1450,9 @@ function renderControl(p) {
   $("#ctlNoCam").textContent = p.connection === "online" ? "No camera" : "Can't reach printer";
   $("#ctlNozzleNow").textContent = live ? fmtTemp(p.nozzle) : "—";
   $("#ctlBedNow").textContent = live ? fmtTemp(p.bed) : "—";
-  for (const el of $("#pgControl").querySelectorAll("button, input")) el.disabled = !live;
-  for (const el of $("#pgControl").querySelectorAll("[data-home], [data-jog], [data-step]")) el.disabled = !live || printing;
+  const ctlRoots = [$("#pgControl"), $("#pbToolhead")].filter(Boolean);
+  for (const r of ctlRoots) for (const el of r.querySelectorAll("button, input")) el.disabled = !live;
+  for (const r of ctlRoots) for (const el of r.querySelectorAll("[data-home], [data-jog], [data-step]")) el.disabled = !live || printing;
   const homed = (p.homed_axes || "").toUpperCase();
   $("#ctlMoveNote").textContent = printing ? "Moving is disabled while a print is running."
     : `Homed: ${homed ? homed.split("").join(", ") : "none"}${homed.length < 3 ? " · home before jogging" : ""}`;
@@ -1770,5 +1772,7 @@ loadConfig();
 connectEvents();
 render();
 </script>
+<script src="/static/vendor/echarts.min.js"></script>
+<script src="/static/printer.js"></script>
 </body>
 </html>

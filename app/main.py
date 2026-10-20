@@ -13,7 +13,8 @@ from pathlib import Path
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
-from starlette.routing import Route
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
 
 from . import discovery
 from .manager import Manager
@@ -843,5 +844,6 @@ _app = Starlette(routes=[
     Route("/api/notify/settings", get_notify_settings),
     Route("/api/notify/settings", save_notify_settings, methods=["PUT"]),
     Route("/api/notify/test", test_notification, methods=["POST"]),
+    Mount("/static", app=StaticFiles(directory=STATIC), name="static"),
 ], lifespan=lifespan)
 app = TunnelGuard(_app)
