@@ -520,6 +520,41 @@ def _online_client(request: Request):
     return client, None
 
 
+async def temps(request: Request):
+    client, e = _online_client(request)
+    if e:
+        return e
+    try:
+        return JSONResponse({"history": await client.temperature_history(), "sensors": client.sensors()},
+                            headers={"Cache-Control": "no-store"})
+    except Exception as ex:
+        return err(str(ex) or type(ex).__name__, 502)
+
+
+async def thumbnail(request: Request):
+    client, e = _online_client(request)
+    if e:
+        return e
+    name = request.query_params.get("file", "").strip().lstrip("/")
+    if not name or ".." in name.split("/"):
+        return err("file is required")
+    try:
+        got = await client.thumbnail(name)
+    except Exception as ex:
+        return err(str(ex) or type(ex).__name__, 502)
+    if not got:
+        return err("no preview picture in this file", 404)
+    ctype, data = got
+    return Response(data, media_type=ctype, headers={"Cache-Control": "max-age=3600"})
+
+
+async def macros(request: Request):
+    client, e = _online_client(request)
+    if e:
+        return e
+    return JSONResponse({"macros": client.macros})
+
+
 async def list_files(request: Request):
     client, e = _online_client(request)
     if e:
@@ -794,6 +829,9 @@ _app = Starlette(routes=[
     Route("/api/printers/{pid:int}/timelapses/{tid}.mp4", timelapse_video),
     Route("/api/printers/{pid:int}/timelapses/{tid}", delete_timelapse, methods=["DELETE"]),
     Route("/api/printers/{pid:int}/gcode", printer_gcode, methods=["POST"]),
+    Route("/api/printers/{pid:int}/temps", temps),
+    Route("/api/printers/{pid:int}/thumbnail", thumbnail),
+    Route("/api/printers/{pid:int}/macros", macros),
     Route("/api/printers/{pid:int}/files", list_files),
     Route("/api/printers/{pid:int}/history", history),
     Route("/api/printers/{pid:int}/history/totals", history_totals),

@@ -10,7 +10,7 @@ from typing import Callable
 
 import uuid
 
-from .net import HandshakeError, WebSocket, get_json, http_post
+from .net import HandshakeError, WebSocket, get_json, http_get, http_post
 
 log = logging.getLogger(__name__)
 VERSION = "0.1.0"
@@ -22,9 +22,25 @@ SUBSCRIBE = {
     "display_status": ["progress", "message"],
     "virtual_sdcard": ["progress", "is_active"],
     "webhooks": ["state", "state_message"],
-    "gcode_move": ["speed_factor"],
-    "toolhead": ["homed_axes"],
+    "gcode_move": ["speed_factor", "extrude_factor"],
+    "toolhead": ["homed_axes", "position"],
 }
+
+# Extra Klipper objects shown on the printer dashboard (found per printer on connect).
+SENSOR_PREFIXES = ("temperature_sensor ", "temperature_fan ", "heater_generic ")
+FAN_PREFIXES = ("heater_fan ", "controller_fan ", "fan_generic ")
+EXTRA_HEATERS = ("extruder1", "extruder2", "extruder3")
+
+
+def _pretty(obj: str) -> str:
+    """'temperature_sensor chamber_temp' -> 'Chamber Temp', 'heater_bed' -> 'Bed'."""
+    named = {"extruder": "Nozzle", "heater_bed": "Bed", "fan": "Part fan"}
+    if obj in named:
+        return named[obj]
+    if obj.startswith("extruder"):
+        return f"Nozzle {obj[8:]}"
+    name = obj.split(" ", 1)[1] if " " in obj else obj
+    return name.replace("_", " ").title()
 
 
 class AuthError(Exception):
@@ -55,6 +71,9 @@ class MoonrakerClient:
         self.klippy_message: str | None = None
         self.status: dict = {}
         self.webcams: list[dict] = []
+        self.extras: list[str] = []          # extra sensors/fans/heaters this printer has
+        self.macros: list[dict] = []         # [{"name", "description"}], hidden ones (_NAME) left out
+        self._thumbs: dict[str, tuple[str, bytes] | None] = {}   # filename -> (content type, image)
         self._ids = itertools.count(1)
         self._pending: dict[int, asyncio.Future] = {}
         self._ws: WebSocket | None = None
@@ -222,9 +241,32 @@ class MoonrakerClient:
             pass
 
     async def _subscribe(self):
-        res = await self._call("printer.objects.subscribe", {"objects": SUBSCRIBE})
+        objects = dict(SUBSCRIBE)
+        try:
+            names = (await self._call("printer.objects.list") or {}).get("objects", [])
+        except (RPCError, asyncio.TimeoutError):
+            names = []
+        self.extras = [n for n in names
+                       if n.startswith(SENSOR_PREFIXES + FAN_PREFIXES) or n == "fan" or n in EXTRA_HEATERS]
+        for n in self.extras:
+            objects[n] = None
+        await self._load_macros([n[len("gcode_macro "):] for n in names if n.startswith("gcode_macro ")])
+        res = await self._call("printer.objects.subscribe", {"objects": objects})
         self.status = (res or {}).get("status", {})
         self._changed()
+
+    async def _load_macros(self, names: list[str]):
+        """Macro names + descriptions (from the printer's config). _NAME macros are Klipper's 'hidden' ones."""
+        desc = {}
+        try:
+            res = await self._call("printer.objects.query", {"objects": {"configfile": ["settings"]}})
+            settings = ((res or {}).get("status", {}).get("configfile", {}) or {}).get("settings", {}) or {}
+            desc = {k[len("gcode_macro "):]: (v or {}).get("description") for k, v in settings.items()
+                    if k.startswith("gcode_macro ")}
+        except (RPCError, asyncio.TimeoutError):
+            pass
+        self.macros = sorted(({"name": n.upper(), "description": desc.get(n.lower()) or desc.get(n) or None}
+                              for n in names if not n.startswith("_")), key=lambda m: m["name"])
 
     async def _load_webcams(self):
         try:
@@ -279,6 +321,40 @@ class MoonrakerClient:
     async def history_totals(self) -> dict:
         res = await self._call("server.history.totals")
         return (res or {}).get("job_totals", {})
+
+    async def temperature_history(self) -> dict:
+        """Moonraker keeps ~20 minutes of 1-per-second readings: {object: {"temperatures": [...], "targets": [...]}}."""
+        res = await self._call("server.temperature_store", {"include_monitors": False}, timeout=15) or {}
+        keep = {"extruder", "heater_bed", *self.extras}
+        return {k: {f: v[f] for f in ("temperatures", "targets", "powers", "speeds") if f in v}
+                for k, v in res.items() if k in keep and isinstance(v, dict)}
+
+    async def thumbnail(self, filename: str) -> tuple[str, bytes] | None:
+        """The slicer's preview picture for a G-code file (the largest up to 400 px wide), cached."""
+        if filename in self._thumbs:
+            return self._thumbs[filename]
+        try:
+            meta = await self._call("server.files.metadata", {"filename": filename}) or {}
+        except RPCError:
+            return None
+        thumbs = [t for t in meta.get("thumbnails") or [] if t.get("relative_path")]
+        if not thumbs:
+            self._thumbs[filename] = None
+            return None
+        fit = [t for t in thumbs if (t.get("width") or 0) <= 400]
+        pick = max(fit, key=lambda t: t.get("width") or 0) if fit else min(thumbs, key=lambda t: t.get("width") or 0)
+        folder = filename.rsplit("/", 1)[0] + "/" if "/" in filename else ""
+        from urllib.parse import quote
+        url = f"http://{self.host}:{self.port}/server/files/gcodes/{quote(folder + pick['relative_path'])}"
+        status, headers, data = await http_get(url, {"X-Api-Key": self.api_key} if self.api_key else {}, timeout=10,
+                                               max_bytes=2_000_000)
+        if status != 200 or not data:
+            return None
+        ctype = next((v for k, v in headers.items() if k.lower() == "content-type"), "image/png")
+        if len(self._thumbs) > 100:
+            self._thumbs.clear()
+        self._thumbs[filename] = (ctype, data)
+        return self._thumbs[filename]
 
     async def gcode(self, script: str):
         """Run G-code; waits until Klipper finishes it (homing can take a while)."""
@@ -375,5 +451,24 @@ class MoonrakerClient:
             "total_layers": (ps.get("info") or {}).get("total_layer"),
             "cams": self.cams_info(),
             "speed_factor": s.get("gcode_move", {}).get("speed_factor"),
+            "extrude_factor": s.get("gcode_move", {}).get("extrude_factor"),
             "homed_axes": s.get("toolhead", {}).get("homed_axes"),
+            "position": (s.get("toolhead", {}).get("position") or [None] * 4)[:4],
+            "sensors": self.sensors() if live else [],
+            "macro_count": len(self.macros),
         }
+
+    def sensors(self) -> list[dict]:
+        """Every heater / temperature sensor / fan, for the dashboard's Thermals card and chart."""
+        out = []
+        for obj in ["extruder", "heater_bed", *self.extras]:
+            st = self.status.get(obj)
+            if not isinstance(st, dict):
+                continue
+            is_fan = obj == "fan" or obj.startswith(FAN_PREFIXES)
+            kind = ("fan" if is_fan else "heater" if "target" in st and not obj.startswith("temperature_fan ")
+                    else "sensor")
+            out.append({"id": obj, "name": _pretty(obj), "kind": kind,
+                        "temp": st.get("temperature"), "target": st.get("target"),
+                        "power": st.get("power"), "speed": st.get("speed")})
+        return out
