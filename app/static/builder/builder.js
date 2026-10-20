@@ -256,6 +256,7 @@
       const head = el("header", "", `<span class="pb-handle" title="Drag to move" aria-hidden="true">⠿</span>${def.icon || ""}<button type="button" class="pb-title">${esc(def.title)}</button>
         <span class="pb-tools"><button type="button" data-a="eye" title="${item.h ? "Show this panel" : "Hide this panel"}" aria-pressed="${!item.h}">${item.h ? "🙈" : "👁"}</button>
         <button type="button" data-a="set" title="Panel settings">⚙</button><button type="button" data-a="menu" title="More" aria-haspopup="menu">⋯</button></span>
+        ${def.gear && def.settings?.length ? `<button type="button" class="pb-qset" title="${esc(def.title)} settings">⚙</button>` : ""}
         <button type="button" class="pb-tog" aria-label="Collapse">${icon('<path d="M6 9l6 6 6-6"/>')}</button>`);
       const body = el("div", "pb-body");
       card.append(head, body);
@@ -268,6 +269,8 @@
       const gear = head.querySelector("[data-a=set]");
       if (def.settings?.length) gear.onclick = () => PB.settings(def, item.o, v => { item.o = v; changed(); });
       else gear.remove();
+      const qset = head.querySelector(".pb-qset");   // panels with gear: true keep their ⚙ outside Edit layout too
+      if (qset) qset.onclick = () => PB.settings(def, item.o, v => { item.o = v; changed(); });
       head.querySelector("[data-a=menu]").onclick = e => menu(e.currentTarget, [
         ["Move up", ops.up], ["Move down", ops.down], ["Move to the left column", ops.left], ["Move to the right column", ops.right],
         ["Remove panel", ops.del, "danger"],

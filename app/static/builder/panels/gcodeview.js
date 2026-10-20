@@ -3,6 +3,7 @@
 PB.panel("gcodeview", {
   title: "G-code preview", desc: "2D layer view or 3D view of a print file; follows the print", cls: "adv",
   icon: PB.icon('<path d="M4 7l8-4 8 4-8 4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/>'),
+  gear: true,
   settings: [
     { k: "view", label: "Start in", type: "select", def: "2d", options: [["2d", "2D (layer)"], ["3d", "3D"]] },
     { k: "quality", label: "3D quality", type: "select", def: "auto", options: [["auto", "Auto"], ["solid", "Solid (lit)"], ["lines", "Lines (fast)"]] },

@@ -1,6 +1,7 @@
 // Printer Buddy - dashboard builder core: the panel registry and one shared live feed for every panel.
 // Loaded after the main page script; builds on its globals (printers, pageId, renderPage, route, conAdd, gcode...).
-// A panel file calls  PB.panel("name", { title, icon, cls, single, settings, create(host, cfg) -> { open, update, shown, log, destroy } })
+// A panel file calls  PB.panel("name", { title, icon, cls, single, settings, gear, create(host, cfg) -> { open, update, shown, log, destroy } })
+//   gear: true    its ⚙ settings button shows all the time, not only in Edit layout (for options people change often)
 //   settings      [{ k, label, type: "check" | "select", options: [[value, label], ...], def }] - shown under the panel's gear
 //   create(host, cfg)  build your HTML inside host (the panel body); cfg = this panel's settings (defaults filled in)
 //   open(id)      a printer page was opened (reset per-printer state)

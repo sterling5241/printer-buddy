@@ -55,6 +55,8 @@
 
 /* edit mode */
 :is(#page, #home).bd.bd-editing .pb-tools { display: flex; }
+:is(#page, #home).bd .pb-qset { height: 26px; padding: 0 7px; font-size: 12px; border: 0; background: none; }
+:is(#page, #home).bd.bd-editing .pb-qset { display: none; }
 :is(#page, #home).bd.bd-editing .pb-card > header { cursor: grab; }
 :is(#page, #home).bd.bd-editing .bd-col { outline: 1px dashed var(--bd-line); outline-offset: 4px; border-radius: 4px; }
 :is(#page, #home).bd .bd-col.bd-over { outline-color: var(--orange); }

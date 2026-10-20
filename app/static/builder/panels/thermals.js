@@ -2,6 +2,7 @@
 PB.panel("thermals", {
   title: "Thermals", desc: "Temperatures table, presets and history chart",
   icon: PB.icon('<path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/>'),
+  gear: true,
   settings: [
     { k: "table", label: "Show the table", type: "check", def: true },
     { k: "presets", label: "Show presets (PLA / PETG / ABS)", type: "check", def: true },
