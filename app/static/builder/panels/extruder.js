@@ -5,7 +5,7 @@ PB.panel("extruder", {
   create(host) {
     host.innerHTML = `<div class="pb-row pb-tools-t" hidden></div>
       <div class="pb-fields"><label>Length <input type="number" data-k="len" value="10" min="1" max="200"> mm</label>
-        <label>Speed <input type="number" data-k="spd" value="5" min="1" max="50"> mm/s</label></div>
+        <label>Speed <input type="number" data-k="spd" value="5" min="1" max="50"> mm/s</label><span class="pb-muted pb-flow" title="Volumetric flow for 1.75 mm filament (most hotends top out around 10-25 mm³/s)"></span></div>
       <div class="pb-row"><button type="button" data-ex="-1">Retract</button><button type="button" data-ex="1">Extrude</button></div>
       <div class="pb-row pb-fil" hidden><button type="button" data-mac="UNLOAD_FILAMENT">Unload filament</button><button type="button" data-mac="LOAD_FILAMENT">Load filament</button></div>
       <div class="pb-note pb-cold"></div>
@@ -17,6 +17,8 @@ PB.panel("extruder", {
     const q = s => host.querySelector(s), k = n => host.querySelector(`[data-k=${n}]`);
     const range = q("input[type=range]"), out = q("output");
     let dragging = false, toolsKey = "";
+    const flow = () => { q(".pb-flow").textContent = `≈ ${(Math.min(50, Math.max(0.5, +k("spd").value || 5)) * Math.PI * 0.875 ** 2).toFixed(1)} mm³/s`; };
+    k("spd").addEventListener("input", flow); flow();
     for (const b of host.querySelectorAll("[data-ex]")) b.onclick = () => {
       const len = Math.min(200, Math.max(0.1, +k("len").value || 10)), spd = Math.min(50, Math.max(0.5, +k("spd").value || 5));
       gcode(`M83\nG1 E${(+b.dataset.ex * len).toFixed(2)} F${Math.round(spd * 60)}`);

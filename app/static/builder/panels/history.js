@@ -11,7 +11,8 @@ PB.panel("history", {
   ],
   create(host, cfg) {
     host.innerHTML = `<div class="pb-tool"><div class="pb-totals pb-muted"></div><span class="bd-sp"></span>
-        <button type="button" data-a="maint" title="Maintenance reminders">🔧 Maintenance</button><button type="button" data-a="csv" title="Download the whole history as a spreadsheet (CSV)">⬇ CSV</button></div>
+        <button type="button" data-a="charts" title="Charts: results, filament and print time per week" aria-pressed="false">📊 Charts</button><button type="button" data-a="maint" title="Maintenance reminders">🔧 Maintenance</button><button type="button" data-a="csv" title="Download the whole history as a spreadsheet (CSV)">⬇ CSV</button></div>
+      <div class="pb-hcharts" hidden><div class="pb-hc1"></div><div class="pb-hc2"></div><div class="pb-hcnums pb-muted"></div></div>
       <div class="pb-maint"></div><div class="pb-msg pb-muted" aria-live="polite"></div>
       <div class="pb-list"></div><button type="button" class="pb-more" hidden>Load more</button>`;
     const q = s => host.querySelector(s), list = q(".pb-list"), msg = q(".pb-msg"), more = q(".pb-more");
@@ -97,13 +98,47 @@ PB.panel("history", {
         dlg.querySelector(".pb-hmore").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(String(v))}</dd>`).join("");
       } catch {}
     }
+    let allJobs = null;   // every job (for CSV + charts), fetched once per printer
+    async function fetchAll(id) {
+      if (allJobs?.id === id) return allJobs.jobs;
+      let all = [], total = 1;
+      while (all.length < total && all.length < 20000) { const r = await api(`/api/printers/${id}/history?start=${all.length}&limit=100`); total = r.count; if (!r.jobs.length) break; all = all.concat(r.jobs); }
+      allJobs = { id, jobs: all }; return all;
+    }
+    // ---- charts: results (donut), and filament + print hours per week for the last 12 weeks ----
+    let c1 = null, c2 = null;
+    q("[data-a=charts]").onclick = async e => {
+      const box = q(".pb-hcharts"), on = box.hidden; box.hidden = !on; e.currentTarget.setAttribute("aria-pressed", on);
+      if (!on) return;
+      if (!window.echarts) { q(".pb-hcnums").textContent = "Charts unavailable."; return; }
+      const id = pageId; q(".pb-hcnums").textContent = "Collecting the history…";
+      let all; try { all = await fetchAll(id); } catch (err) { q(".pb-hcnums").textContent = err.message; return; }
+      if (id !== pageId) return;
+      const count = {}; for (const j of all) count[j.status || "unknown"] = (count[j.status || "unknown"] || 0) + 1;
+      const COL = { completed: "#4ade80", cancelled: "#8f8b99", error: "#e5484d", klippy_shutdown: "#e5484d", klippy_disconnect: "#f6c344", interrupted: "#f6c344", in_progress: "#ff8a1f" };
+      const WEEK = 7 * 86400, now = Date.now() / 1000, weeks = Array.from({ length: 12 }, (_, i) => Math.floor(now / WEEK) - 11 + i);
+      const fil = weeks.map(() => 0), hrs = weeks.map(() => 0);
+      for (const j of all) { const w = weeks.indexOf(Math.floor((j.start_time || 0) / WEEK)); if (w >= 0) { fil[w] += (j.filament_used || 0) / 1000; hrs[w] += (j.print_duration || 0) / 3600; } }
+      const label = w => new Date(w * WEEK * 1000).toLocaleDateString([], { month: "short", day: "numeric" });
+      c1 ||= echarts.init(q(".pb-hc1")); c2 ||= echarts.init(q(".pb-hc2"));
+      const txt = { color: "#8f8b99", fontSize: 11 };
+      c1.setOption({ tooltip: { trigger: "item" }, legend: { bottom: 0, textStyle: txt }, series: [{ type: "pie", radius: ["45%", "70%"], center: ["50%", "42%"], label: { show: false },
+        data: Object.entries(count).map(([k, v]) => ({ name: (RESULT[k] || [k])[0], value: v, itemStyle: { color: COL[k] || "#90cdf4" } })) }] });
+      c2.setOption({ tooltip: { trigger: "axis" }, legend: { top: 0, textStyle: txt }, grid: { left: 40, right: 40, top: 28, bottom: 24 },
+        xAxis: { type: "category", data: weeks.map(label), axisLabel: txt },
+        yAxis: [{ type: "value", name: "m", axisLabel: txt, nameTextStyle: txt, splitLine: { lineStyle: { color: "rgba(127,127,140,.15)" } } }, { type: "value", name: "h", axisLabel: txt, nameTextStyle: txt, splitLine: { show: false } }],
+        series: [{ name: "Filament (m)", type: "bar", data: fil.map(v => +v.toFixed(1)), itemStyle: { color: "#ff8a1f" } },
+                 { name: "Print hours", type: "line", yAxisIndex: 1, data: hrs.map(v => +v.toFixed(1)), itemStyle: { color: "#4fd1c5" }, showSymbol: false }] });
+      const done = all.filter(j => j.status === "completed"), avg = done.length ? done.reduce((a, j) => a + (j.print_duration || 0), 0) / done.length : 0;
+      q(".pb-hcnums").textContent = `${all.length} prints · ${all.length ? Math.round(done.length / all.length * 100) : 0}% finished · average finished print ${avg ? fmtDur(avg) : "—"}`;
+      c1.resize(); c2.resize();
+    };
     // ---- CSV export: every job, not just the ones loaded ----
     q("[data-a=csv]").onclick = async () => {
       const id = pageId; if (id === null) return;
       msg.textContent = "Collecting the history…";
       try {
-        let all = [], total = 1;
-        while (all.length < total && all.length < 20000) { const r = await api(`/api/printers/${id}/history?start=${all.length}&limit=100`); total = r.count; if (!r.jobs.length) break; all = all.concat(r.jobs); }
+        const all = await fetchAll(id);
         const cell = v => { const t = v == null ? "" : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
         const iso = t => t ? new Date(t * 1000).toISOString() : "";
         const csv = [["file", "result", "started", "ended", "print_seconds", "filament_mm", "note"].join(","),
@@ -152,13 +187,13 @@ PB.panel("history", {
       render(); dlg.showModal();
     };
     return {
-      open() { loaded = false; jobs = []; notes = {}; maint = []; totals = {}; list.innerHTML = ""; msg.textContent = ""; q(".pb-totals").textContent = ""; q(".pb-maint").innerHTML = ""; },
+      open() { allJobs = null; q(".pb-hcharts").hidden = true; q("[data-a=charts]").setAttribute("aria-pressed", false); loaded = false; jobs = []; notes = {}; maint = []; totals = {}; list.innerHTML = ""; msg.textContent = ""; q(".pb-totals").textContent = ""; q(".pb-maint").innerHTML = ""; },
       shown() { if (!loaded) load(true); },
       update(p) {
         const b = p.state === "printing" || p.state === "paused";
         if (b !== busy) { busy = b; for (const x of list.querySelectorAll("[data-print]")) x.disabled = busy; }
       },
-      destroy() { dlg.remove(); },
+      destroy() { dlg.remove(); c1?.dispose(); c2?.dispose(); },
     };
   },
 });

@@ -767,7 +767,7 @@ RPC_ALLOW = {
     "server.spoolman.status": 15, "server.spoolman.get_spool_id": 15, "server.spoolman.post_spool_id": 15,
     "server.spoolman.proxy": 20,
     "machine.peripherals.usb": 20, "machine.peripherals.serial": 20, "machine.peripherals.video": 20, "machine.peripherals.canbus": 30,
-    "server.history.get_job": 15, "printer.query_endstops.status": 10, "printer.objects.list": 10,
+    "server.history.get_job": 15, "printer.query_endstops.status": 10, "server.webcams.list": 10, "server.webcams.post_item": 15, "server.webcams.delete_item": 15, "printer.objects.list": 10,
     "server.info": 10, "server.announcements.list": 15, "server.announcements.dismiss": 15, "printer.info": 10,
 }
 
@@ -784,7 +784,10 @@ async def rpc(request: Request):
     if params is not None and not isinstance(params, dict):
         return err("params must be an object")
     try:
-        return JSONResponse({"result": await client.rpc(method, params, timeout=RPC_ALLOW[method])})
+        result = await client.rpc(method, params, timeout=RPC_ALLOW[method])
+        if method in ("server.webcams.post_item", "server.webcams.delete_item"):
+            await client._load_webcams()   # the camera list changed: show it right away
+        return JSONResponse({"result": result})
     except Exception as ex:
         text = str(ex) or type(ex).__name__
         return err(text, 404 if "not found" in text.lower() else 502)

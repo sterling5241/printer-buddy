@@ -1,14 +1,17 @@
 // Z offset panel: babystep Z up / down (also mid-print), reset, and save it to the config.
 PB.panel("zoffset", {
-  title: "Z offset", desc: "Babystep Z up / down and save it", cls: "adv",
+  title: "Z offset", desc: "Babystep Z up / down and save it", cls: "adv", gear: true,
+  settings: [{ k: "steps", label: "Step sizes (mm)", type: "select", def: "0.005,0.01,0.025,0.05", options: [["0.005,0.01,0.025,0.05", "0.005 · 0.01 · 0.025 · 0.05"],
+    ["0.01,0.025,0.05,0.1", "0.01 · 0.025 · 0.05 · 0.1"], ["0.001,0.005,0.01,0.05", "0.001 · 0.005 · 0.01 · 0.05"]] }],
   icon: PB.icon('<path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/><path d="M3 12h4M17 12h4"/>'),
-  create(host) {
+  create(host, cfg) {
+    const STEPS = String(cfg.steps || "0.005,0.01,0.025,0.05").split(",").map(Number);
     host.innerHTML = `<div class="pb-big"><span>Z offset</span><b>0.000</b><small>mm</small></div>
-      <div class="pb-seg">${[0.005, 0.01, 0.025, 0.05].map(s => `<button type="button" data-step="${s}" aria-pressed="${s === 0.01}">${s}</button>`).join("")}</div>
+      <div class="pb-seg">${STEPS.map((s, i) => `<button type="button" data-step="${s}" aria-pressed="${i === 1}">${s}</button>`).join("")}</div>
       <div class="pb-row"><button type="button" data-dir="-1" title="Nozzle closer to the bed">↓ Lower</button><button type="button" data-dir="1" title="Nozzle further from the bed">↑ Raise</button></div>
       <div class="pb-row"><button type="button" data-a="reset">Reset to 0</button><button type="button" data-a="save">Save</button></div>
       <div class="pb-note">Lower = closer to the bed (more squish). Save writes it to the probe or endstop, then needs SAVE_CONFIG.</div>`;
-    let step = 0.01, feats = {};
+    let step = STEPS[1], feats = {};
     for (const b of host.querySelectorAll("[data-step]")) b.onclick = () => {
       step = +b.dataset.step; for (const o of host.querySelectorAll("[data-step]")) o.setAttribute("aria-pressed", String(o === b));
     };
