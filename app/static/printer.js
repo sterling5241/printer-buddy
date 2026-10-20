@@ -6,13 +6,17 @@
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
                   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+  let chart = null, series = {}, lastPush = 0, tempsKey = "";   // thermals state (declared early: the layout code resizes the chart)
   const ICON = p => `<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 
   // ---- top bar -------------------------------------------------------------
   const head = page.querySelector(".pg-head");
   const top = el("div", "pb-top");
   const editBtn = el("button", "adv", "Edit layout"); editBtn.id = "pbEdit"; editBtn.type = "button";
-  top.append(head.querySelector(".pg-back"), $("#pgName"), $("#pgTag"), el("span", "pb-spacer"), editBtn, $("#pgPause"), $("#pgCancel"), $("#pgStop"));
+  const back = head.querySelector(".pg-back"), actions = el("div", "pb-actions");
+  for (const n of back.childNodes) if (n.nodeType === 3 && n.textContent.trim()) n.replaceWith(el("span", "pb-backtxt", esc(n.textContent.trim())));
+  actions.append(editBtn, $("#pgPause"), $("#pgCancel"), $("#pgStop"));
+  top.append(back, $("#pgName"), $("#pgTag"), el("span", "pb-spacer"), actions);
   head.replaceWith(top);
   page.querySelector(".pg-tabs").hidden = true;
 
@@ -70,11 +74,16 @@
     ai:       { title: "AI watch", body: [$("#pgAi")], cls: "ai" },
     console:  { title: "Console", body: [mini], cls: "adv" },
   };
-  const DEFAULT = { cols: [["camera", "thermals", "console"], ["status", "ai", "toolhead", "macros"]], off: [], collapsed: [] };
+  const DEFAULT = { cols: [["camera", "thermals", "console"], ["status", "ai", "toolhead", "macros"]],
+                    phone: ["status", "camera", "ai", "thermals", "toolhead", "macros", "console"], off: [], collapsed: [] };
   let layout = store.get("pb-layout-v1", null);
   if (!layout || !Array.isArray(layout.cols) || layout.cols.length !== 2) layout = structuredClone(DEFAULT);
   for (const id of Object.keys(CARDS)) if (!layout.cols.flat().includes(id)) layout.cols[0].push(id);   // cards added later
   layout.cols = layout.cols.map(c => c.filter(id => CARDS[id]));
+  if (!Array.isArray(layout.phone)) layout.phone = [...DEFAULT.phone];                  // phones: one column, own order
+  layout.phone = layout.phone.filter(id => CARDS[id]);
+  for (const id of Object.keys(CARDS)) if (!layout.phone.includes(id)) layout.phone.push(id);
+  const phone = matchMedia("(max-width: 760px)");
 
   const cardEl = {};
   for (const [id, c] of Object.entries(CARDS)) {
@@ -101,7 +110,9 @@
   function toggle(list, id) { const i = list.indexOf(id); i >= 0 ? list.splice(i, 1) : list.push(id); }
   function saveLayout() { store.set("pb-layout-v1", layout); drawLayout(); }
   function drawLayout() {
-    layout.cols.forEach((ids, i) => cols[i].replaceChildren(...ids.map(id => cardEl[id])));
+    if (phone.matches) { cols[0].replaceChildren(...layout.phone.map(id => cardEl[id])); cols[1].replaceChildren(); }
+    else layout.cols.forEach((ids, i) => cols[i].replaceChildren(...ids.map(id => cardEl[id])));
+    cols[1].hidden = phone.matches;
     for (const [id, card] of Object.entries(cardEl)) {
       card.classList.toggle("pb-off", layout.off.includes(id));
       card.classList.toggle("collapsed", layout.collapsed.includes(id));
@@ -110,23 +121,26 @@
     chart?.resize();
   }
   function moveCard(id, how) {
-    const ci = layout.cols.findIndex(c => c.includes(id)), col = layout.cols[ci], i = col.indexOf(id);
-    if (how === "up" && i > 0) [col[i - 1], col[i]] = [col[i], col[i - 1]];
-    else if (how === "down" && i < col.length - 1) [col[i + 1], col[i]] = [col[i], col[i + 1]];
-    else if (how === "col") { col.splice(i, 1); layout.cols[1 - ci].push(id); }
+    const ci = layout.cols.findIndex(c => c.includes(id)), col = phone.matches ? layout.phone : layout.cols[ci], i = col.indexOf(id);
+    // step past cards this setup never shows (e.g. AI off, Basic UI), so every click visibly moves the card
+    const shown = j => j >= 0 && j < col.length && getComputedStyle(cardEl[col[j]]).display !== "none";
+    let j = i + (how === "up" ? -1 : 1);
+    while (j >= 0 && j < col.length && !shown(j)) j += how === "up" ? -1 : 1;
+    if ((how === "up" || how === "down") && shown(j)) { col.splice(i, 1); col.splice(j, 0, id); }
+    else if (how === "col" && !phone.matches) { col.splice(i, 1); layout.cols[1 - ci].push(id); }
     else if (how === "off") toggle(layout.off, id);
     saveLayout();
   }
   editBtn.onclick = () => page.classList.toggle("pb-editing");
   $("#pbDone").onclick = () => page.classList.remove("pb-editing");
   $("#pbReset").onclick = () => { layout = structuredClone(DEFAULT); saveLayout(); };
+  phone.addEventListener("change", drawLayout);
   drawLayout();
 
   // ---- thermals: chart + table + presets ------------------------------------------------
   const COLORS = { extruder: "#FF8A1F", heater_bed: "#7C3AED" }, EXTRA = ["#C4A7FF", "#4FD1C5", "#F6E05E", "#FC8181", "#90CDF4", "#68D391"];
   const colorOf = (id, i) => COLORS[id] || EXTRA[i % EXTRA.length];
   const SPAN = 20 * 60 * 1000;
-  let chart = null, series = {}, lastPush = 0, tempsKey = "";
   if (window.echarts) {
     chart = echarts.init($("#pbChart"), null, { renderer: "canvas" });
     new ResizeObserver(() => chart.resize()).observe($("#pbChart"));
@@ -189,8 +203,9 @@
     const key = list.map(s => s.id).join("|");
     if (key !== tempsKey) {
       tempsKey = key;
-      body.innerHTML = list.length ? list.map((s, i) => `<tr data-s="${esc(s.id)}">
-        <td><span class="dot" style="background:${s.kind === "fan" ? "var(--track)" : colorOf(s.id, i)}"></span>${esc(s.name)}</td>
+      const heatIdx = list.filter(x => x.kind !== "fan").map(x => x.id);   // same order and colours as the chart
+      body.innerHTML = list.length ? list.map(s => `<tr data-s="${esc(s.id)}">
+        <td><span class="dot" style="background:${s.kind === "fan" ? "var(--track)" : colorOf(s.id, heatIdx.indexOf(s.id))}"></span>${esc(s.name)}</td>
         <td class="num" data-f="now"></td>
         <td>${s.target != null ? `<input type="number" min="0" max="400" inputmode="numeric" aria-label="${esc(s.name)} target °C" class="adv-in">` : `<span class="muted" data-f="tgt"></span>`}</td>
         <td class="muted" data-f="extra"></td></tr>`).join("")
@@ -286,4 +301,6 @@
     baseRoute();
     if (pageId !== null) { loadHistory(pageId); drawMini(); showTab("status"); }
   };
+  window.removeEventListener("hashchange", baseRoute);   // the main script listens with the original route
+  window.addEventListener("hashchange", route);
 })();

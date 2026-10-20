@@ -11,6 +11,7 @@
 .pb-top #pgCancel { background: transparent; border: 1.5px solid var(--orange); color: var(--orange); }
 .pb-top #pgStop { background: var(--red); color: #fff; }
 .pb-top #pbEdit { background: transparent; color: var(--muted); font-weight: 700; }
+.pb-actions { display: flex; align-items: center; gap: 10px; }
 .pb-editing .pb-top #pbEdit { color: var(--orange); }
 
 /* rail + main */
@@ -26,6 +27,16 @@
   .pb-wrap { flex-direction: column; }
   .pb-rail { position: static; flex-direction: row; overflow-x: auto; width: 100%; box-sizing: border-box; }
   .pb-rail button { width: auto; flex: 1 0 70px; }
+  /* phone top bar: back arrow + name + state on one row, the buttons in one row under it */
+  .pb-top { gap: 6px 8px; padding-top: 4px; }
+  .pb-top .pg-back { padding-right: 0; }
+  .pb-backtxt { display: none; }
+  .pb-top h1 { font-size: 20px; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pb-top .pb-spacer { display: none; }
+  .pb-actions { flex: 1 0 100%; gap: 8px; }
+  .pb-actions button { flex: 1 1 0; min-width: 0; padding: 0 6px; }
+  .pb-actions #pbEdit { flex: 0 0 auto; }
+  .pb-tools [data-t=col] { display: none; }   /* one column on phones */
 }
 
 /* dashboard */
@@ -52,7 +63,7 @@
 .pb-editing .pb-editbar { display: flex; }
 
 /* cards that reuse the old page parts */
-.pb-card .pg-cambox { border: 0; border-radius: 0; }
+.pb-card .pg-cambox { flex: none; border: 0; border-radius: 0; }
 .pb-card .pg-ai { background: transparent; padding: 0; }
 .pb-card .pg-ai .head strong { display: none; }
 .pb-stathead { display: flex; gap: 14px; align-items: center; }
