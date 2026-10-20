@@ -5,6 +5,10 @@ PB.panel("gcodeview", {
   icon: PB.icon('<path d="M4 7l8-4 8 4-8 4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/>'),
   settings: [
     { k: "view", label: "Start in", type: "select", def: "2d", options: [["2d", "2D (layer)"], ["3d", "3D"]] },
+    { k: "quality", label: "3D quality", type: "select", def: "auto", options: [["auto", "Auto"], ["solid", "Solid (lit)"], ["lines", "Lines (fast)"]] },
+    { k: "color", label: "3D colours", type: "select", def: "feature", options: [["feature", "By feature (walls, infill…)"], ["tool", "By tool"], ["single", "One colour"]] },
+    { k: "toolhead", label: "Show the nozzle in 3D", type: "check", def: true },
+    { k: "specular", label: "Shiny lighting in 3D", type: "check", def: true },
     { k: "travel", label: "Show travel moves", type: "check", def: false },
     { k: "height", label: "Height", type: "select", def: 320, options: [[220, "Small"], [320, "Medium"], [480, "Tall"]] },
   ],
@@ -14,25 +18,41 @@ PB.panel("gcodeview", {
         <label class="pb-chk"><input type="checkbox" data-a="follow" checked> Follow print</label><span class="bd-sp"></span>
         <span class="bd-seg pb-gmode"><button type="button" data-m="2d">2D</button><button type="button" data-m="3d">3D</button></span>
         <span class="pb-gmsg pb-muted"></span></div>
-      <canvas class="pb-gcv"></canvas><div class="pb-g3" hidden><span class="pb-g3help pb-muted">Drag: rotate · Right-drag / Shift: pan · Wheel / pinch: zoom · Double-click: reset</span></div>
+      <canvas class="pb-gcv"></canvas><div class="pb-g3" hidden><div class="pb-g3legend"></div><span class="pb-g3help pb-muted">Drag: rotate · Right-drag / Shift: pan · Wheel / pinch: zoom · Double-click: reset</span></div>
       <label class="pb-speed">Layer <input type="range" min="0" max="0" value="0"><output>—</output></label>`;
     const q = s => host.querySelector(s), cv = q("canvas"), range = q("input[type=range]"), out = q("output"), gmsg = q(".pb-gmsg");
     const g3 = q(".pb-g3"); cv.style.height = g3.style.height = `${cfg.height}px`;
     let mode = cfg.view === "3d" ? "3d" : "2d";
     let layers = [], file = null, bed = null, pos = null, loading = false;
+    // slicer feature names (PrusaSlicer / Orca / Bambu / Cura / Simplify3D) -> FEATS index
+    const TYPE_RE = /^;\s*(?:TYPE:|FEATURE[: ])\s*(.+)/i;
+    function featOf(n) {
+      n = n.toLowerCase();
+      return /outer|external|overhang/.test(n) ? 0 : /bridge/.test(n) ? 4 : /support/.test(n) ? 5 : /skirt|brim|prime|tower|purge|wipe/.test(n) ? 6
+        : /top|bottom|solid|skin|ironing/.test(n) ? 3 : /inner|perimeter|wall/.test(n) ? 1 : /fill|gap/.test(n) ? 2 : 7;
+    }
     // parse: layers = [{z, start (byte offset), segs: Float32Array [x0,y0,x1,y1,...], trav: [...], offs: byte offset per extrusion seg}]
     function parse(text) {
-      const L = []; let cur = null, x = 0, y = 0, z = 0, e = 0, absE = true, abs = true, off = 0;
-      const seg = [], trav = [], offs = [];
-      const flush = () => { if (cur) { cur.segs = Float32Array.from(seg); cur.trav = Float32Array.from(trav); cur.offs = Float64Array.from(offs); L.push(cur); } seg.length = trav.length = offs.length = 0; };
+      const L = []; let cur = null, x = 0, y = 0, z = 0, e = 0, absE = true, abs = true, off = 0, ft = 7, tool = 0;
+      const seg = [], trav = [], offs = [], fts = [], tls = [];
+      const flush = () => {
+        if (cur) {
+          cur.segs = Float32Array.from(seg); cur.trav = Float32Array.from(trav); cur.offs = Float64Array.from(offs);
+          cur.ft = Uint8Array.from(fts); cur.tl = Uint8Array.from(tls);
+          cur.h = Math.min(1, Math.max(0.05, L.length ? cur.z - L.at(-1).z : cur.z)); L.push(cur);
+        }
+        seg.length = trav.length = offs.length = fts.length = tls.length = 0;
+      };
       for (const raw of text.split("\n")) {
         const at = off; off += raw.length + 1;
+        if (raw.charCodeAt(0) === 59) { const m = TYPE_RE.exec(raw); if (m) ft = featOf(m[1]); continue; }   // ;TYPE:Outer wall …
         const line = raw.split(";")[0].trim().toUpperCase();
         if (!line) continue;
         const w = line.split(/\s+/), c = w[0];
         if (c === "G90") { abs = true; absE = true; continue; } if (c === "G91") { abs = false; absE = false; continue; }
         if (c === "M82") { absE = true; continue; } if (c === "M83") { absE = false; continue; }
         if (c === "G92") { for (const t of w) if (t[0] === "E") e = +t.slice(1); continue; }
+        if (c[0] === "T" && /^T\d+$/.test(c)) { tool = +c.slice(1); continue; }
         if (c !== "G0" && c !== "G1" && c !== "G2" && c !== "G3") continue;
         let nx = x, ny = y, nz = z, de = 0;
         for (const t of w.slice(1)) {
@@ -43,7 +63,7 @@ PB.panel("gcodeview", {
         const extruding = de > 0 && (nx !== x || ny !== y);
         if (extruding && (!cur || Math.abs(nz - cur.z) > 1e-4)) { flush(); cur = { z: nz, start: at }; }
         if (cur && (nx !== x || ny !== y)) {
-          if (extruding) { seg.push(x, y, nx, ny); offs.push(at); } else if (Math.abs(nz - cur.z) < 1e-4) trav.push(x, y, nx, ny);
+          if (extruding) { seg.push(x, y, nx, ny); offs.push(at); fts.push(ft); tls.push(tool); } else if (Math.abs(nz - cur.z) < 1e-4) trav.push(x, y, nx, ny);
         }
         x = nx; y = ny; z = nz;
       }
@@ -69,8 +89,14 @@ PB.panel("gcodeview", {
       g.lineWidth = 0.45; g.strokeStyle = "#ff8a1f"; line(L.segs, done);
       if (done < L.segs.length) { g.strokeStyle = "rgba(255,138,31,.25)"; const rest = L.segs.slice(done); line(rest); }
     }
-    // ---- 3D (Three.js scene, our own orbit controls, renders only when something changes) ----
-    let T = null, three = null, built = null;   // T = THREE, three = {renderer, scene, camera, ...}, built = file the geometry is for
+    // ---- 3D (Three.js scene, our own camera controls + toolpath meshes; renders only when something changes) ----
+    // Quality: "lines" = thin lines (fast), "solid" = every extrusion is a lit box (width x layer height), "auto" = solid
+    // unless the file is huge. Colours: by feature (from the slicer's ;TYPE: comments), by tool, or one colour.
+    const FEATS = [["Outer wall", 0xff8a1f], ["Inner wall", 0xf6c344], ["Infill", 0xe5484d], ["Top / bottom", 0x8b5cf6],
+                   ["Bridge", 0x4fd1c5], ["Support", 0x4ade80], ["Skirt / brim", 0x90cdf4], ["Other", 0x9ca3af]];
+    const TOOLS = [0xff8a1f, 0x4fd1c5, 0x8b5cf6, 0x4ade80, 0x90cdf4, 0xe5484d, 0xf6c344, 0xf472b6];
+    const SOLID_MAX = 1500000;   // auto: above this many moves, fall back to lines
+    let T = null, three = null, built = "";   // T = THREE; built = what the meshes were made for (file + settings)
     const loadThree = () => window.THREE ? Promise.resolve(window.THREE) : (PB._three ||= new Promise((ok, bad) => {
       const sc = document.createElement("script"); sc.src = "/static/vendor/three.min.js";
       sc.onload = () => ok(window.THREE); sc.onerror = () => { PB._three = null; bad(new Error("couldn't load the 3D library")); };
@@ -86,13 +112,18 @@ PB.panel("gcodeview", {
     }
     function init3d() {
       const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(devicePixelRatio || 1); g3.prepend(renderer.domElement);
+      renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); g3.prepend(renderer.domElement);
       const scene = new T.Scene(), camera = new T.PerspectiveCamera(40, 1, 0.5, 5000); camera.up.set(0, 0, 1);
+      scene.add(new T.HemisphereLight(0xffffff, 0x444450, 0.75));
+      const sun = new T.DirectionalLight(0xffffff, 0.75); camera.add(sun); sun.position.set(0.4, 1, 0.6); scene.add(camera);   // light follows the camera
       const bedGrp = new T.Group(); scene.add(bedGrp);
-      three = { renderer, scene, camera, bedGrp, bedKey: "", done: null, ghost: null, trav: null, starts: null, orbit: { th: -Math.PI / 2.6, ph: 1.0, r: 400, tx: 0, ty: 0, tz: 0 } };
+      const nozzle = new T.Mesh(new T.ConeGeometry(2.2, 6, 20), new T.MeshPhongMaterial({ color: 0xe5e5ea, emissive: 0x333338, shininess: 80 }));
+      nozzle.rotation.x = -Math.PI / 2; nozzle.geometry.translate(0, 3, 0); nozzle.visible = false; scene.add(nozzle);
+      three = { renderer, scene, camera, bedGrp, nozzle, bedKey: "", objs: [], starts: null, solid: false,
+                orbit: { th: 0, ph: 1, r: 400, tx: 0, ty: 0, tz: 0 } };
       orbitControls(renderer.domElement);
     }
-    function home3d() {   // camera looks at the middle of the bed from the front-left, high up
+    function home3d() {   // look at the middle of the bed from the front-left, high up
       const [x0, y0, x1, y1] = bed || [0, 0, 250, 250], o = three.orbit, zTop = layers.at(-1)?.z || 0;
       Object.assign(o, { th: -Math.PI / 2 - 0.5, ph: 0.95, r: Math.max(x1 - x0, y1 - y0) * 1.7, tx: (x0 + x1) / 2, ty: (y0 + y1) / 2, tz: zTop / 3 });
     }
@@ -107,48 +138,99 @@ PB.panel("gcodeview", {
       g.add(new T.LineSegments(grid, new T.LineBasicMaterial({ color: 0x8f8b99, transparent: true, opacity: 0.18 })));
       const edge = new T.BufferGeometry(); edge.setAttribute("position", new T.Float32BufferAttribute([x0, y0, 0, x1, y0, 0, x1, y1, 0, x0, y1, 0], 3));
       g.add(new T.LineLoop(edge, new T.LineBasicMaterial({ color: 0x8f8b99, transparent: true, opacity: 0.6 })));
+      const plate = new T.Mesh(new T.PlaneGeometry(x1 - x0, y1 - y0), new T.MeshBasicMaterial({ color: 0x8f8b99, transparent: true, opacity: 0.06, depthWrite: false }));
+      plate.position.set((x0 + x1) / 2, (y0 + y1) / 2, -0.01); g.add(plate);
     }
-    function build3d() {   // one geometry for the whole file; drawRange shows "printed so far"
-      for (const k of ["done", "ghost"]) if (three[k]) { three.scene.remove(three[k]); three[k].material.dispose(); }
-      three.geo?.dispose(); three.ghostGeo?.dispose(); three.done = three.ghost = null; built = file;
+    const colorOf = (L, k, c) => cfg.color === "tool" ? c.setHex(TOOLS[L.tl[k] % TOOLS.length])
+      : cfg.color === "single" ? c.setHex(0xff8a1f) : c.setHex(FEATS[L.ft[k]][1]);
+    function clear3d() {
+      for (const o of three.objs) { three.scene.remove(o); o.geometry.dispose(); o.material.dispose(); }
+      three.objs = []; three.lines = three.ghost = three.mesh = three.trav = null;
+    }
+    function build3d() {   // all toolpaths of the file at once; draw ranges / instance counts show "printed so far"
+      clear3d(); built = `${file}|${cfg.quality}|${cfg.color}|${cfg.specular}`;
       let n = 0; for (const L of layers) n += L.segs.length / 4;
-      const pos = new Float32Array(n * 6), col = new Float32Array(n * 6), starts = new Uint32Array(layers.length + 1);
-      const zTop = layers.at(-1)?.z || 1, base = new T.Color(0xff8a1f), c = new T.Color();
-      let v = 0;
+      three.solid = cfg.quality === "solid" || (cfg.quality !== "lines" && n <= SOLID_MAX);
+      const starts = new Uint32Array(layers.length + 1), c = new T.Color(), zTop = layers.at(-1)?.z || 1;
+      // thin lines: always built (the faint "rest of this layer" ghost), and the main view in lines quality
+      const pos = new Float32Array(n * 6), col = new Float32Array(n * 6);
+      let s = 0;
       layers.forEach((L, i) => {
-        starts[i] = v / 3; const shade = 0.45 + 0.55 * (L.z / zTop); c.copy(base).multiplyScalar(shade);
-        for (let k = 0; k < L.segs.length; k += 4) {
-          pos.set([L.segs[k], L.segs[k + 1], L.z, L.segs[k + 2], L.segs[k + 3], L.z], v);
-          col.set([c.r, c.g, c.b, c.r, c.g, c.b], v); v += 6;
+        starts[i] = s;
+        for (let k = 0; k < L.segs.length; k += 4, s++) {
+          const v = s * 6; pos[v] = L.segs[k]; pos[v + 1] = L.segs[k + 1]; pos[v + 2] = L.z; pos[v + 3] = L.segs[k + 2]; pos[v + 4] = L.segs[k + 3]; pos[v + 5] = L.z;
+          colorOf(L, k / 4, c); if (!three.solid) c.multiplyScalar(0.45 + 0.55 * (L.z / zTop));   // lines: darker low down, for depth
+          col[v] = col[v + 3] = c.r; col[v + 1] = col[v + 4] = c.g; col[v + 2] = col[v + 5] = c.b;
         }
       });
-      starts[layers.length] = v / 3; three.starts = starts;
-      const pa = new T.BufferAttribute(pos, 3), ca = new T.BufferAttribute(col, 3);
-      three.geo = new T.BufferGeometry(); three.geo.setAttribute("position", pa); three.geo.setAttribute("color", ca);
-      three.ghostGeo = new T.BufferGeometry(); three.ghostGeo.setAttribute("position", pa);
-      three.done = new T.LineSegments(three.geo, new T.LineBasicMaterial({ vertexColors: true }));
-      three.ghost = new T.LineSegments(three.ghostGeo, new T.LineBasicMaterial({ color: 0xff8a1f, transparent: true, opacity: 0.18, depthWrite: false }));
-      three.scene.add(three.done, three.ghost); home3d();
+      starts[layers.length] = s; three.starts = starts;
+      const pa = new T.BufferAttribute(pos, 3);
+      const ghostGeo = new T.BufferGeometry(); ghostGeo.setAttribute("position", pa);
+      three.ghost = new T.LineSegments(ghostGeo, new T.LineBasicMaterial({ color: 0xff8a1f, transparent: true, opacity: 0.22, depthWrite: false }));
+      three.objs.push(three.ghost);
+      if (!three.solid) {
+        const g = new T.BufferGeometry(); g.setAttribute("position", pa); g.setAttribute("color", new T.BufferAttribute(col, 3));
+        three.lines = new T.LineSegments(g, new T.LineBasicMaterial({ vertexColors: true })); three.objs.push(three.lines);
+      } else {
+        // solid: one lit box per extrusion move: length x line width x layer height, matrices written straight into the buffer
+        const mat = cfg.specular ? new T.MeshPhongMaterial({ shininess: 60, specular: 0x555555 }) : new T.MeshLambertMaterial();
+        const mesh = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), mat, n);
+        const m = mesh.instanceMatrix.array, ic = new Float32Array(n * 3), W = 0.45;
+        let i = 0;
+        for (const L of layers) {
+          const h = L.h;
+          for (let k = 0; k < L.segs.length; k += 4, i++) {
+            const x0 = L.segs[k], y0 = L.segs[k + 1], dx = L.segs[k + 2] - x0, dy = L.segs[k + 3] - y0, len = Math.hypot(dx, dy) || 1e-3;
+            const cs = dx / len, sn = dy / len, l = len + W * 0.5, o = i * 16;
+            m[o] = cs * l; m[o + 1] = sn * l; m[o + 2] = 0; m[o + 3] = 0;
+            m[o + 4] = -sn * W; m[o + 5] = cs * W; m[o + 6] = 0; m[o + 7] = 0;
+            m[o + 8] = 0; m[o + 9] = 0; m[o + 10] = h; m[o + 11] = 0;
+            m[o + 12] = x0 + dx / 2; m[o + 13] = y0 + dy / 2; m[o + 14] = L.z - h / 2; m[o + 15] = 1;
+            colorOf(L, k / 4, c); ic[i * 3] = c.r; ic[i * 3 + 1] = c.g; ic[i * 3 + 2] = c.b;
+          }
+        }
+        mesh.instanceColor = new T.InstancedBufferAttribute(ic, 3);
+        mesh.frustumCulled = false; three.mesh = mesh; three.objs.push(mesh);
+      }
+      for (const o of three.objs) three.scene.add(o);
+      legend(); home3d();
+    }
+    function legend() {   // which colours mean what (feature / tool mode), only the ones in this file
+      const box = q(".pb-g3legend"); box.innerHTML = "";
+      if (!layers.length || cfg.color === "single") return;
+      const used = new Set(); for (const L of layers) for (const v of (cfg.color === "tool" ? L.tl : L.ft)) used.add(v);
+      box.innerHTML = [...used].sort((a, b) => a - b).map(v => {
+        const [name, hex] = cfg.color === "tool" ? [`Tool ${v}`, TOOLS[v % TOOLS.length]] : FEATS[v];
+        return `<span><i style="background:#${hex.toString(16).padStart(6, "0")}"></i>${esc(name)}</span>`;
+      }).join("");
     }
     function draw3d() {
       if (!three) return;
       const r = g3.getBoundingClientRect(); if (!r.width) return;
       three.renderer.setSize(r.width, r.height, false); three.camera.aspect = r.width / r.height; three.camera.updateProjectionMatrix();
       bed3d();
-      if (layers.length && built !== file) build3d();
-      if (!layers.length && three.done) { three.done.visible = three.ghost.visible = false; }
+      const want = `${file}|${cfg.quality}|${cfg.color}|${cfg.specular}`;
+      if (!layers.length) { if (three.objs.length) { clear3d(); built = ""; legend(); } }
+      else if (built !== want) build3d();
+      if (three.trav) { three.scene.remove(three.trav); three.objs.splice(three.objs.indexOf(three.trav), 1); three.trav.geometry.dispose(); three.trav.material.dispose(); three.trav = null; }
       const li = +range.value, L = layers[li];
-      if (three.trav) { three.scene.remove(three.trav); three.trav.geometry.dispose(); three.trav.material.dispose(); three.trav = null; }
-      if (L && three.done) {
+      three.nozzle.visible = false;
+      if (L && three.starts) {
+        const live = q("[data-a=follow]").checked && pos != null && pos >= L.start;
         let done = L.segs.length;
-        if (q("[data-a=follow]").checked && pos != null && pos >= L.start) { done = 0; while (done / 4 < L.offs.length && L.offs[done / 4] < pos) done += 4; }
-        three.done.visible = three.ghost.visible = true;
-        three.geo.setDrawRange(0, three.starts[li] + (done / 4) * 2);                       // printed layers + this layer so far
-        three.ghostGeo.setDrawRange(three.starts[li], three.starts[li + 1] - three.starts[li]);   // the whole current layer, faint
+        if (live) { done = 0; while (done / 4 < L.offs.length && L.offs[done / 4] < pos) done += 4; }
+        const upto = three.starts[li] + done / 4;   // moves shown solid / bright
+        if (three.lines) three.lines.geometry.setDrawRange(0, upto * 2);
+        if (three.mesh) { three.mesh.count = upto; }
+        three.ghost.geometry.setDrawRange(upto * 2, (three.starts[li + 1] - upto) * 2);   // the rest of this layer, faint
+        if (cfg.toolhead && live && done > 0) {
+          three.nozzle.position.set(L.segs[done - 2], L.segs[done - 1], L.z); three.nozzle.visible = true;
+        }
         if (cfg.travel && L.trav.length) {
-          const tp = new Float32Array(L.trav.length / 2 * 3); for (let i = 0, j = 0; i < L.trav.length; i += 2, j += 3) tp.set([L.trav[i], L.trav[i + 1], L.z], j);
+          const tp = new Float32Array(L.trav.length / 2 * 3); for (let i = 0, j = 0; i < L.trav.length; i += 2, j += 3) { tp[j] = L.trav[i]; tp[j + 1] = L.trav[i + 1]; tp[j + 2] = L.z; }
           const tg = new T.BufferGeometry(); tg.setAttribute("position", new T.BufferAttribute(tp, 3));
-          three.trav = new T.LineSegments(tg, new T.LineBasicMaterial({ color: 0x4fd1c5, transparent: true, opacity: 0.35 })); three.scene.add(three.trav);
+          three.trav = new T.LineSegments(tg, new T.LineBasicMaterial({ color: 0x4fd1c5, transparent: true, opacity: 0.35 }));
+          three.objs.push(three.trav); three.scene.add(three.trav);
         }
       }
       const o = three.orbit, cam = three.camera;
@@ -156,7 +238,7 @@ PB.panel("gcodeview", {
       cam.lookAt(o.tx, o.ty, o.tz);
       three.renderer.render(three.scene, cam);
     }
-    function orbitControls(c) {   // drag = rotate, right-drag / shift-drag / two fingers = pan, wheel / pinch = zoom, double-click = reset
+    function orbitControls(c) {   // drag = rotate, right-drag / shift-drag = pan, wheel / pinch = zoom, double-click = reset
       const pts = new Map(); let last = null, pinch = 0;
       c.addEventListener("contextmenu", e => e.preventDefault());
       c.addEventListener("pointerdown", e => { c.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); last = [e.clientX, e.clientY, e.button === 2 || e.shiftKey]; pinch = 0; });
@@ -165,14 +247,14 @@ PB.panel("gcodeview", {
       c.addEventListener("pointermove", e => {
         if (!pts.has(e.pointerId) || !last) return;
         pts.set(e.pointerId, [e.clientX, e.clientY]); const o = three.orbit;
-        if (pts.size === 2) {   // pinch zoom + two-finger pan
+        if (pts.size === 2) {   // pinch zoom
           const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
           if (pinch) o.r = Math.min(4000, Math.max(20, o.r * pinch / d)); pinch = d; draw3d(); return;
         }
         const dx = e.clientX - last[0], dy = e.clientY - last[1]; last[0] = e.clientX; last[1] = e.clientY;
-        if (last[2]) {   // pan in the view plane
-          const k = o.r / c.clientHeight * 0.75, sx = -Math.sin(o.th), sy = Math.cos(o.th);
-          o.tx -= (dx * sx) * k; o.ty -= (dx * sy) * k; o.tz += dy * k * Math.sin(o.ph);
+        if (last[2]) {   // pan sideways + up/down in the view
+          const k = o.r / c.clientHeight * 0.75;
+          o.tx += dx * Math.sin(o.th) * k; o.ty -= dx * Math.cos(o.th) * k; o.tz += dy * k * Math.sin(o.ph);
         } else { o.th -= dx * 0.008; o.ph = Math.min(Math.PI - 0.05, Math.max(0.05, o.ph - dy * 0.008)); }
         draw3d();
       });
@@ -220,7 +302,7 @@ PB.panel("gcodeview", {
     return {
       open() { layers = []; file = null; pos = null; manual = false; listed = false; gmsg.textContent = ""; out.textContent = "—"; range.max = 0; draw(); },
       shown() { draw(); if (!listed) listFiles(); },
-      destroy() { if (three) { three.geo?.dispose(); three.ghostGeo?.dispose(); three.renderer.dispose(); three = null; } },
+      destroy() { if (three) { clear3d(); three.renderer.dispose(); three = null; } },
       update(p) {
         bed = p.bed_area; cur = (p.state === "printing" || p.state === "paused" || p.state === "complete") ? p.filename : null;
         q("[data-a=load]").disabled = !cur || loading;
