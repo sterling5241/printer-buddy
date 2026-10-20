@@ -15,7 +15,7 @@ PB.parts.historyMaint = c => {
       const box = c.q(".pb-maint");
       if (!c.cfg.maint || !c.maint.length) { box.innerHTML = ""; return; }
       box.innerHTML = c.maint.map((m, i) => { const st = status(m), due = st.frac >= 1;
-        return `<div class="pb-mrow${due ? " due" : ""}"><span class="pb-mname">${due ? "⚠ " : "🔧 "}${esc(m.name)}</span>
+        return `<div class="pb-mrow${due ? " due" : ""}"><span class="pb-mname">${due ? PB.ic.alert : PB.ic.wrench}${esc(m.name)}</span>
           <span class="pb-mbar"><i style="width:${Math.min(100, Math.round(st.frac * 100))}%"></i></span><span class="pb-muted pb-mtext">${esc(st.text)}</span>
           <button type="button" data-done="${i}" title="Mark as done now (starts counting again)">Done</button></div>`; }).join("");
       for (const b of box.querySelectorAll("[data-done]")) b.onclick = async () => { c.maint[+b.dataset.done].last = nowTotals(); drawMaint(); saveMaint(); };
@@ -28,7 +28,7 @@ PB.parts.historyMaint = c => {
       const render = () => {
         c.dlg.innerHTML = `<h3>Maintenance reminders</h3><p class="pb-muted">Remind me after this much printing since it was last done (0 = off). Shown at the top of History.</p>
           <div class="pb-plist">${list.map((m, i) => `<div class="pb-prow" data-i="${i}"><div class="pb-prowtop"><input data-k="name" value="${esc(m.name)}" placeholder="e.g. Lube the Z rods">
-              <button type="button" data-del aria-label="Delete">✕</button></div><div class="pb-ptemps">
+              <button type="button" data-del aria-label="Delete">${PB.ic.x}</button></div><div class="pb-ptemps">
               <label>every <input type="number" min="0" data-k="hours" value="${m.hours || ""}"> print hours</label>
               <label><input type="number" min="0" data-k="fil" value="${m.fil || ""}"> m filament</label><label><input type="number" min="0" data-k="days" value="${m.days || ""}"> days</label></div></div>`).join("") || `<p class="pb-muted">None yet.</p>`}</div>
           <div class="bd-libfoot"><button type="button" data-a="add">+ Add</button><span class="bd-sp"></span><button type="button" data-a="no">Cancel</button><button type="button" class="bd-primary" data-a="ok">Save</button></div>`;

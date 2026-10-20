@@ -12,7 +12,7 @@
       cd.innerHTML = `<h3>Cameras on ${esc(p.name)}</h3><p class="pb-muted">Saved in Moonraker, so Mainsail and Fluidd see the same list.
           Printer Buddy shows MJPEG cameras live and uses snapshots for the rest.</p>
         <div class="pb-plist">${cams.map((c, i) => `<div class="pb-prow"><div class="pb-prowtop"><b>${esc(c.name)}</b>${c.enabled === false ? `<span class="pb-chip">off</span>` : ""}
-            <span class="bd-sp"></span><button type="button" data-e="${i}">Edit</button><button type="button" data-d="${i}" aria-label="Delete">✕</button></div>
+            <span class="bd-sp"></span><button type="button" data-e="${i}">Edit</button><button type="button" data-d="${i}" aria-label="Delete">${PB.ic.x}</button></div>
             <div class="pb-muted pb-mono">${esc(c.service || "")} · ${esc(c.stream_url || "")}</div></div>`).join("") || `<p class="pb-muted">No cameras yet.</p>`}</div>
         <div class="bd-libfoot"><button type="button" data-a="add">+ Add camera</button><span class="bd-sp"></span><button type="button" data-a="close">Close</button></div>`;
       cd.querySelector("[data-a=close]").onclick = () => cd.close();

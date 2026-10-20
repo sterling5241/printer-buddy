@@ -29,7 +29,7 @@
   function drawPrompt() {
     const s = prompts.get(pageId);
     if (!s || !s.shown) { if (pd.open) pd.close(); return; }
-    pd.innerHTML = `<div class="pb-ptop"><h3>${esc(s.title)}</h3><button type="button" class="pb-px" aria-label="Close">✕</button></div>
+    pd.innerHTML = `<div class="pb-ptop"><h3>${esc(s.title)}</h3><button type="button" class="pb-px" aria-label="Close">${PB.ic.x}</button></div>
       <div class="pb-pbody">${s.items.map(i => i.text != null ? `<p>${esc(i.text)}</p>` : i.group ? `<div class="pb-pgroup">${i.group.map(btn).join("")}</div>` : `<div class="pb-pgroup">${btn(i)}</div>`).join("")}</div>
       ${s.footer.length ? `<div class="bd-libfoot">${s.footer.map(btn).join("")}</div>` : ""}`;
     pd.querySelector(".pb-px").onclick = closePrompt;

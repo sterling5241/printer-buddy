@@ -44,7 +44,7 @@ PB.panel("system", {
         push("Moonraker", ps?.moonraker_stats?.at?.(-1)?.cpu_usage);
         const flags = (ps?.throttled_state?.flags || []).map(f => THROTTLE[f] || f);
         const th = q(".pb-throt"); th.hidden = !flags.length;
-        if (flags.length) th.textContent = `⚠ The Pi reports: ${flags.join(", ")}. Check the power supply.`;
+        if (flags.length) th.textContent = `The Pi reports: ${flags.join(", ")}. Check the power supply.`;
         draw();
       } catch (e) { q(".pb-mcus").innerHTML = `<p class="pb-muted">${esc(e.message)}</p>`; }
     }

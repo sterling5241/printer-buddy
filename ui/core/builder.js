@@ -6,6 +6,16 @@
   const { el, icon } = PB;
   const SPLITS = { "1": [1], "1-1": [1, 1], "1-2": [1, 2], "2-1": [2, 1], "1-1-1": [1, 1, 1], "1-1-1-1": [1, 1, 1, 1] };
   const SPLIT_NAMES = { "1": "1 column", "1-1": "½ + ½", "1-2": "⅓ + ⅔", "2-1": "⅔ + ⅓", "1-1-1": "⅓ ×3", "1-1-1-1": "¼ ×4" };
+  // sidebar icons for the base tabs (any other tab uses its first panel's icon)
+  const TAB_ICONS = {
+    dash: icon('<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>'),
+    jobs: icon('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>'),
+    history: icon('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 3"/>'),
+    tuning: icon('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>'),
+    console: icon('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 9l4 3-4 3M12 15h5"/>'),
+    timelapse: icon('<rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-4v12l-6-4z"/>'),
+    machine: icon('<rect x="6" y="6" width="12" height="12" rx="1"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>'),
+  };
   const GRID = icon('<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>');
   const rid = () => Math.random().toString(36).slice(2, 9);
   const phone = matchMedia("(max-width: 760px)");   // phones: one column per tab, in the tab's own phone order
@@ -48,14 +58,14 @@
   PB.applyTheme = () => {
     const t = PB.store.get("pb-theme", "auto");
     document.documentElement.dataset.theme = t === "auto" ? (dark.matches ? "dark" : "light") : t;
-    themeBtn.textContent = t === "auto" ? "◐" : t === "light" ? "☀" : "☾";
+    themeBtn.innerHTML = t === "auto" ? PB.ic.contrast : t === "light" ? PB.ic.sun : PB.ic.moon;
     themeBtn.title = `Theme: ${t} (click to change)`;
   };
   PB.setTheme = t => { PB.store.set("pb-theme", t); PB.applyTheme(); };
   themeBtn.onclick = () => PB.setTheme(THEMES[(THEMES.indexOf(PB.store.get("pb-theme", "auto")) + 1) % 3]);
   dark.addEventListener("change", PB.applyTheme);
   PB.applyTheme();
-  actions.append(themeBtn, editBtn, $("#pgPause"), $("#pgCancel"), $("#pgStop"));
+  actions.append(themeBtn, editBtn, el("span", "bd-divider"), $("#pgPause"), $("#pgCancel"), $("#pgStop"));
   top.append(head.querySelector(".pg-back"), $("#pgName"), $("#pgTag"), el("span", "bd-sp"), actions);
   head.replaceWith(top);
   page.querySelector(".pg-tabs").hidden = true;
@@ -124,7 +134,7 @@
       if (rail) {
         rail.replaceChildren(...layout.tabs.map(t => {
           const first = items(t)[0];
-          const b = el("button", "", `${reg[first?.t]?.icon || GRID}<span>${esc(t.name)}</span>`);
+          const b = el("button", "", `${TAB_ICONS[t.id] || reg[first?.t]?.icon || GRID}<span>${esc(t.name)}</span>`);
           b.type = "button"; b.setAttribute("aria-current", String(t.id === active));
           b.onclick = () => showTab(t.id);
           return b;
@@ -157,13 +167,13 @@
     }
 
     function tabBar(tab) {
-      const bar = el("div", "bd-tabbar", `<span>Editing <b>${esc(tab.name)}</b>: drag <b>⠿</b> to move a panel, <b>👁</b> hides it.</span>
+      const bar = el("div", "bd-tabbar", `<span>Editing <b>${esc(tab.name)}</b>: drag ${PB.ic.grip} to move a panel, ${PB.ic.eye} hides it.</span>
         ${phone.matches ? "" : `<span class="bd-seg"><button type="button" data-v="0" aria-pressed="${!preview}">Desktop</button><button type="button" data-v="1" aria-pressed="${preview}">Phone</button></span>`}
         <span class="bd-sp"></span>
         ${rail ? `<button type="button" data-a="rename">Rename tab</button><button type="button" data-a="del">Delete tab</button>` : ""}
         <button type="button" data-a="reset">Reset to base layout</button><button type="button" class="bd-primary" data-a="done">Done</button>`);
       for (const b of bar.querySelectorAll("[data-v]")) b.onclick = () => { preview = b.dataset.v === "1"; build(); };
-      if (phoneView()) bar.querySelector("span").innerHTML = `Phone order for <b>${esc(tab.name)}</b>: only used on small screens. Drag <b>⠿</b> to reorder.`;
+      if (phoneView()) bar.querySelector("span").innerHTML = `Phone order for <b>${esc(tab.name)}</b>: only used on small screens. Drag ${PB.ic.grip} to reorder.`;
       if (rail) {
         bar.querySelector("[data-a=rename]").onclick = () => { const n = prompt("Tab name:", tab.name); if (n) { tab.name = n.slice(0, 30); changed(); } };
         const del = bar.querySelector("[data-a=del]");
@@ -254,14 +264,20 @@
       const def = reg[item.t] || { title: item.t, icon: "", cls: "" };
       const card = el("section", `pb-card${def.cls ? " " + def.cls : ""}${def.flush ? " flush" : ""}${item.c ? " collapsed" : ""}${item.h ? " pb-hidden" : ""}`);
       card._item = item;
-      const head = el("header", "", `<span class="pb-handle" title="Drag to move" aria-hidden="true">⠿</span>${def.icon || ""}<button type="button" class="pb-title">${esc(def.title)}</button>
-        <span class="pb-tools"><button type="button" data-a="eye" title="${item.h ? "Show this panel" : "Hide this panel"}" aria-pressed="${!item.h}">${item.h ? "🙈" : "👁"}</button>
-        <button type="button" data-a="set" title="Panel settings">⚙</button><button type="button" data-a="menu" title="More" aria-haspopup="menu">⋯</button></span>
-        ${def.gear && def.settings?.length ? `<button type="button" class="pb-qset" title="${esc(def.title)} settings">⚙</button>` : ""}
+      const head = el("header", "", `<span class="pb-handle" title="Drag to move" aria-hidden="true">${PB.ic.grip}</span>${def.icon || ""}<button type="button" class="pb-title">${esc(def.title)}</button>
+        <span class="pb-tools"><button type="button" data-a="eye" title="${item.h ? "Show this panel" : "Hide this panel"}" aria-pressed="${!item.h}">${item.h ? PB.ic.eyeOff : PB.ic.eye}</button>
+        <button type="button" data-a="set" title="Panel settings">${PB.ic.cog}</button><button type="button" data-a="menu" title="More" aria-haspopup="menu">${PB.ic.more}</button></span>
+        ${def.gear && def.settings?.length ? `<button type="button" class="pb-qset" title="${esc(def.title)} settings">${PB.ic.cog}</button>` : ""}
         <button type="button" class="pb-tog" aria-label="Collapse">${icon('<path d="M6 9l6 6 6-6"/>')}</button>`);
       const body = el("div", "pb-body");
       card.append(head, body);
+      // buttons a panel marks data-head go in its title strip; its own host.querySelector(...) still finds them
+      const q1 = Element.prototype.querySelector, qa = Element.prototype.querySelectorAll, moved = () => [...qa.call(head, "[data-head]")];
+      body.querySelector = sel => q1.call(body, sel) || moved().find(e => e.matches(sel)) || null;
+      body.querySelectorAll = sel => [...qa.call(body, sel), ...moved().filter(e => e.matches(sel))];
       const inst = PB.mount(item.t, body, item.o, reg);
+      const slot = head.querySelector(".pb-qset") || head.querySelector(".pb-tools");
+      for (const b of [...qa.call(body, "[data-head]")]) { b.classList.add("pb-hbtn"); slot.before(b); }
       if (inst) list.push(inst);
       const toggle = () => { item.c = !item.c; card.classList.toggle("collapsed", item.c); save(); if (!item.c && inst) PB.shown([inst]); };
       head.querySelector(".pb-title").onclick = toggle;

@@ -4,8 +4,8 @@
   const { el } = PB;
   const row = $(".top .row");
   $("#aiBtn").hidden = true; $("#notifyBtn").hidden = true;   // their panels now live in Settings
-  const bell = el("button", "pb-bell", `🔔<i hidden></i>`); bell.type = "button"; bell.title = "News and printer notices"; bell.setAttribute("aria-label", "News");
-  const gear = el("button", "", "⚙ Settings"); gear.type = "button";
+  const bell = el("button", "pb-bell", `${PB.ic.bell}<i hidden></i>`); bell.type = "button"; bell.title = "News and printer notices"; bell.setAttribute("aria-label", "News");
+  const gear = el("button", "pb-iconbtn", `${PB.ic.cog}Settings`); gear.type = "button";
   row.insertBefore(gear, $("#homeEdit") || $("#manualBtn"));
   row.insertBefore(bell, gear);
 
@@ -51,7 +51,7 @@
     const n = PB.news.items.find(x => x.level === "important" && !seen.has(x.id));
     $(".pb-banner")?.remove();
     if (!n) return;
-    const b = el("div", "pb-banner", `<b>${esc(n.title)}</b> ${esc(n.body || "")} ${n.link && /^https?:\/\//.test(n.link) ? `<a href="${esc(n.link)}" target="_blank" rel="noopener">Read more →</a>` : ""}<button type="button" aria-label="Dismiss">✕</button>`);
+    const b = el("div", "pb-banner", `<b>${esc(n.title)}</b> ${esc(n.body || "")} ${n.link && /^https?:\/\//.test(n.link) ? `<a href="${esc(n.link)}" target="_blank" rel="noopener">Read more →</a>` : ""}<button type="button" aria-label="Dismiss">${PB.ic.x}</button>`);
     b.querySelector("button").onclick = () => { seen.add(n.id); PB.store.set("pb-news-banner", [...seen]); b.remove(); };
     document.body.prepend(b);
   }

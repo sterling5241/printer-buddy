@@ -8,7 +8,7 @@ PB.panel("machine", {
       <div class="pb-row"><button type="button" data-r="klipper">Klipper</button><button type="button" data-r="firmware">Firmware</button><button type="button" data-r="moonraker">Moonraker</button></div>
       <div class="pb-row"><button type="button" data-r="reboot">Reboot host</button><button type="button" data-r="shutdown">Shut down host</button></div>
       <div class="pb-sub-h">Logs</div>
-      <div class="pb-row"><a class="pb-dl pb-dlw" data-log="klippy.log">⬇ klippy.log</a><a class="pb-dl pb-dlw" data-log="moonraker.log">⬇ moonraker.log</a></div>`;
+      <div class="pb-row"><a class="pb-dl pb-dlw" data-log="klippy.log">${PB.ic.download}klippy.log</a><a class="pb-dl pb-dlw" data-log="moonraker.log">${PB.ic.download}moonraker.log</a></div>`;
     const kv = host.querySelector(".pb-mach");
     let timer = null, busy = false;
     const gb = b => b == null ? "—" : `${(b / 1073741824).toFixed(1)} GB`;

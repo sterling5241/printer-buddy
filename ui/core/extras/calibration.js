@@ -55,7 +55,7 @@
       const [h, mm] = String(r.adjust || "00:00").split(":").map(Number), mins = (h || 0) * 60 + (mm || 0);
       const ok = r.is_base || mins < 6;
       return `<tr class="${ok ? "ok" : "bad"}"><td>${esc(r.name || name)}</td><td>${Number(r.z).toFixed(4)}</td>
-        <td>${r.is_base ? "<b>base</b>" : mins === 0 ? "✓" : `${r.sign === "CW" ? "↻ clockwise" : "↺ anticlockwise"} <b>${esc(r.adjust)}</b>`}</td></tr>`;
+        <td>${r.is_base ? "<b>base</b>" : mins === 0 ? "✓" : `${r.sign === "CW" ? "clockwise" : "anticlockwise"} <b>${esc(r.adjust)}</b>`}</td></tr>`;
     }).join("");
     st.innerHTML = `<h3>Screws tilt</h3>${t.error ? `<p class="pb-terr">The last run failed. Check the console.</p>` : ""}
       ${rows ? `<table class="pb-ttable"><tr><th>Screw</th><th>Z</th><th>Turn</th></tr>${rows}</table>

@@ -4,7 +4,7 @@ PB.panel("explorer", {
   icon: PB.icon('<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>'),
   create(host) {
     host.innerHTML = `<div class="pb-tool"><input type="search" placeholder="Filter objects…" aria-label="Filter objects"><select aria-label="Object"></select>
-        <label class="pb-chk"><input type="checkbox" data-a="live" checked> Live</label><span class="bd-sp"></span><button type="button" data-a="ref">↻</button></div>
+        <label class="pb-chk"><input type="checkbox" data-a="live" checked> Live</label><span class="bd-sp"></span><button type="button" data-a="ref" data-head title="Refresh" aria-label="Refresh">${PB.ic.refresh}</button></div>
       <pre class="pb-expl pb-muted">Pick an object.</pre>`;
     const q = s => host.querySelector(s), sel = q("select"), out = q(".pb-expl");
     let names = [], timer = null;

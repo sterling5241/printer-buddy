@@ -16,7 +16,7 @@ PB.panel("macros", {
     }
     function draw() {
       const hid = hidden(), shown = list.filter(m => !hid.includes(m.name));
-      box.innerHTML = shown.length ? shown.map(m => `<span class="pb-mac"><button type="button" data-mac="${esc(m.name)}" title="${esc(m.description || m.name)}">${esc(m.name.replaceAll("_", " "))}</button><button type="button" class="x" data-hide="${esc(m.name)}" title="Hide">✕</button></span>`).join("")
+      box.innerHTML = shown.length ? shown.map(m => `<span class="pb-mac"><button type="button" data-mac="${esc(m.name)}" title="${esc(m.description || m.name)}">${esc(m.name.replaceAll("_", " "))}</button><button type="button" class="x" data-hide="${esc(m.name)}" title="Hide">${PB.ic.x}</button></span>`).join("")
         : `<span class="pb-muted">${list.length ? "All macros are hidden." : "No macros on this printer."}</span>`;
       const show = host.querySelector("[data-a=show]");
       show.hidden = !hid.length; show.textContent = `Show hidden (${hid.length})`;

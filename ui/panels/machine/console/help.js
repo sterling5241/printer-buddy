@@ -4,7 +4,7 @@ PB.parts.consoleHelp = (q, input, getHelp) => {
     // command help: search every command, click one to put it in the box
     const hd = PB.el("dialog", "bd-lib pb-xd pb-cmdhelp"); document.body.append(hd);
     q("[data-a=help]").onclick = () => {
-      hd.innerHTML = `<div class="pb-ptop"><h3>Commands</h3><button type="button" class="pb-px" aria-label="Close">✕</button></div>
+      hd.innerHTML = `<div class="pb-ptop"><h3>Commands</h3><button type="button" class="pb-px" aria-label="Close">${PB.ic.x}</button></div>
         <input type="search" placeholder="Search commands or what they do…" aria-label="Search commands"><div class="pb-cmdlist"></div>`;
       const box = hd.querySelector(".pb-cmdlist"), find = hd.querySelector("input");
       const draw = () => {

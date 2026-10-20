@@ -9,7 +9,7 @@ PB.panel("config", {
   ],
   create(host, cfg) {
     host.innerHTML = `<div class="pb-tool"><span class="pb-ccount pb-muted"></span><span class="bd-sp"></span>
-        <button type="button" data-a="refresh">Refresh</button></div><div class="pb-cfiles"></div>`;
+        <button type="button" data-a="refresh" data-head title="Refresh" aria-label="Refresh">${PB.ic.refresh}</button></div><div class="pb-cfiles"></div>`;
     const ed = PB.parts.cfgEditor(cfg, () => listFiles());   // editor.js (+ highlight.js)
     const el2 = s => host.querySelector(s);
     let files = [];
@@ -29,7 +29,7 @@ PB.panel("config", {
     }
     function drawList() {
       const dirs = {}; for (const f of files) { const d = f.includes("/") ? f.slice(0, f.lastIndexOf("/")) : ""; (dirs[d] ||= []).push(f); }
-      el2(".pb-cfiles").innerHTML = Object.keys(dirs).sort().map(d => `${d ? `<div class="pb-cdir">📁 ${esc(d)}</div>` : ""}${dirs[d].map(f =>
+      el2(".pb-cfiles").innerHTML = Object.keys(dirs).sort().map(d => `${d ? `<div class="pb-cdir">${PB.ic.folder}${esc(d)}</div>` : ""}${dirs[d].map(f =>
         `<button type="button" data-f="${esc(f)}" class="pb-crow${d ? " in" : ""}"><span>${esc(f.split("/").pop())}</span>
           <small class="pb-muted">${esc(when(meta[f]?.modified))}</small><small class="pb-muted">${esc(kb(meta[f]?.size))}</small></button>`).join("")}`).join("")
         || `<p class="pb-muted">No config files found.</p>`;

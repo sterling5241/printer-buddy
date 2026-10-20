@@ -6,7 +6,7 @@ PB.panel("queue", {
   create(host, cfg) {
     host.innerHTML = `<div class="pb-tool"><span class="pb-qstate pb-muted"></span><span class="bd-sp"></span>
         <button type="button" class="pb-pri" data-a="start">Start queue</button><button type="button" data-a="pause">Pause queue</button>
-        <button type="button" data-a="ref" title="Refresh" aria-label="Refresh">↻</button></div>
+        <button type="button" data-a="ref" data-head title="Refresh" aria-label="Refresh">${PB.ic.refresh}</button></div>
       <div class="pb-msg pb-muted"></div><div class="pb-list"></div>`;
     const q = s => host.querySelector(s), list = q(".pb-list"), msg = q(".pb-msg");
     let jobs = [], state = null, timer = null, pid = null;
@@ -43,7 +43,7 @@ PB.panel("queue", {
           <div class="pb-lbtn"><span class="pb-qcount"><button type="button" data-less="${i}" title="One copy fewer" aria-label="One copy fewer">−</button>
               <b title="Copies">×${g.jobs.length}</b><button type="button" data-more="${i}" title="One more copy" aria-label="One more copy">+</button></span>
             ${i ? `<button type="button" data-next="${i}" title="Make this the next job">↑ Next</button>` : ""}
-            <button type="button" data-rm="${i}" title="Remove from the queue" aria-label="Remove">✕</button></div></div>`).join("");
+            <button type="button" data-rm="${i}" title="Remove from the queue" aria-label="Remove">${PB.ic.x}</button></div></div>`).join("");
       for (const img of list.querySelectorAll(".pb-lthumb")) img.onerror = () => img.classList.add("none");
       for (const b of list.querySelectorAll("[data-next]")) b.onclick = () => { const i = +b.dataset.next; rebuild([gs[i], ...gs.filter((_, k) => k !== i)]); };
       for (const b of list.querySelectorAll("[data-rm]")) b.onclick = () => call("remove", { job_ids: gs[+b.dataset.rm].jobs.map(j => j.id) });

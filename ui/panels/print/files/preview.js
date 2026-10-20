@@ -6,9 +6,9 @@ PB.parts.filesPreview = c => {
     const pv = PB.el("dialog", "bd-lib pb-xd pb-pvdlg"); document.body.append(pv);
     async function look(path) {
       const url = PB.fileUrl(c.root, path), img = /\.(png|jpe?g|gif|webp|bmp)$/i.test(path);
-      pv.innerHTML = `<div class="pb-ptop"><h3>${esc(path.split("/").pop())}</h3><button type="button" class="pb-px" aria-label="Close">✕</button></div>
+      pv.innerHTML = `<div class="pb-ptop"><h3>${esc(path.split("/").pop())}</h3><button type="button" class="pb-px" aria-label="Close">${PB.ic.x}</button></div>
         <div class="pb-pvbody">${img ? `<img src="${url}" alt="">` : `<pre class="pb-muted">Loading…</pre>`}</div>
-        <div class="bd-libfoot"><a class="pb-dl" href="${PB.fileUrl(c.root, path, true)}">⬇ Download</a></div>`;
+        <div class="bd-libfoot"><a class="pb-dl" href="${PB.fileUrl(c.root, path, true)}">${PB.ic.download}Download</a></div>`;
       pv.querySelector(".pb-px").onclick = () => pv.close();
       pv.showModal();
       if (img) return;

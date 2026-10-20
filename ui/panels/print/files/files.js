@@ -20,9 +20,9 @@ PB.panel("files", {
         <select data-a="sort" aria-label="Sort"><option value="new">Newest</option><option value="name">Name</option><option value="size">Biggest</option><option value="time">Print time</option></select>
         <button type="button" data-a="mkdir" title="New folder">+ Folder</button>
         <button type="button" data-a="sel" title="Pick several files to delete, move or download" aria-pressed="false">Select</button>
-        <button type="button" data-a="ref" title="Refresh" aria-label="Refresh">↻</button></div>
+        <button type="button" data-a="ref" data-head title="Refresh" aria-label="Refresh">${PB.ic.refresh}</button></div>
       <div class="pb-bulk" hidden><b class="pb-bn">0 picked</b><button type="button" data-b="all">All</button><button type="button" data-b="none">None</button><span class="bd-sp"></span>
-        <button type="button" data-b="dl">⬇ Download</button><button type="button" data-b="mv">Move to…</button><button type="button" data-b="del" class="pb-danger">Delete</button></div>
+        <button type="button" data-b="dl">${PB.ic.download}Download</button><button type="button" data-b="mv">Move to…</button><button type="button" data-b="del" class="pb-danger">Delete</button></div>
       <div class="pb-crumbs"></div><div class="pb-msg pb-muted" aria-live="polite"></div><div class="pb-list"></div>
       <button type="button" class="pb-more" hidden></button>`;
     const q = s => host.querySelector(s), list = q(".pb-list"), msg = q(".pb-msg"), more = q(".pb-more");
@@ -64,21 +64,21 @@ PB.panel("files", {
       rows = rows.slice(0, cap);
       msg.textContent = !files.length && !dirs.length ? "This folder is empty." : `${ds.length ? ds.length + " folders, " : ""}${files.length} files`;
       list.innerHTML = (dir ? `<div class="pb-li pb-dir" data-up><span class="pb-lthumb pb-ico">↩</span><div class="pb-lmain"><div class="pb-lname">..</div></div></div>` : "")
-        + ds.map(d => `<div class="pb-li pb-dir" data-open="${esc(d.dirname)}"><span class="pb-lthumb pb-ico">📁</span>
+        + ds.map(d => `<div class="pb-li pb-dir" data-open="${esc(d.dirname)}"><span class="pb-lthumb pb-ico">${PB.ic.folder}</span>
             <div class="pb-lmain"><div class="pb-lname">${esc(d.dirname)}</div><div class="pb-lsub">${fmtDate(d.modified)}</div></div>
-            <div class="pb-lbtn">${root !== "logs" ? `<button type="button" data-ren="${esc(d.dirname)}" data-isdir="1" title="Rename">✎</button>
-            <button type="button" data-deld="${esc(d.dirname)}" title="Delete folder">✕</button>` : ""}</div></div>`).join("")
+            <div class="pb-lbtn">${root !== "logs" ? `<button type="button" data-ren="${esc(d.dirname)}" data-isdir="1" title="Rename">${PB.ic.pencil}</button>
+            <button type="button" data-deld="${esc(d.dirname)}" title="Delete folder">${PB.ic.x}</button>` : ""}</div></div>`).join("")
         + rows.map(f => `<div class="pb-li${picked.has(f.filename) ? " picked" : ""}">${selecting ? `<input type="checkbox" class="pb-pick" data-pick="${esc(f.filename)}"${picked.has(f.filename) ? " checked" : ""} aria-label="Pick ${esc(f.filename)}">` : ""}
-            ${g && cfg.thumbs ? `<img class="pb-lthumb" loading="lazy" alt="" src="${PB.thumbUrl(pageId, full(f.filename))}">` : g ? "" : `<span class="pb-lthumb pb-ico">📄</span>`}
+            ${g && cfg.thumbs ? `<img class="pb-lthumb" loading="lazy" alt="" src="${PB.thumbUrl(pageId, full(f.filename))}">` : g ? "" : `<span class="pb-lthumb pb-ico">${PB.ic.file}</span>`}
             <div class="pb-lmain"><div class="pb-lname">${esc(f.filename)}</div>
               <div class="pb-lsub">${[fmtSize(f.size), fmtDate(f.modified), ...(g ? meta(f) : [])].join(" · ")}</div></div>
             <div class="pb-lbtn">${g ? `<button type="button" class="pb-pri" data-print="${esc(f.filename)}"${busy ? " disabled" : ""}>Print</button>
               <button type="button" data-queue="${esc(f.filename)}" title="Add to the job queue">+ Queue</button>
               ${PB.previewFile ? `<button type="button" data-prev="${esc(f.filename)}" title="Preview the G-code">Preview</button>` : ""}` : ""}
               ${root === "config" && PB.openConfig ? `<button type="button" data-edit="${esc(f.filename)}">Edit</button>` : ""}
-              ${pv.PREVIEW.test(f.filename) ? `<button type="button" data-look="${esc(f.filename)}" title="Show it here">👁</button>` : ""}
-              <a class="pb-dl" href="${PB.fileUrl(root, full(f.filename), true)}" title="Download" aria-label="Download">⬇</a>
-              ${root !== "logs" ? `<button type="button" data-ren="${esc(f.filename)}" title="Rename">✎</button><button type="button" data-dup="${esc(f.filename)}" title="Duplicate">⧉</button><button type="button" data-del="${esc(f.filename)}" title="Delete">✕</button>` : ""}
+              ${pv.PREVIEW.test(f.filename) ? `<button type="button" data-look="${esc(f.filename)}" title="Show it here">${PB.ic.eye}</button>` : ""}
+              <a class="pb-dl" href="${PB.fileUrl(root, full(f.filename), true)}" title="Download" aria-label="Download">${PB.ic.download}</a>
+              ${root !== "logs" ? `<button type="button" data-ren="${esc(f.filename)}" title="Rename">${PB.ic.pencil}</button><button type="button" data-dup="${esc(f.filename)}" title="Duplicate">⧉</button><button type="button" data-del="${esc(f.filename)}" title="Delete">${PB.ic.x}</button>` : ""}
             </div></div>`).join("");
       for (const img of list.querySelectorAll("img.pb-lthumb")) img.onerror = () => img.classList.add("none");
       list.querySelector("[data-up]")?.addEventListener("click", () => { dir = dir.split("/").slice(0, -1).join("/"); showAll = false; load(); });

@@ -4,17 +4,17 @@ PB.parts = PB.parts || {};
 PB.parts.cfgEditor = (cfg, onClose) => {
     const fx = PB.el("div", "pb-cfx"); fx.hidden = true;
     fx.innerHTML = `<div class="pb-cfx-bar">
-          <button type="button" data-a="close" title="Close (Esc)" aria-label="Close">✕</button>
+          <button type="button" data-a="close" title="Close (Esc)" aria-label="Close">${PB.ic.x}</button>
           <b class="pb-cpath"></b><span class="pb-cstate pb-muted"></span><span class="bd-sp"></span>
-          <button type="button" data-a="outline" title="Section outline">☰<span> Outline</span></button>
-          <button type="button" data-a="find" title="Search and replace (Ctrl+F)">🔍<span> Find</span></button>
+          <button type="button" data-a="outline" title="Section outline">${PB.ic.list}<span> Outline</span></button>
+          <button type="button" data-a="find" title="Search and replace (Ctrl+F)">${PB.ic.search}<span> Find</span></button>
           <a class="pb-cdoc" target="_blank" rel="noopener" hidden></a>
-          <button type="button" data-a="restart">↻<span> Save &amp; restart</span></button>
+          <button type="button" data-a="restart">${PB.ic.refresh}<span> Save &amp; restart</span></button>
           <button type="button" class="pb-pri" data-a="save" title="Save (Ctrl+S)">Save</button></div>
         <div class="pb-cfind" hidden><input data-f="q" placeholder="Find" aria-label="Find"><input data-f="r" placeholder="Replace with" aria-label="Replace with">
           <label class="pb-chk"><input type="checkbox" data-f="case"> Aa</label><span class="pb-fcount pb-muted"></span>
           <button type="button" data-f="prev" title="Previous (Shift+Enter)">↑</button><button type="button" data-f="next" title="Next (Enter)">↓</button>
-          <button type="button" data-f="one">Replace</button><button type="button" data-f="all">All</button><button type="button" data-f="x" aria-label="Close search">✕</button></div>
+          <button type="button" data-f="one">Replace</button><button type="button" data-f="all">All</button><button type="button" data-f="x" aria-label="Close search">${PB.ic.x}</button></div>
         <div class="pb-cfx-main">
           <div class="pb-ed"><div class="pb-gutter" aria-hidden="true"></div>
             <div class="pb-edarea"><pre class="pb-hl" aria-hidden="true"></pre>
@@ -58,7 +58,7 @@ PB.parts.cfgEditor = (cfg, onClose) => {
       q(".pb-cpos").textContent = path ? `Line ${ln + 1}, column ${col} · ${ta.value.split("\n").length} lines` : "";
       const sec = [...sections].reverse().find(([i]) => i <= ln), doc = q(".pb-cdoc");
       doc.hidden = !sec || !path.endsWith(".cfg");
-      if (sec) { doc.href = `https://www.klipper3d.org/Config_Reference.html#${ANCHOR(sec[1])}`; doc.textContent = `Docs: [${sec[1].split(/\s+/)[0]}] ↗`; }
+      if (sec) { doc.href = `https://www.klipper3d.org/Config_Reference.html#${ANCHOR(sec[1])}`; doc.innerHTML = `Docs: [${esc(sec[1].split(/\s+/)[0])}] ${PB.ic.external}`; }
     }
     // ---- full-screen editor ----
     function show(on) {

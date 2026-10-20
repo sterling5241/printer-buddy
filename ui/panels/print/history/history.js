@@ -11,7 +11,7 @@ PB.panel("history", {
   ],
   create(host, cfg) {
     host.innerHTML = `<div class="pb-tool"><div class="pb-totals pb-muted"></div><span class="bd-sp"></span>
-        <button type="button" data-a="charts" title="Charts: results, filament and print time per week" aria-pressed="false">📊 Charts</button><button type="button" data-a="maint" title="Maintenance reminders">🔧 Maintenance</button><button type="button" data-a="csv" title="Download the whole history as a spreadsheet (CSV)">⬇ CSV</button></div>
+        <button type="button" data-a="charts" data-head title="Charts" aria-label="Charts" aria-pressed="false">${PB.ic.chart}</button><button type="button" data-a="maint" data-head title="Maintenance reminders" aria-label="Maintenance">${PB.ic.wrench}</button><button type="button" data-a="csv" title="Download the whole history as a spreadsheet (CSV)" data-head aria-label="Download CSV">${PB.ic.download}</button></div>
       <div class="pb-hcharts" hidden><div class="pb-hc1"></div><div class="pb-hc2"></div><div class="pb-hcnums pb-muted"></div></div>
       <div class="pb-maint"></div><div class="pb-msg pb-muted" aria-live="polite"></div>
       <div class="pb-list"></div><button type="button" class="pb-more" hidden>Load more</button>`;
@@ -55,7 +55,7 @@ PB.panel("history", {
           const [label, cls] = RESULT[j.status] || [j.status || "—", ""];
           return `<tr>${cfg.thumbs ? `<td class="pb-tthumb"><img class="pb-lthumb" loading="lazy" alt="" src="${PB.thumbUrl(pageId, j.filename)}"></td>` : ""}
             <td class="pb-tname" title="${esc(j.filename)}"><button type="button" class="pb-hname" data-job="${esc(j.id)}">${esc(j.filename)}</button>
-              ${notes[j.id] ? `<div class="pb-hnote" title="Note">📝 ${esc(notes[j.id].slice(0, 80))}</div>` : ""}</td><td class="num">${fmtDate(j.start_time)}</td>
+              ${notes[j.id] ? `<div class="pb-hnote" title="Note">${PB.ic.note}${esc(notes[j.id].slice(0, 80))}</div>` : ""}</td><td class="num">${fmtDate(j.start_time)}</td>
             <td class="num">${j.print_duration ? fmtDur(j.print_duration) : "—"}</td><td class="num">${fmtFil(j.filament_used)}</td>
             <td><span class="pb-chip ${cls}">${esc(label)}</span></td>
             <td class="pb-tbtn">${j.exists ? `<button type="button" data-print="${esc(j.filename)}"${busy ? " disabled" : ""}>Reprint</button>` : ""}</td></tr>`;

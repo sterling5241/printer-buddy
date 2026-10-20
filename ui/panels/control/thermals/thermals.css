@@ -9,3 +9,15 @@
 .pb-pres { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
 :is(#page, #home).bd .pb-pres button { height: 28px; padding: 0 10px; }
 .pb-presdlg { width: min(640px, 94vw); }
+/* Presets button (title strip) + its menu */
+:is(#page, #home).bd .pb-card > header .pb-presbtn { height: 30px; padding: 0 8px; border: 0; background: transparent; color: var(--text); font-weight: 500; font-size: 13px; }
+:is(#page, #home).bd .pb-card > header .pb-presbtn:hover { background: var(--bd-hover); }
+.pb-presbtn > svg.pb-ic:first-child { color: var(--orange); }
+.pb-presmenu { min-width: 210px; display: flex; flex-direction: column; padding: 4px; }
+.pb-presmenu button { display: flex !important; align-items: center; justify-content: flex-start !important; gap: 10px; height: 34px; }
+.pb-presmenu button svg.pb-ic { color: var(--orange); }
+.pb-presmenu [data-cool] svg.pb-ic { color: #42a5f5; }
+.pb-presmenu [data-edit] { color: var(--muted); } .pb-presmenu [data-edit] svg.pb-ic { color: var(--muted); }
+.pb-presmenu small { margin-left: auto; color: var(--muted); font-family: var(--bd-mono, monospace); font-size: 12px; }
+.pb-presmenu hr { border: 0; border-top: 1px solid rgba(255, 255, 255, .08); margin: 4px 0; }
+.pb-pres:empty { display: none; }

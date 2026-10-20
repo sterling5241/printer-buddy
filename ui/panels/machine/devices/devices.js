@@ -7,7 +7,7 @@ PB.panel("devices", {
     host.innerHTML = `<div class="pb-tool"><span class="bd-seg pb-dtabs"><button type="button" data-t="serial" aria-pressed="true">Serial</button>
         <button type="button" data-t="usb">USB</button><button type="button" data-t="can">CAN</button><button type="button" data-t="video">Cameras</button></span>
         <span class="bd-sp"></span><input class="pb-canif" value="can0" aria-label="CAN interface" title="CAN interface" hidden>
-        <button type="button" data-a="scan">Scan</button></div><div class="pb-msg pb-muted"></div><div class="pb-list"></div>`;
+        <button type="button" data-a="scan" data-head title="Scan again" aria-label="Scan again">${PB.ic.refresh}</button></div><div class="pb-msg pb-muted"></div><div class="pb-list"></div>`;
     const q = s => host.querySelector(s), list = q(".pb-list"), msg = q(".pb-msg");
     let tab = "serial", busy = false;
     const copy = async t => { try { await navigator.clipboard.writeText(t); toast("Copied"); } catch { prompt("Copy this:", t); } };

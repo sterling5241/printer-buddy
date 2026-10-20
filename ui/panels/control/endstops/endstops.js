@@ -5,7 +5,7 @@ PB.panel("endstops", {
   settings: [{ k: "live", label: "Refresh every 2 seconds while visible", type: "check", def: true }],
   create(host, cfg) {
     host.innerHTML = `<div class="pb-tool"><span class="pb-msg pb-muted">Press a switch by hand and watch it change.</span><span class="bd-sp"></span>
-        <button type="button" data-a="ref">Check now</button></div><div class="pb-endst"></div>`;
+        <button type="button" data-a="ref" data-head title="Check now" aria-label="Check now">${PB.ic.refresh}</button></div><div class="pb-endst"></div>`;
     const box = host.querySelector(".pb-endst"), msg = host.querySelector(".pb-msg");
     let timer = null, busy = false, live = false;
     async function check() {

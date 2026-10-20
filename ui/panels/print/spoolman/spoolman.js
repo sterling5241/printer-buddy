@@ -3,7 +3,7 @@ PB.panel("spoolman", {
   title: "Spools", desc: "Active filament spool (Spoolman)", cls: "adv",
   icon: PB.icon('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6"/>'),
   create(host) {
-    host.innerHTML = `<div class="pb-tool"><span class="pb-msg pb-muted"></span><span class="bd-sp"></span><button type="button" data-a="ref" aria-label="Refresh">↻</button></div>
+    host.innerHTML = `<div class="pb-tool"><span class="pb-msg pb-muted"></span><span class="bd-sp"></span><button type="button" data-a="ref" data-head title="Refresh" aria-label="Refresh">${PB.ic.refresh}</button></div>
       <div class="pb-spool"></div><div class="pb-sub-h">Other spools</div><input type="search" class="pb-sfind" placeholder="Search spools…" aria-label="Search spools"><div class="pb-list"></div>`;
     const q = s => host.querySelector(s), list = q(".pb-list"), msg = q(".pb-msg");
     let spools = [], active = null, loaded = false;

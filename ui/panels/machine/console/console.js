@@ -12,7 +12,7 @@ PB.panel("console", {
   create(host, cfg) {
     host.innerHTML = `<div class="pb-ctool"><button type="button" data-a="filters" title="Hide lines that match your filters">Filters<span class="pb-fn"></span></button>
         <button type="button" data-a="scroll" title="Keep scrolling to the newest line" aria-pressed="true">Auto-scroll</button>
-        <span class="bd-sp"></span><button type="button" data-a="help" title="Every command Klipper knows, with what it does">Commands</button><button type="button" data-a="clear" title="Clear the console">Clear</button></div>
+        <span class="bd-sp"></span><button type="button" data-a="help" data-head title="Commands: every command Klipper knows" aria-label="Commands">${PB.ic.list}</button><button type="button" data-a="clear" data-head title="Clear the console" aria-label="Clear">${PB.ic.trash}</button></div>
       <div class="pb-log" role="log" aria-label="Klipper console"></div>
       <form class="pb-cin"><input autocomplete="off" spellcheck="false" aria-label="G-code command" placeholder="Send G-code… (↑ ↓ history)"><button>Send</button></form>`;
     const dl = PB.el("datalist"); dl.id = "pb-cmds-" + Math.random().toString(36).slice(2, 7); host.append(dl);
