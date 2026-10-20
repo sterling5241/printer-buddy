@@ -6,7 +6,9 @@
   const SPLITS = { "1": [1], "1-1": [1, 1], "1-2": [1, 2], "2-1": [2, 1], "1-1-1": [1, 1, 1], "1-1-1-1": [1, 1, 1, 1] };
   const SPLIT_NAMES = { "1": "1 column", "1-1": "½ + ½", "1-2": "⅓ + ⅔", "2-1": "⅔ + ⅓", "1-1-1": "⅓ ×3", "1-1-1-1": "¼ ×4" };
   const GRID = icon('<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>');
+  const rid = () => Math.random().toString(36).slice(2, 9);
   const P = t => ({ t });
+  const phone = matchMedia("(max-width: 760px)");   // phones: one column per tab, in the tab's own phone order
   const DEFAULT = { v: 1, tabs: [
     { id: "dash", name: "Dashboard", rows: [{ s: "1-1", cols: [[P("camera"), P("thermals"), P("console")], [P("status"), P("ai"), P("toolhead"), P("macros")]] }] },
     { id: "files", name: "Files", rows: [{ s: "1", cols: [[P("files")]] }] },
@@ -30,15 +32,17 @@
   page.classList.add("bd");
 
   // ---- layout state -------------------------------------------------------------------------
-  let layout = structuredClone(DEFAULT), active = PB.store.get("pb-tab", "dash"), saveTimer = null;
+  let layout = null, active = PB.store.get("pb-tab", "dash"), saveTimer = null;
   const insts = new Map();   // tab id -> [panel instances]
   const clean = l => {
     if (!l || !Array.isArray(l.tabs) || !l.tabs.length) return null;
     l.tabs = l.tabs.filter(t => t && t.id && Array.isArray(t.rows)).map(t => ({
       id: String(t.id), name: String(t.name || "Tab"),
       rows: t.rows.filter(r => r && SPLITS[r.s] && Array.isArray(r.cols)).map(r => ({
-        s: r.s, cols: SPLITS[r.s].map((_, i) => (r.cols[i] || []).filter(it => it && typeof it.t === "string").map(it => ({ t: it.t, c: !!it.c }))),
+        s: r.s, cols: SPLITS[r.s].map((_, i) => (r.cols[i] || []).filter(it => it && typeof it.t === "string")
+          .map(it => ({ id: String(it.id || rid()), t: it.t, c: !!it.c }))),
       })),
+      phone: Array.isArray(t.phone) ? t.phone.map(String) : [],
     }));
     return l.tabs.length ? l : null;
   };
@@ -50,6 +54,17 @@
   const changed = () => { save(); build(); };
   const used = t => layout.tabs.some(tab => tab.rows.some(r => r.cols.some(c => c.some(it => it.t === t))));
   const tabOf = () => layout.tabs.find(t => t.id === active) || layout.tabs[0];
+  const fresh = () => clean(structuredClone(DEFAULT));
+  layout = fresh();
+  const items = tab => tab.rows.flatMap(r => r.cols.flat());
+  const phoneItems = tab => {   // the tab's phone order; panels added since go at the end in desktop order
+    const all = items(tab), seen = new Set(tab.phone);
+    return [...tab.phone.map(id => all.find(i => i.id === id)).filter(Boolean), ...all.filter(i => !seen.has(i.id))];
+  };
+  const removeItem = (tab, item) => {
+    for (const r of tab.rows) for (const c of r.cols) { const i = c.indexOf(item); if (i >= 0) c.splice(i, 1); }
+    tab.phone = tab.phone.filter(id => id !== item.id);
+  };
 
   // ---- building ---------------------------------------------------------------------------------
   function build() {
@@ -79,6 +94,7 @@
       const sec = el("section", "bd-tab"); sec.hidden = tab.id !== active;
       const list = []; insts.set(tab.id, list);
       if (editing) sec.append(tabBar(tab));
+      if (phone.matches) { sec.append(buildPhone(tab, list)); return sec; }
       tab.rows.forEach((row, ri) => sec.append(buildRow(tab, row, ri, list)));
       if (editing) {
         const add = el("button", "bd-addrow", "+ Add row"); add.type = "button";
@@ -99,7 +115,8 @@
     const del = bar.querySelector("[data-a=del]");
     del.disabled = layout.tabs.length < 2;
     del.onclick = () => { if (confirm(`Delete the "${tab.name}" tab and its panels?`)) { layout.tabs = layout.tabs.filter(t => t !== tab); changed(); } };
-    bar.querySelector("[data-a=reset]").onclick = () => { if (confirm("Put every tab back to the default layout?")) { layout = structuredClone(DEFAULT); active = "dash"; changed(); } };
+    bar.querySelector("[data-a=reset]").onclick = () => { if (confirm("Put every tab back to the default layout?")) { layout = fresh(); active = "dash"; changed(); } };
+    if (phone.matches) bar.querySelector("span").innerHTML = `Editing <b>${esc(tab.name)}</b> on phones: this order is only used on small screens.`;
     bar.querySelector("[data-a=done]").onclick = () => { page.classList.remove("bd-editing"); build(); };
     return bar;
   }
@@ -133,10 +150,17 @@
   function buildCol(row, col, ci, list) {
     const c = el("div", "bd-col");
     const editing = page.classList.contains("bd-editing");
-    col.forEach((item, i) => c.append(buildCard(row, col, ci, item, i, list)));
+    col.forEach((item, i) => c.append(buildCard(item, list, {
+      up: i > 0 && (() => { [col[i - 1], col[i]] = [col[i], col[i - 1]]; }),
+      down: i < col.length - 1 && (() => { [col[i + 1], col[i]] = [col[i], col[i + 1]]; }),
+      left: !!row.cols[ci - 1] && (() => { col.splice(i, 1); row.cols[ci - 1].push(item); }),
+      right: !!row.cols[ci + 1] && (() => { col.splice(i, 1); row.cols[ci + 1].push(item); }),
+      del: () => col.splice(i, 1),
+      drag: col,
+    })));
     if (editing) {
       const add = el("button", "bd-addpanel", "+ Add panel"); add.type = "button";
-      add.onclick = () => library(t => { col.push({ t }); changed(); });
+      add.onclick = () => library(t => { col.push({ id: rid(), t }); changed(); });
       c.append(add);
       c.ondragover = e => { if (drag) { e.preventDefault(); c.classList.add("bd-over"); } };
       c.ondragleave = () => c.classList.remove("bd-over");
@@ -154,7 +178,29 @@
     return c;
   }
 
-  function buildCard(row, col, ci, item, i, list) {
+  function buildPhone(tab, list) {   // phones: one column in the tab's phone order; edits only change that order
+    const r = el("div", "bd-row"), c = el("div", "bd-col"), order = phoneItems(tab);
+    const setOrder = o => { tab.phone = o.map(i => i.id); };
+    order.forEach((item, i) => c.append(buildCard(item, list, {
+      up: i > 0 && (() => { [order[i - 1], order[i]] = [order[i], order[i - 1]]; setOrder(order); }),
+      down: i < order.length - 1 && (() => { [order[i + 1], order[i]] = [order[i], order[i + 1]]; setOrder(order); }),
+      del: () => removeItem(tab, item),
+    })));
+    if (page.classList.contains("bd-editing")) {
+      const add = el("button", "bd-addpanel", "+ Add panel"); add.type = "button";
+      add.onclick = () => library(t => {
+        if (!tab.rows.length) tab.rows.push({ s: "1", cols: [[]] });
+        const item = { id: rid(), t }, last = tab.rows[tab.rows.length - 1];
+        last.cols[last.cols.length - 1].push(item); setOrder([...order, item]); changed();
+      });
+      c.append(add);
+    }
+    r.style.gridTemplateColumns = "minmax(0, 1fr)";
+    r.append(c);
+    return r;
+  }
+
+  function buildCard(item, list, ops) {
     const def = PB.defs[item.t] || { title: item.t, icon: "", cls: "" };
     const card = el("section", `pb-card${def.cls ? " " + def.cls : ""}${def.flush ? " flush" : ""}${item.c ? " collapsed" : ""}`);
     const head = el("header", "", `${def.icon || ""}<button type="button" class="pb-title">${esc(def.title)}</button>
@@ -169,17 +215,13 @@
     const toggle = () => { item.c = !item.c; card.classList.toggle("collapsed", item.c); save(); if (!item.c && inst) PB.shown([inst]); };
     head.querySelector(".pb-title").onclick = toggle;
     head.querySelector(".pb-tog").onclick = toggle;
-    const move = (dc, di) => {
-      if (di) { const j = i + di; if (j < 0 || j >= col.length) return; [col[i], col[j]] = [col[j], col[i]]; }
-      else { const to = row.cols[ci + dc]; if (!to) return; col.splice(i, 1); to.push(item); }
-      changed();
-    };
-    head.querySelector("[data-a=up]").onclick = () => move(0, -1);
-    head.querySelector("[data-a=down]").onclick = () => move(0, 1);
-    head.querySelector("[data-a=left]").onclick = () => move(-1, 0);
-    head.querySelector("[data-a=right]").onclick = () => move(1, 0);
-    head.querySelector("[data-a=del]").onclick = () => { col.splice(i, 1); changed(); };
-    if (page.classList.contains("bd-editing")) {
+    for (const a of ["up", "down", "left", "right", "del"]) {
+      const b = head.querySelector(`[data-a=${a}]`);
+      if (!ops[a]) { if (a === "left" || a === "right") b.remove(); else b.disabled = true; continue; }
+      b.onclick = () => { ops[a](); changed(); };
+    }
+    if (page.classList.contains("bd-editing") && ops.drag) {
+      const col = ops.drag;
       head.draggable = true;
       head.ondragstart = e => { drag = { col, item }; e.dataTransfer.effectAllowed = "move"; card.classList.add("bd-dragging"); };
       head.ondragend = () => { drag = null; card.classList.remove("bd-dragging"); };
@@ -208,6 +250,7 @@
     PB.shown(insts.get(id) || []);
   }
   editBtn.onclick = () => { page.classList.toggle("bd-editing"); build(); };
+  phone.addEventListener("change", build);
   PB.onRoute(p => { if (p) PB.shown(insts.get(tabOf().id) || []); });
 
   build();
