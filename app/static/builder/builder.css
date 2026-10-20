@@ -497,3 +497,23 @@ html[data-theme="light"] .pb-prow input, html[data-theme="light"] .pb-prow texta
 @media (max-width: 760px) { .pb-mrow { grid-template-columns: 1fr auto; } .pb-mbar, .pb-mtext { grid-column: 1 / -1; } }
 .pb-mono { font-family: var(--bd-mono); font-size: 12.5px; word-break: break-all; }
 .pb-canif { width: 70px; height: 28px; background: var(--bd-deep); color: var(--text); border: 1px solid var(--bd-line); border-radius: 4px; padding: 0 6px; }
+.pb-macform { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.pb-macform label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); font-family: var(--bd-mono, monospace); }
+.pb-macform input { height: 30px; background: #2a2a2f; color: var(--text); border: 1px solid #3a3a40; border-radius: 4px; padding: 0 8px; font: inherit; }
+html[data-theme="light"] .pb-macform input { background: #fff; color: #1c1b20; border-color: #dcdce2; }
+.pb-pal { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 12.5px; }
+:is(#page, #home).bd .pb-pal button { height: 26px; padding: 0 8px; font-size: 12px; }
+.pb-pal .pb-palstate { color: var(--orange); }
+.pb-palnum { width: 80px; height: 28px; margin-left: 6px; background: #2a2a2f; color: var(--text); border: 1px solid #3a3a40; border-radius: 4px; padding: 0 6px; }
+.pb-xd .bd-check { margin: 6px 0; }
+html[data-theme="light"] .pb-palnum { background: #fff; color: #1c1b20; border-color: #dcdce2; }
+.pb-endst { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
+.pb-es { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 4px; background: rgba(127, 127, 140, .1); border: 1px solid transparent; font-size: 13px; }
+.pb-es span { color: var(--muted); font-size: 12px; }
+.pb-es.on { border-color: var(--orange); background: rgba(255, 138, 31, .12); }
+.pb-es.on span { color: var(--orange); font-weight: 700; }
+.pb-throt { padding: 6px 10px; margin-bottom: 8px; border-radius: 4px; background: rgba(246, 195, 68, .14); color: #f6c344; font-size: 13px; }
+.pb-mcus { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.pb-mcu { padding: 8px 10px; border-radius: 4px; background: rgba(127, 127, 140, .08); font-size: 12.5px; display: flex; flex-direction: column; gap: 3px; }
+.pb-mcuh { display: flex; justify-content: space-between; gap: 6px; font-size: 13px; }
+.pb-mcuv { color: var(--text); }

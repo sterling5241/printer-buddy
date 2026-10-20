@@ -4,7 +4,7 @@
   const { el } = PB;
   const row = $(".top .row");
   $("#aiBtn").hidden = true; $("#notifyBtn").hidden = true;   // their panels now live in Settings
-  const bell = el("button", "pb-bell", `🔔<i hidden></i>`); bell.type = "button"; bell.title = "Printer Buddy news"; bell.setAttribute("aria-label", "News");
+  const bell = el("button", "pb-bell", `🔔<i hidden></i>`); bell.type = "button"; bell.title = "News and printer notices"; bell.setAttribute("aria-label", "News");
   const gear = el("button", "", "⚙ Settings"); gear.type = "button";
   row.insertBefore(gear, $("#homeEdit") || $("#manualBtn"));
   row.insertBefore(bell, gear);
@@ -23,7 +23,10 @@
         : `<p class="pb-muted">No news yet.</p>`;
     },
     async load() {
-      try { this.items = (await api("/api/news")).items || []; } catch { return; }
+      // Printer Buddy news + each printer's Moonraker notices (warnings, failed parts, Klipper / Moonraker announcements)
+      const [news, notes] = await Promise.all([api("/api/news").then(r => r.items || [], () => null), api("/api/notices").then(r => r.items || [], () => [])]);
+      if (news === null && !notes.length) return;
+      this.items = [...notes, ...(news || [])];
       bell.querySelector("i").hidden = !this.unread().length;
       dispatchEvent(new Event("pb-news"));
       banner();
@@ -53,7 +56,7 @@
     document.body.prepend(b);
   }
   PB.news.load();
-  setInterval(() => PB.news.load(), 6 * 3600 * 1000);
+  setInterval(() => PB.news.load(), 15 * 60 * 1000);   // the box caches: news 6 h, printer notices 10 min
 
   // ---- settings ----------------------------------------------------------------------------------------
   const panel = el("section", "panel pb-settings"); panel.hidden = true;

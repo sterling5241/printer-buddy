@@ -9,6 +9,7 @@ PB.panel("status", {
   create(host, cfg) {
     host.innerHTML = `<div class="pb-st"><img class="pb-thumb" alt="" hidden><div class="pb-st-txt"><div class="pb-file"></div><div class="pb-state"></div></div></div>
       <div class="pb-prog"><i></i></div><div class="pb-pct"><span></span><span></span></div>
+      <div class="pb-pal" hidden><span class="pb-palstate pb-muted"></span><span class="bd-sp"></span><button type="button" data-a="pal">Pause at layer…</button></div>
       <dl class="pb-kv">
         <div><dt>Nozzle</dt><dd data-k="nozzle"></dd></div><div><dt>Bed</dt><dd data-k="bed"></dd></div>
         <div><dt>Elapsed</dt><dd data-k="elapsed"></dd></div><div><dt>Done around</dt><dd data-k="done"></dd></div>
@@ -20,6 +21,7 @@ PB.panel("status", {
     thumb.onload = () => { thumb.hidden = false; };
     thumb.onerror = () => { thumb.hidden = true; };
     let thumbFile;
+    q("[data-a=pal]").onclick = () => PB.pauseAtLayer?.();
     const temp = (t, tg) => t == null ? "—" : `${t.toFixed(1)}°` + (tg > 0 ? ` / ${tg.toFixed(0)}°` : "");
     return {
       open() { thumbFile = undefined; },
@@ -33,6 +35,9 @@ PB.panel("status", {
           if (file) thumb.src = `/api/printers/${p.id}/thumbnail?file=${encodeURIComponent(file)}`; else thumb.removeAttribute("src");
         }
         q(".pb-file").textContent = file || "No print running";
+        const pl = p.pause_layer, pal = q(".pb-pal");   // pause at layer (needs the SET_PAUSE_AT_LAYER macros)
+        pal.hidden = !pl || !active;
+        if (pl) q(".pb-palstate").textContent = pl.next?.enable ? "Pausing at the next layer" : pl.at?.enable && pl.at.layer ? `Pausing at layer ${pl.at.layer}` : "";
         const state = q(".pb-state");
         state.textContent = p.klippy_message || (p.state === "error" && p.message) || statusText; state.style.color = statusColor;
         q(".pb-prog i").style.width = `${pct * 100}%`; q(".pb-prog i").style.background = barColor;

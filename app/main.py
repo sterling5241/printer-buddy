@@ -8,6 +8,7 @@ import logging
 import os
 import secrets
 import time
+import zlib
 from pathlib import Path
 
 from starlette.applications import Starlette
@@ -315,6 +316,56 @@ async def printer_kv(request: Request):
             return err("bad value")
         store.save_settings({name: b["value"]})
     return JSONResponse({"value": store.settings().get(name)})
+
+
+_notices = {"at": 0.0, "items": []}
+
+
+async def notices(request: Request):
+    """Moonraker's own notices from every online printer, for the bell: warnings, failed components and the official
+    Klipper / Moonraker announcements (server.announcements). Cached 10 minutes."""
+    if time.time() - _notices["at"] < 600 and request.query_params.get("refresh") != "1":
+        return JSONResponse({"items": _notices["items"]})
+    names = {p["id"]: p["name"] for p in store.list()}
+
+    async def one(pid, client):
+        out = []
+        if client.connection != "online":
+            return out
+        name = names.get(pid, f"Printer {pid}")
+        try:
+            info = await client.rpc("server.info", timeout=8) or {}
+            for w in info.get("warnings") or []:
+                out.append({"id": f"w-{pid}-{zlib.crc32(str(w).encode())}", "title": f"{name}: Moonraker warning", "body": str(w)[:600], "level": "important"})
+            for c in info.get("failed_components") or []:
+                out.append({"id": f"f-{pid}-{c}", "title": f"{name}: Moonraker part failed to start: {c}",
+                            "body": "Check moonraker.log on that printer.", "level": "important"})
+        except Exception:
+            pass
+        try:
+            res = await client.rpc("server.announcements.list", {"include_dismissed": False}, timeout=8) or {}
+            for a in res.get("entries") or []:
+                if a.get("dismissed"):
+                    continue
+                out.append({"id": f"a-{pid}-{a.get('entry_id')}", "title": f"{name}: {a.get('title') or 'Announcement'}",
+                            "body": str(a.get("description") or "")[:600], "link": a.get("url"),
+                            "level": "important" if a.get("priority") == "high" else "update",
+                            "date": time.strftime("%Y-%m-%d", time.localtime(a["date"])) if a.get("date") else None})
+        except Exception:
+            pass
+        return out
+
+    groups = await asyncio.gather(*(one(pid, c) for pid, c in list(manager.clients.items())))
+    seen, items = set(), []
+    for g in groups:   # the same announcement on several printers: show it once
+        for it in g:
+            key = it["id"].split("-", 2)[0] + it["title"].split(": ", 1)[-1] + (it.get("body") or "")[:80]
+            if it["id"].startswith("a-") and key in seen:
+                continue
+            seen.add(key)
+            items.append(it)
+    _notices.update(at=time.time(), items=items)
+    return JSONResponse({"items": items})
 
 
 _news = {"at": 0.0, "items": []}
@@ -716,7 +767,8 @@ RPC_ALLOW = {
     "server.spoolman.status": 15, "server.spoolman.get_spool_id": 15, "server.spoolman.post_spool_id": 15,
     "server.spoolman.proxy": 20,
     "machine.peripherals.usb": 20, "machine.peripherals.serial": 20, "machine.peripherals.video": 20, "machine.peripherals.canbus": 30,
-    "server.history.get_job": 15,
+    "server.history.get_job": 15, "printer.query_endstops.status": 10, "printer.objects.list": 10,
+    "server.info": 10, "server.announcements.list": 15, "server.announcements.dismiss": 15, "printer.info": 10,
 }
 
 
@@ -1059,6 +1111,7 @@ _app = Starlette(routes=[
     Route("/api/printers/{pid:int}/queue", job_queue, methods=["GET", "POST"]),
     Route("/api/printers/{pid:int}/rpc", rpc, methods=["POST"]),
     Route("/api/printers/{pid:int}/kv", printer_kv, methods=["GET", "PUT"]),
+    Route("/api/notices", notices),
     Route("/api/printers/{pid:int}/file", printer_file, methods=["GET", "PUT"]),
     Route("/api/printers/{pid:int}/files/upload", upload_file, methods=["POST"]),
     Route("/api/printers/{pid:int}/{action}", printer_action, methods=["POST"]),

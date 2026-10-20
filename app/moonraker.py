@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import itertools
 import json
 import logging
@@ -35,6 +36,22 @@ OUTPUT_PREFIXES = ("output_pin ", "led ", "neopixel ", "dotstar ", "pca9533 ", "
 FSENSOR_PREFIXES = ("filament_switch_sensor ", "filament_motion_sensor ")
 FEATURES = ("quad_gantry_level", "z_tilt", "bed_mesh", "exclude_object", "firmware_retraction", "probe", "bltouch",
             "safe_z_home", "screws_tilt_adjust")
+
+
+_PARAM_RE = re.compile(r"""params\s*(?:\.\s*([A-Za-z_]\w*)|\[\s*['"]([A-Za-z_]\w*)['"]\s*\])(?:\s*\|\s*default\s*\(\s*([^,)]*))?""")
+
+
+def _macro_params(gcode: str) -> list[dict]:
+    """Parameters a macro reads (params.TEMP|default(200) -> TEMP, default 200), for the Macros panel's form."""
+    out: dict[str, str | None] = {}
+    for m in _PARAM_RE.finditer(gcode):
+        name = (m.group(1) or m.group(2)).upper()
+        if name in ("RAWPARAMS",):
+            continue
+        d = (m.group(3) or "").strip().strip("'\"") or None
+        if name not in out or (out[name] is None and d is not None):
+            out[name] = d
+    return [{"name": k, "default": v} for k, v in list(out.items())[:20]]
 
 
 def _pretty(obj: str) -> str:
@@ -266,6 +283,9 @@ class MoonrakerClient:
         for n in ("manual_probe", "bed_screws", "screws_tilt_adjust"):   # calibration helper dialogs
             if n in names:
                 objects[n] = None
+        self.pause_layer = "gcode_macro SET_PAUSE_AT_LAYER" in names or "gcode_macro SET_PAUSE_NEXT_LAYER" in names
+        if "gcode_macro SET_PRINT_STATS_INFO" in names:   # pause-at-layer state lives in this macro's variables
+            objects["gcode_macro SET_PRINT_STATS_INFO"] = ["pause_next_layer", "pause_at_layer"]
         for n in ("bed_mesh", "firmware_retraction", "quad_gantry_level", "z_tilt"):
             if n in names:
                 objects[n] = ["profile_name", "profiles"] if n == "bed_mesh" else None
@@ -282,9 +302,12 @@ class MoonrakerClient:
             settings = ((res or {}).get("status", {}).get("configfile", {}) or {}).get("settings", {}) or {}
             desc = {k[len("gcode_macro "):]: (v or {}).get("description") for k, v in settings.items()
                     if k.startswith("gcode_macro ")}
+            params = {k[len("gcode_macro "):]: _macro_params((v or {}).get("gcode") or "") for k, v in settings.items()
+                      if k.startswith("gcode_macro ")}
         except (RPCError, asyncio.TimeoutError):
-            pass
-        self.macros = sorted(({"name": n.upper(), "description": desc.get(n.lower()) or desc.get(n) or None}
+            params = {}
+        self.macros = sorted(({"name": n.upper(), "description": desc.get(n.lower()) or desc.get(n) or None,
+                               "params": params.get(n.lower()) or params.get(n) or []}
                               for n in names if not n.startswith("_")), key=lambda m: m["name"])
 
     async def _load_webcams(self):
@@ -504,6 +527,9 @@ class MoonrakerClient:
                              "lo": s.get("manual_probe", {}).get("z_position_lower"), "hi": s.get("manual_probe", {}).get("z_position_upper")} if live else None,
             "bed_screws": {"active": bool(s.get("bed_screws", {}).get("is_active")), "state": s.get("bed_screws", {}).get("state"),
                            "screw": s.get("bed_screws", {}).get("current_screw"), "accepted": s.get("bed_screws", {}).get("accepted_screws")} if live else None,
+            "pause_layer": {"next": s.get("gcode_macro SET_PRINT_STATS_INFO", {}).get("pause_next_layer") or {},
+                            "at": s.get("gcode_macro SET_PRINT_STATS_INFO", {}).get("pause_at_layer") or {}}
+                           if live and getattr(self, "pause_layer", False) else None,
             "screws_tilt": {"error": s.get("screws_tilt_adjust", {}).get("error"),
                             "results": s.get("screws_tilt_adjust", {}).get("results") or {}} if live and "screws_tilt_adjust" in s else None,
             "mesh": {"profile": s.get("bed_mesh", {}).get("profile_name"),
