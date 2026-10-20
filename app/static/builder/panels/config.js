@@ -1,35 +1,43 @@
-// Config editor panel (Fluidd-style, our own code): file tree, Klipper syntax highlighting, line numbers, search + replace,
-// section outline, a Klipper docs link for the section you're in. Save, or Save & restart. No editor library.
+// Config files panel + full-screen editor (Fluidd-style layout, our own code). The panel lists the config files; clicking
+// one opens a full-screen editor: top bar (close, file name, unsaved dot | outline, find, docs, Save & restart, Save),
+// Klipper syntax highlighting, line numbers, search + replace, section outline. No editor library.
 PB.panel("config", {
-  title: "Config editor", desc: "Edit printer.cfg and other config files", cls: "adv",
+  title: "Config files", desc: "printer.cfg and other config files; opens a full-screen editor", cls: "adv",
   icon: PB.icon('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>'),
   settings: [
-    { k: "height", label: "Editor height", type: "select", def: 520, options: [[360, "Small"], [520, "Medium"], [720, "Tall"]] },
-    { k: "tree", label: "Show the file list", type: "check", def: true },
+    { k: "outline", label: "Show the section outline in the editor", type: "check", def: true },
   ],
   create(host, cfg) {
-    host.innerHTML = `<div class="pb-cfg">
-        <aside class="pb-ctree"><div class="pb-sub-h">Files</div><div class="pb-cfiles"></div><div class="pb-sub-h">Outline</div><div class="pb-coutline"></div></aside>
-        <div class="pb-cmain">
-          <div class="pb-tool"><b class="pb-cpath pb-muted">Pick a file</b><span class="pb-cstate pb-muted"></span><span class="bd-sp"></span>
-            <a class="pb-cdoc" target="_blank" rel="noopener" hidden></a>
-            <button type="button" data-a="find" title="Search and replace (Ctrl+F)">🔍</button>
-            <button type="button" data-a="save">Save</button><button type="button" class="pb-pri" data-a="restart">Save &amp; restart</button></div>
-          <div class="pb-cfind" hidden><input data-f="q" placeholder="Find" aria-label="Find"><input data-f="r" placeholder="Replace with" aria-label="Replace with">
-            <label class="pb-chk"><input type="checkbox" data-f="case"> Aa</label><span class="pb-fcount pb-muted"></span>
-            <button type="button" data-f="prev" title="Previous (Shift+Enter)">↑</button><button type="button" data-f="next" title="Next (Enter)">↓</button>
-            <button type="button" data-f="one">Replace</button><button type="button" data-f="all">All</button><button type="button" data-f="x" aria-label="Close search">✕</button></div>
+    host.innerHTML = `<div class="pb-tool"><span class="pb-ccount pb-muted"></span><span class="bd-sp"></span>
+        <button type="button" data-a="refresh">Refresh</button></div><div class="pb-cfiles"></div>`;
+    const fx = PB.el("div", "pb-cfx"); fx.hidden = true;
+    fx.innerHTML = `<div class="pb-cfx-bar">
+          <button type="button" data-a="close" title="Close (Esc)" aria-label="Close">✕</button>
+          <b class="pb-cpath"></b><span class="pb-cstate pb-muted"></span><span class="bd-sp"></span>
+          <button type="button" data-a="outline" title="Section outline">☰<span> Outline</span></button>
+          <button type="button" data-a="find" title="Search and replace (Ctrl+F)">🔍<span> Find</span></button>
+          <a class="pb-cdoc" target="_blank" rel="noopener" hidden></a>
+          <button type="button" data-a="restart">↻<span> Save &amp; restart</span></button>
+          <button type="button" class="pb-pri" data-a="save" title="Save (Ctrl+S)">Save</button></div>
+        <div class="pb-cfind" hidden><input data-f="q" placeholder="Find" aria-label="Find"><input data-f="r" placeholder="Replace with" aria-label="Replace with">
+          <label class="pb-chk"><input type="checkbox" data-f="case"> Aa</label><span class="pb-fcount pb-muted"></span>
+          <button type="button" data-f="prev" title="Previous (Shift+Enter)">↑</button><button type="button" data-f="next" title="Next (Enter)">↓</button>
+          <button type="button" data-f="one">Replace</button><button type="button" data-f="all">All</button><button type="button" data-f="x" aria-label="Close search">✕</button></div>
+        <div class="pb-cfx-main">
           <div class="pb-ed"><div class="pb-gutter" aria-hidden="true"></div>
             <div class="pb-edarea"><pre class="pb-hl" aria-hidden="true"></pre>
               <textarea spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-label="Config file contents"></textarea></div></div>
-          <div class="pb-cfoot pb-muted"><span class="pb-cpos"></span></div>
-        </div></div>`;
-    const q = s => host.querySelector(s), ta = q("textarea"), hl = q(".pb-hl"), gut = q(".pb-gutter"), state = q(".pb-cstate");
-    q(".pb-ed").style.height = `${cfg.height}px`;
-    if (!cfg.tree) q(".pb-ctree").hidden = true;
+          <aside class="pb-coutline"></aside></div>
+        <div class="pb-cfoot pb-muted"><span class="pb-cpos"></span></div>`;
+    ($("#page") || document.body).appendChild(fx);   // inside #page so it gets the page's colours + button styles
+    const el2 = s => host.querySelector(s);
+    const q = s => fx.querySelector(s), ta = q("textarea"), hl = q(".pb-hl"), gut = q(".pb-gutter"), state = q(".pb-cstate");
+    let showOutline = cfg.outline;
+    const setOutline = () => { q(".pb-coutline").hidden = !showOutline; q("[data-a=outline]").setAttribute("aria-pressed", showOutline); };
+    setOutline();
     let path = "", saved = "", files = [], timer = null;
     const dirty = () => path && ta.value !== saved;
-    const mark = () => { state.textContent = !path ? "" : dirty() ? "● unsaved" : "saved"; };
+    const mark = () => { state.textContent = !path ? "" : dirty() ? "● unsaved" : ""; };
 
     // ---- highlighting (Klipper config: [sections], key: value, # comments, indented G-code / Jinja in macros) ----
     const h = (cls, t) => `<span class="${cls}">${esc(t)}</span>`;
@@ -84,28 +92,48 @@ PB.panel("config", {
       doc.hidden = !sec || !path.endsWith(".cfg");
       if (sec) { doc.href = `https://www.klipper3d.org/Config_Reference.html#${ANCHOR(sec[1])}`; doc.textContent = `Docs: [${sec[1].split(/\s+/)[0]}] ↗`; }
     }
-    // ---- files ----
+    // ---- files (panel) ----
+    let meta = {};
+    const when = t => t ? new Date(t * 1000).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : "";
+    const kb = n => n == null ? "" : n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} KB`;
     async function listFiles() {
+      el2(".pb-ccount").textContent = "Loading…";
       try {
-        files = ((await PB.rpc("server.files.list", { root: "config" })) || []).map(f => f.path || f.filename)
-          .filter(n => /\.(cfg|conf|ini|txt|json|py|sh)$/i.test(n) && !/backup|printer-\d{8}/i.test(n)).sort();
-      } catch (e) { state.textContent = e.message; }
-      drawTree();
+        const all = (await PB.rpc("server.files.list", { root: "config" })) || [];
+        meta = {}; for (const f of all) meta[f.path || f.filename] = f;
+        files = Object.keys(meta).filter(n => /\.(cfg|conf|ini|txt|json|py|sh)$/i.test(n) && !/backup|printer-\d{8}/i.test(n)).sort();
+        el2(".pb-ccount").textContent = `${files.length} file${files.length === 1 ? "" : "s"}`;
+      } catch (e) { el2(".pb-ccount").textContent = e.message; }
+      drawList();
     }
-    function drawTree() {
+    function drawList() {
       const dirs = {}; for (const f of files) { const d = f.includes("/") ? f.slice(0, f.lastIndexOf("/")) : ""; (dirs[d] ||= []).push(f); }
-      q(".pb-cfiles").innerHTML = Object.keys(dirs).sort().map(d => `${d ? `<div class="pb-cdir">📁 ${esc(d)}</div>` : ""}${dirs[d].map(f =>
-        `<button type="button" data-f="${esc(f)}" class="${f === path ? "on" : ""}${d ? " in" : ""}">${esc(f.split("/").pop())}</button>`).join("")}`).join("");
-      for (const b of q(".pb-cfiles").querySelectorAll("[data-f]")) b.onclick = () => open(b.dataset.f);
+      el2(".pb-cfiles").innerHTML = Object.keys(dirs).sort().map(d => `${d ? `<div class="pb-cdir">📁 ${esc(d)}</div>` : ""}${dirs[d].map(f =>
+        `<button type="button" data-f="${esc(f)}" class="pb-crow${d ? " in" : ""}"><span>${esc(f.split("/").pop())}</span>
+          <small class="pb-muted">${esc(when(meta[f]?.modified))}</small><small class="pb-muted">${esc(kb(meta[f]?.size))}</small></button>`).join("")}`).join("")
+        || `<p class="pb-muted">No config files found.</p>`;
+      for (const b of el2(".pb-cfiles").querySelectorAll("[data-f]")) b.onclick = () => open(b.dataset.f);
+    }
+    // ---- full-screen editor ----
+    function show(on) {
+      fx.hidden = !on; document.documentElement.classList.toggle("pb-noscroll", on);
+      if (on) { addEventListener("keydown", onKey); setTimeout(() => ta.focus(), 0); } else removeEventListener("keydown", onKey);
+    }
+    function close() {
+      if (dirty() && !confirm(`Throw away your changes to ${path}?`)) return;
+      saved = ta.value; show(false); listFiles();
+    }
+    function onKey(e) {
+      if (e.key !== "Escape") return;
+      if (!q(".pb-cfind").hidden) { q(".pb-cfind").hidden = true; ta.focus(); } else close();
     }
     async function open(p) {
-      if (dirty() && !confirm(`Throw away your changes to ${path}?`)) return;
-      path = p; ta.value = ""; saved = ""; q(".pb-cpath").textContent = p || "Pick a file"; paint(); mark(); drawTree();
-      if (!p) return;
+      if (!fx.hidden && dirty() && !confirm(`Throw away your changes to ${path}?`)) return;
+      path = p; ta.value = ""; saved = ""; q(".pb-cpath").textContent = p; q(".pb-cfind").hidden = true; show(true); paint(); mark();
       state.textContent = "Loading…";
       try {
         const r = await fetch(PB.fileUrl("config", p)); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
-        ta.value = saved = await r.text(); ta.scrollTop = 0; paint(); mark();
+        ta.value = saved = await r.text(); ta.scrollTop = 0; paint(); mark(); ta.setSelectionRange(0, 0);
       } catch (e) { state.textContent = e.message; }
     }
     async function save() {
@@ -158,6 +186,9 @@ PB.panel("config", {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") { e.preventDefault(); openFind(); }
     };
     q("[data-a=find]").onclick = openFind;
+    q("[data-a=close]").onclick = close;
+    q("[data-a=outline]").onclick = () => { showOutline = !showOutline; setOutline(); };
+    el2("[data-a=refresh]").onclick = listFiles;
     q("[data-a=save]").onclick = save;
     q("[data-a=restart]").onclick = async () => {
       const mr = path.startsWith("moonraker");
@@ -166,12 +197,12 @@ PB.panel("config", {
       try { await PB.rpc(mr ? "machine.services.restart" : "printer.restart", mr ? { service: "moonraker" } : undefined); toast(mr ? "Restarting Moonraker…" : "Restarting Klipper…"); }
       catch (e) { toast(e.message); }
     };
-    PB.openConfig = p => { PB.reveal(host); open(p); };
-    paint();
+    PB.openConfig = p => open(p);
     return {
-      open() { path = ""; saved = ""; ta.value = ""; files = []; q(".pb-cpath").textContent = "Pick a file"; paint(); mark(); drawTree(); },
-      shown() { if (!files.length) listFiles(); sync(); },
+      open() { if (!fx.hidden) { saved = ta.value; show(false); } path = ""; files = []; meta = {}; drawList(); el2(".pb-ccount").textContent = ""; },
+      shown() { if (!files.length) listFiles(); },
       update(p) { const busy = p.state === "printing" || p.state === "paused"; q("[data-a=restart]").disabled = busy || p.connection !== "online"; },
+      destroy() { show(false); fx.remove(); if (PB.openConfig) delete PB.openConfig; },
     };
   },
 });
