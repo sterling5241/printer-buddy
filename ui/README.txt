@@ -2,7 +2,7 @@ ui/
 index.html - main page
 share.html - public share-link page
 assets/ - icons
-vendor/ - echarts + three (and their licences)
+vendor/ - echarts + echarts-gl + three (credits in the main README.md)
 styles/ - builder.css
 core/ - the layout builder + page-wide features
 panels/ - every printer-page panel
