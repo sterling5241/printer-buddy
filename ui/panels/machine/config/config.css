@@ -1,12 +1,28 @@
 /* config panel */
 .pb-cstate { font-size: 12.5px; }
-:is(#page, #home).bd .pb-cfiles .pb-crow { display: grid; grid-template-columns: 1fr auto 64px; gap: 10px; align-items: center; width: 100%; height: 32px;
-                                           padding: 0 8px; text-align: left; border: 0; border-radius: 4px; background: none; font-weight: 500; }
-:is(#page, #home).bd .pb-cfiles .pb-crow:hover { background: var(--bd-hover); }
-:is(#page, #home).bd .pb-cfiles .pb-crow.in { padding-left: 22px; }
-.pb-crow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pb-crow small { font-size: 12px; text-align: right; }
-.pb-cdir { color: var(--muted); font-size: 12.5px; padding: 6px 8px 2px; }
+.pb-chead, .pb-crow { display: grid; grid-template-columns: 18px 1fr 130px 64px; gap: 10px; align-items: center; padding: 0 8px; }
+.pb-chead { height: 28px; border-bottom: 1px solid var(--bd-line); }
+:is(#page, #home).bd .pb-chead button { height: 24px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 600; text-align: left; }
+:is(#page, #home).bd .pb-chead button:not([data-s=name]) { text-align: right; }
+.pb-crow { height: 32px; border-radius: 4px; cursor: pointer; }
+.pb-crow:hover { background: var(--bd-hover); }
+.pb-crow.picked { background: rgba(255, 138, 31, .1); }
+.pb-crow.over, .pb-cwrap.over { outline: 2px dashed var(--orange); outline-offset: -2px; }
+.pb-cname { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 500; }
+.pb-cname span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pb-cdir .pb-cname .pb-ic { color: var(--orange); }
+.pb-crow small { font-size: 12px; text-align: right; white-space: nowrap; }
+.pb-cwrap { min-height: 60px; border-radius: 4px; }
+.pb-cwrap > p { padding: 8px; margin: 0; }
+.pb-clow { display: inline-flex; color: var(--orange); }
+.pb-clow[hidden] { display: none; }
+.pb-cmenu { position: fixed; z-index: 960; min-width: 180px; padding: 4px 0; background: var(--bd-panel); border: 1px solid var(--bd-line); border-radius: 6px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, .4); }
+.pb-cmenu[hidden] { display: none; }
+#page.bd .pb-cmenu button { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 12px; border: 0; border-radius: 0; background: none;
+                            text-align: left; font-weight: 500; }
+#page.bd .pb-cmenu button:hover { background: var(--bd-hover); }
+.pb-cmenu .bd-check { padding: 5px 12px; font-size: 13px; }
 html.pb-noscroll, html.pb-noscroll body { overflow: hidden; }
 .pb-cfx { position: fixed; inset: 0; z-index: 900; display: flex; flex-direction: column; background: var(--bd-deep); }
 .pb-cfx[hidden] { display: none; }
@@ -25,8 +41,9 @@ html.pb-noscroll, html.pb-noscroll body { overflow: hidden; }
                                color: var(--muted); font-family: var(--bd-mono); font-size: 12px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #page.bd .pb-coutline button:hover { background: var(--bd-hover); color: var(--text); }
 .pb-cfx .pb-cfoot { flex: none; padding: 3px 10px; background: var(--bd-panel); border-top: 1px solid var(--bd-line); }
-@media (max-width: 760px) { .pb-cfx-bar button span { display: none; } .pb-cfx .pb-coutline { display: none; } .pb-crow small:first-of-type { display: none; }
-                            :is(#page, #home).bd .pb-cfiles .pb-crow { grid-template-columns: 1fr 64px; } }
+@media (max-width: 760px) { .pb-cfx-bar button span { display: none; } .pb-cfx .pb-coutline { display: none; }
+                            .pb-crow small:first-of-type, :is(#page, #home).bd .pb-chead [data-s=modified] { display: none; }
+                            .pb-chead, .pb-crow { grid-template-columns: 18px 1fr 64px; } }
 .pb-cdoc { font-size: 12.5px; color: var(--orange); text-decoration: none; }
 .pb-cfind { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
 .pb-cfind input:not([type=checkbox]) { height: 28px; flex: 1 1 140px; min-width: 0; background: var(--bd-deep); border: 1px solid var(--bd-line); border-radius: 4px;

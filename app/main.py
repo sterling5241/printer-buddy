@@ -657,6 +657,7 @@ async def printer_action(request: Request):
 
 
 GCODE_EXT = (".gcode", ".gco", ".g")
+CONFIG_EXT = (".conf", ".cfg", ".md", ".css", ".jpg", ".jpeg", ".png", ".gif")   # config uploads (same list as Fluidd)
 MAX_UPLOAD = 1024 * 1024 * 1024  # 1 GB
 
 
@@ -772,7 +773,7 @@ async def job_queue(request: Request):
 # method -> timeout in seconds. Updates can take many minutes.
 RPC_ALLOW = {
     "server.files.get_directory": 20, "server.files.list": 20, "server.files.move": 30, "server.files.copy": 60, "server.files.post_directory": 15,
-    "server.files.delete_directory": 30, "server.files.delete_file": 15, "server.files.metadata": 15,
+    "server.files.delete_directory": 30, "server.files.delete_file": 15, "server.files.metadata": 15, "server.files.zip": 120,
     "machine.proc_stats": 10, "machine.system_info": 10, "machine.services.restart": 30, "machine.services.stop": 30,
     "machine.services.start": 30, "machine.reboot": 15, "machine.shutdown": 15,
     "printer.restart": 15, "printer.firmware_restart": 15, "printer.gcode.help": 15, "printer.objects.query": 15,
@@ -809,7 +810,7 @@ async def rpc(request: Request):
         return err(text, 404 if "not found" in text.lower() else 502)
 
 
-FILE_ROOTS = ("gcodes", "config", "logs")
+FILE_ROOTS = ("gcodes", "config", "logs", "config_examples", "docs")
 
 
 def _root_path(request: Request):
@@ -879,9 +880,12 @@ async def upload_file(request: Request):
     client, e = _online_client(request)
     if e:
         return e
+    root = request.query_params.get("root", "gcodes")
+    if root not in ("gcodes", "config"):
+        return err("bad root")
     name = request.query_params.get("name", "").replace("\\", "/").split("/")[-1].strip()
-    if not name or not name.lower().endswith(GCODE_EXT) or '"' in name:
-        return err("pick a .gcode file")
+    if not name or not name.lower().endswith(GCODE_EXT if root == "gcodes" else CONFIG_EXT) or '"' in name:
+        return err("pick a .gcode file" if root == "gcodes" else f"pick a config file ({' '.join(CONFIG_EXT)})")
     data = bytearray()
     async for chunk in request.stream():
         data += chunk
@@ -893,7 +897,8 @@ async def upload_file(request: Request):
         folder = request.query_params.get("dir", "").strip().strip("/")
         if ".." in folder.split("/"):
             return err("bad folder")
-        await client.upload(name, bytes(data), start=request.query_params.get("print") == "1", folder=folder)
+        await client.upload(name, bytes(data), start=root == "gcodes" and request.query_params.get("print") == "1",
+                            root=root, folder=folder)
     except Exception as ex:
         return err(str(ex) or type(ex).__name__, 502)
     return JSONResponse({"ok": True, "name": name})

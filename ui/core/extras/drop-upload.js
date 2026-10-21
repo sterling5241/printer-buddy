@@ -2,9 +2,11 @@
 (() => {
   const { el } = PB, { onPage, cur, send, live, dialog, pageHook } = PB.x;
   const drop = el("div", "pb-drop", `<div>Drop G-code to upload</div>`); drop.hidden = true; document.body.append(drop);
-  const isFiles = e => [...(e.dataTransfer?.types || [])].includes("Files");
+  const own = e => e.target.closest?.("[data-drop]");   // panels with their own drop (Config files)
+  const isFiles = e => [...(e.dataTransfer?.types || [])].includes("Files") && !own(e);
   let dragN = 0;
   addEventListener("dragenter", e => {
+    if (own(e)) { dragN = 0; drop.hidden = true; return; }
     if (!isFiles(e) || !onPage()) return; e.preventDefault(); dragN++;
     const p = cur(); drop.firstChild.textContent = `Drop G-code to upload to ${p ? p.name : "this printer"}`; drop.hidden = false;
   });
