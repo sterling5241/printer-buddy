@@ -46,7 +46,7 @@
     const fns = cfg.lines.map(l => { try { return compile(l.formula); } catch { return () => NaN; } });
     const objs = [...new Set(cfg.lines.flatMap(l => [l.obj, ...refs(l.formula).map(r => ref(r)[0])]))];
     let data = cfg.lines.map(() => []), chart = null, timer = null, busy = false;
-    if (!cfg.lines.length) msg("Nothing picked yet: click Edit layout, then this panel's ⚙ to pick values.");
+    if (!cfg.lines.length) msg("Nothing picked yet: click ⚙ on this panel to pick values.");
     async function poll() {
       if (pageId === null || busy || !objs.length) return;
       busy = true;
@@ -191,6 +191,7 @@
   const full = cfg => ({ ...blank(), ...structuredClone(cfg || {}) });
   PB.panel("ksensors", {
     title: "Klipper sensors", desc: "Live chart of any Klipper values, e.g. Cartographer temperature and frequency", cls: "adv",
+    gear: true,
     icon: PB.icon('<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>'),
     edit: (cfg, save) => edit(full(cfg), save),
     create: (host, cfg) => create(host, full(cfg)),
