@@ -4,6 +4,11 @@
 .pb-chead { height: 28px; border-bottom: 1px solid var(--bd-line); }
 :is(#page, #home).bd .pb-chead button { height: 24px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 600; text-align: left; }
 :is(#page, #home).bd .pb-chead button:not([data-s=name]) { text-align: right; }
+.pb-chead input[type=checkbox], .pb-crow input[type=checkbox] { appearance: none; width: 16px; height: 16px; margin: 0; border: 1.5px solid var(--muted);
+                                                                 border-radius: 3px; background: none; cursor: pointer; display: grid; place-items: center; }
+.pb-chead input[type=checkbox]:checked, .pb-crow input[type=checkbox]:checked { border-color: var(--orange); }
+.pb-chead input[type=checkbox]:checked::after, .pb-crow input[type=checkbox]:checked::after { content: ""; width: 4px; height: 8px; margin-top: -2px;
+                                                                 border: solid var(--orange); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .pb-crow { height: 32px; border-radius: 4px; cursor: pointer; }
 .pb-crow:hover { background: var(--bd-hover); }
 .pb-crow.picked { background: rgba(255, 138, 31, .1); }
