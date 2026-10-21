@@ -4,7 +4,7 @@
 .pb-chead { height: 28px; border-bottom: 1px solid var(--bd-line); }
 :is(#page, #home).bd .pb-chead button { height: 24px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 600; text-align: left; }
 :is(#page, #home).bd .pb-chead button:not([data-s=name]) { text-align: right; }
-.pb-chead input[type=checkbox], .pb-crow input[type=checkbox] { appearance: none; width: 16px; height: 16px; margin: 0; border: 1.5px solid var(--muted);
+.pb-chead input[type=checkbox], .pb-crow input[type=checkbox] { appearance: none; width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; box-sizing: border-box; border: 1.5px solid var(--muted);
                                                                  border-radius: 3px; background: none; cursor: pointer; display: grid; place-items: center; }
 .pb-chead input[type=checkbox]:checked, .pb-crow input[type=checkbox]:checked { border-color: var(--orange); }
 .pb-chead input[type=checkbox]:checked::after, .pb-crow input[type=checkbox]:checked::after { content: ""; width: 4px; height: 8px; margin-top: -2px;
