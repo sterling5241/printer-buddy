@@ -3,6 +3,7 @@
 // A panel file calls  PB.panel("name", { title, icon, cls, single, settings, gear, create(host, cfg) -> { open, update, shown, log, destroy } })
 //   gear: true    its ⚙ settings button shows all the time, not only in Edit layout (for options people change often)
 //   settings      [{ k, label, type: "check" | "select", options: [[value, label], ...], def }] - shown under the panel's gear
+//   edit(cfg, save)  instead of settings: the gear opens the panel's own setup box; call save(newCfg) when done
 //   create(host, cfg)  build your HTML inside host (the panel body); cfg = this panel's settings (defaults filled in)
 //   open(id)      a printer page was opened (reset per-printer state)
 //   update(p)     new data for the open printer (several times a second)
@@ -27,7 +28,7 @@ window.PB = (() => {
   const page = i => !i.def.home, home = i => i.def.home;
   const all = () => [...printers.values()];
 
-  const config = (def, cfg) => Object.fromEntries((def.settings || []).map(s => [s.k, cfg?.[s.k] ?? s.def]));
+  const config = (def, cfg) => def.edit ? structuredClone(cfg || {}) : Object.fromEntries(   // edit panels keep their whole setup(def.settings || []).map(s => [s.k, cfg?.[s.k] ?? s.def]));
 
   function mount(type, host, cfg, reg = defs) {
     const def = reg[type];

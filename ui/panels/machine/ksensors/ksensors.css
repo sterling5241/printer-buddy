@@ -1,4 +1,4 @@
-/* custom panel: diagnostics chart */
+/* Klipper sensors panel */
 .pb-cc { width: 100%; }
 .pb-ccmsg { font-size: 12.5px; margin: 4px 0 0; }
 .pb-ccmsg:empty { display: none; }

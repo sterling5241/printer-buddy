@@ -302,16 +302,6 @@ async def ui_layout(request: Request):
     return JSONResponse({"layout": store.settings().get(key)})
 
 
-async def ui_custom(request: Request):
-    """Custom panels people made (+ Add panel > Custom panels), saved on this box so every device has them."""
-    if request.method == "PUT":
-        panels = (await body(request)).get("panels")
-        if not isinstance(panels, list) or len(json.dumps(panels)) > 200_000:
-            return err("bad custom panels")
-        store.save_settings({"ui_custom": panels})
-    return JSONResponse({"panels": store.settings().get("ui_custom") or []})
-
-
 KV_KEYS = ("presets", "notes", "maintenance", "console_filters")
 
 
@@ -1121,9 +1111,7 @@ _app = Starlette(routes=[
     Route("/share/printer/{pid:int}/{code}/stream", share_stream),
     Route("/api/timelapse/settings", timelapse_settings, methods=["GET", "PUT"]),
     Route("/api/ai/settings", ai_settings, methods=["GET", "PUT"]),
-    Route("/api/ui/layout", ui_layout, methods=["GET", "PUT"]),
-    Route("/api/ui/custom", ui_custom, methods=["GET", "PUT"]),
-    Route("/api/news", news),
+    Route("/api/ui/layout", ui_layout, methods=["GET", "PUT"]),    Route("/api/news", news),
     Route("/api/ai/reload", ai_reload, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/check", ai_check, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/save", ai_save, methods=["POST"]),

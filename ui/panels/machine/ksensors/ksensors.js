@@ -1,5 +1,5 @@
-// Custom panel type: Diagnostics chart - a live line chart of any values the printer reports (e.g. Cartographer temperature
-// and frequency). Setup: pick an object, tick its values, then name / colour / axis / optional formula for each line.
+// Klipper sensors panel: a live line chart of any values Klipper reports (e.g. Cartographer temperature and frequency).
+// Setup (the panel's ⚙): pick an object, tick its values, then name / colour / axis / optional formula for each line.
 // A formula uses x (this value), {object.field} (another value), numbers, + - * / and ( ). No code is run.
 (() => {
   const COLORS = ["#ff8a1f", "#4fd1c5", "#c4a7ff", "#f6ad55", "#90cdf4", "#f87171", "#a3e635"];
@@ -44,7 +44,7 @@
     const fns = cfg.lines.map(l => { try { return compile(l.formula); } catch { return () => NaN; } });
     const objs = [...new Set(cfg.lines.flatMap(l => [l.obj, ...refs(l.formula).map(r => ref(r)[0])]))];
     let data = cfg.lines.map(() => []), chart = null, timer = null, busy = false;
-    if (!cfg.lines.length) msg("No values yet: open Edit layout and click this panel's ⚙ to pick some.");
+    if (!cfg.lines.length) msg("Nothing picked yet: click Edit layout, then this panel's ⚙ to pick values.");
     async function poll() {
       if (pageId === null || busy || !objs.length) return;
       busy = true;
@@ -88,8 +88,7 @@
   // ---- the setup box ----
   const dlg = PB.x.dialog("pb-ccedit");
   function edit(cfg, done) {
-    dlg.innerHTML = `<div class="pb-ptop"><h3>Diagnostics chart</h3><button type="button" class="pb-px" aria-label="Close">${PB.ic.x}</button></div>
-      <label class="bd-field">Panel name <input data-k="title" maxlength="40"></label>
+    dlg.innerHTML = `<div class="pb-ptop"><h3>Klipper sensors setup</h3><button type="button" class="pb-px" aria-label="Close">${PB.ic.x}</button></div>
       <h4>1. Values to show</h4>
       <p class="pb-muted pb-cchint">Each value is one line on the chart.</p>
       <div class="pb-cclines"></div>
@@ -108,7 +107,7 @@
       <p class="pb-ccerr" hidden></p>
       <div class="bd-libfoot"><button type="button" data-a="cancel">Cancel</button><button type="button" class="bd-primary" data-a="save">Save</button></div>`;
     const q = s => dlg.querySelector(s), lines = q(".pb-cclines"), pick = q(".pb-ccpick");
-    q("[data-k=title]").value = cfg.title; q("[data-k=height]").value = cfg.height; q("[data-k=minutes]").value = cfg.minutes;
+    q("[data-k=height]").value = cfg.height; q("[data-k=minutes]").value = cfg.minutes;
     for (const x of dlg.querySelectorAll("[data-ax]")) x.value = cfg.axes[x.dataset.ax][x.dataset.f] ?? "";
     function drawLines() {
       lines.innerHTML = cfg.lines.map((l, i) => `<div class="pb-ccline" data-i="${i}">
@@ -170,7 +169,6 @@
       for (const l of cfg.lines) {
         try { compile(l.formula); } catch (e) { err.hidden = false; err.textContent = `"${l.name}" formula: ${e.message}`; return; }
       }
-      cfg.title = q("[data-k=title]").value.trim() || "Diagnostics";
       cfg.height = +q("[data-k=height]").value; cfg.minutes = +q("[data-k=minutes]").value;
       for (const x of dlg.querySelectorAll("[data-ax]")) cfg.axes[x.dataset.ax][x.dataset.f] = x.value.trim();
       dlg.close(); done(cfg);
@@ -178,10 +176,12 @@
     drawLines(); dlg.showModal();
   }
 
-  PB.custom.type("chart", {
-    title: "Diagnostics chart", desc: "Live chart of any printer values, e.g. Cartographer temperature and frequency",
+  const blank = () => ({ height: 280, minutes: 5, lines: [], axes: [{ unit: "", min: "", max: "" }, { unit: "", min: "", max: "" }] });
+  const full = cfg => ({ ...blank(), ...structuredClone(cfg || {}) });
+  PB.panel("ksensors", {
+    title: "Klipper sensors", desc: "Live chart of any Klipper values, e.g. Cartographer temperature and frequency", cls: "adv",
     icon: PB.icon('<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>'),
-    blank: () => ({ title: "Diagnostics", height: 280, minutes: 5, lines: [], axes: [{ unit: "", min: "", max: "" }, { unit: "", min: "", max: "" }] }),
-    create, edit,
+    edit: (cfg, save) => edit(full(cfg), save),
+    create: (host, cfg) => create(host, full(cfg)),
   });
 })();
