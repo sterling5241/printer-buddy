@@ -8,6 +8,7 @@
   const ref = r => { const i = r.indexOf("."); return [r.slice(0, i), r.slice(i + 1)]; };   // "extruder.target" -> [object, field]
   const refs = f => (f || "").match(/\{[^}]+\}/g)?.map(r => r.slice(1, -1).trim()) || [];
   const num = v => +(+v).toFixed(4);
+  const live = new Map();   // setup (as JSON) -> the min / max each axis is showing now, for the setup box
 
   // ---- formula -> function({ x, ref(name) }) ----
   function compile(src) {
@@ -39,6 +40,7 @@
 
   // ---- the panel ----
   function create(host, cfg) {
+    const key = JSON.stringify(cfg);
     host.innerHTML = `<div class="pb-cc" style="height:${cfg.height}px"></div><p class="pb-muted pb-ccmsg"></p>`;
     const box = host.querySelector(".pb-cc"), msg = t => { host.querySelector(".pb-ccmsg").textContent = t; };
     const fns = cfg.lines.map(l => { try { return compile(l.formula); } catch { return () => NaN; } });
@@ -75,13 +77,14 @@
         series: cfg.lines.map((l, i) => ({ type: "line", name: l.name, yAxisIndex: l.axis, showSymbol: false, data: data[i],
                                           lineStyle: { color: l.color, width: 1.5 }, itemStyle: { color: l.color } })),
       });
+      live.set(key, cfg.axes.map((_, i) => chart.getModel().getComponent("yAxis", i)?.axis.scale.getExtent().map(num)));
     }
     const ro = new ResizeObserver(() => chart?.resize()); ro.observe(box);
     timer = setInterval(poll, 1000);
     return {
       open() { data = cfg.lines.map(() => []); chart?.clear(); },
       shown() { chart?.resize(); draw(); },
-      destroy() { clearInterval(timer); ro.disconnect(); chart?.dispose(); },
+      destroy() { clearInterval(timer); ro.disconnect(); chart?.dispose(); live.delete(key); },
     };
   }
 
@@ -108,7 +111,15 @@
       <div class="bd-libfoot"><button type="button" data-a="cancel">Cancel</button><button type="button" class="bd-primary" data-a="save">Save</button></div>`;
     const q = s => dlg.querySelector(s), lines = q(".pb-cclines"), pick = q(".pb-ccpick");
     q("[data-k=height]").value = cfg.height; q("[data-k=minutes]").value = cfg.minutes;
-    for (const x of dlg.querySelectorAll("[data-ax]")) x.value = cfg.axes[x.dataset.ax][x.dataset.f] ?? "";
+    // empty min / max = auto: show what the chart is using now; left untouched they stay auto
+    const now = live.get(JSON.stringify(cfg)), right = cfg.lines.some(l => l.axis === 1);
+    for (const x of dlg.querySelectorAll("[data-ax]")) {
+      x.value = cfg.axes[x.dataset.ax][x.dataset.f] ?? "";
+      const auto = now?.[x.dataset.ax]?.[x.dataset.f === "min" ? 0 : 1];
+      if (x.value === "" && x.dataset.f !== "unit" && auto != null && (x.dataset.ax === "0" || right)) {
+        x.value = auto; x.dataset.auto = "1"; x.oninput = () => { delete x.dataset.auto; };
+      }
+    }
     function drawLines() {
       lines.innerHTML = cfg.lines.map((l, i) => `<div class="pb-ccline" data-i="${i}">
           <input type="color" data-f="color" value="${l.color}" aria-label="Line colour">
@@ -170,7 +181,7 @@
         try { compile(l.formula); } catch (e) { err.hidden = false; err.textContent = `"${l.name}" formula: ${e.message}`; return; }
       }
       cfg.height = +q("[data-k=height]").value; cfg.minutes = +q("[data-k=minutes]").value;
-      for (const x of dlg.querySelectorAll("[data-ax]")) cfg.axes[x.dataset.ax][x.dataset.f] = x.value.trim();
+      for (const x of dlg.querySelectorAll("[data-ax]")) cfg.axes[x.dataset.ax][x.dataset.f] = x.dataset.auto ? "" : x.value.trim();
       dlg.close(); done(cfg);
     };
     drawLines(); dlg.showModal();
