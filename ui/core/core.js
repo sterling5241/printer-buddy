@@ -28,7 +28,8 @@ window.PB = (() => {
   const page = i => !i.def.home, home = i => i.def.home;
   const all = () => [...printers.values()];
 
-  const config = (def, cfg) => def.edit ? structuredClone(cfg || {}) : Object.fromEntries(   // edit panels keep their whole setup(def.settings || []).map(s => [s.k, cfg?.[s.k] ?? s.def]));
+  // edit panels keep their whole setup; the rest get their settings list with defaults filled in
+  const config = (def, cfg) => def.edit ? structuredClone(cfg || {}) : Object.fromEntries((def.settings || []).map(s => [s.k, cfg?.[s.k] ?? s.def]));
 
   function mount(type, host, cfg, reg = defs) {
     const def = reg[type];
