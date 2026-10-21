@@ -285,6 +285,7 @@
       head.querySelector("[data-a=eye]").onclick = () => { item.h = !item.h; changed(); };
       const gear = head.querySelector("[data-a=set]");
       if (def.settings?.length) gear.onclick = () => PB.settings(def, item.o, v => { item.o = v; changed(); });
+      else if (def.edit) gear.onclick = def.edit;   // custom panels open their own setup box
       else gear.remove();
       const qset = head.querySelector(".pb-qset");   // panels with gear: true keep their ⚙ outside Edit layout too
       if (qset) qset.onclick = () => PB.settings(def, item.o, v => { item.o = v; changed(); });
@@ -301,8 +302,11 @@
         const taken = d.single && used(d.type);
         return `<button type="button" class="${d.cls}" data-t="${esc(d.type)}"${taken ? " disabled" : ""}>${d.icon}<span>${esc(d.title)}</span>
           <small>${taken ? "already placed" : esc(d.desc || "")}</small></button>`;
-      }).join("")}</div><div class="bd-libfoot"><button type="button" data-a="close">Cancel</button></div>`;
+      }).join("")}</div><div class="bd-libfoot">${PB.custom && reg === PB.defs ? `<button type="button" data-a="custom">Custom panels…</button>` : ""}
+        <button type="button" data-a="close">Cancel</button></div>`;
       for (const b of lib.querySelectorAll("[data-t]")) b.onclick = () => { lib.close(); pick(b.dataset.t); };
+      const cb = lib.querySelector("[data-a=custom]");
+      if (cb) cb.onclick = () => { lib.close(); PB.custom.manage(pick); };   // a panel made there is placed right away
       lib.querySelector("[data-a=close]").onclick = () => lib.close();
       lib.showModal();
     }
@@ -324,7 +328,9 @@
     if (rail) PB.onRoute(p => { if (p) PB.shown(insts.get(active) || []); });
     build();
     api(o.url).then(r => { const l = clean(r.layout); if (l) { layout = l; build(); } }).catch(() => {});
-    return { build, showTab, setEditing };
+    // take every copy of one panel type off the layout (a custom panel was deleted)
+    const dropType = t => { for (const tab of layout.tabs) for (const it of items(tab)) if (it.t === t) removeItem(tab, it); changed(); };
+    return { build, showTab, setEditing, dropType };
   }
 
   // ---- shared by both builders: the panel library box, the ⋯ menu, drag + drop -----------------------

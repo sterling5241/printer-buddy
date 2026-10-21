@@ -335,3 +335,11 @@ svg.pb-ic { width: 16px; height: 16px; flex: none; vertical-align: -3px; }
 :is(#page, #home).bd .pb-card > header .pb-hbtn:hover:not(:disabled) { background: var(--bd-hover); color: var(--text); }
 :is(#page, #home).bd .pb-card > header .pb-hbtn[aria-pressed="true"] { color: var(--orange); }
 :is(#page, #home).bd .pb-card > header .pb-qset { height: 30px; min-width: 30px; padding: 0 6px; color: var(--muted); }
+/* the Custom panels box (core/custom.js) */
+.pb-custdlg { width: min(560px, 94vw); }
+.pb-custdlg h4 { margin: 14px 0 6px; font-size: 13.5px; }
+.pb-custrow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(127, 127, 140, .15); }
+.pb-custrow small { font-size: 12px; }
+.pb-custtypes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.pb-xd .pb-custtypes button { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; height: auto; padding: 10px 12px; text-align: left; }
+.pb-custtypes small { color: var(--muted); font-weight: 400; font-size: 12px; }
