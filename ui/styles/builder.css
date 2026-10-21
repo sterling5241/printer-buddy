@@ -335,3 +335,4 @@ svg.pb-ic { width: 16px; height: 16px; flex: none; vertical-align: -3px; }
 :is(#page, #home).bd .pb-card > header .pb-hbtn:hover:not(:disabled) { background: var(--bd-hover); color: var(--text); }
 :is(#page, #home).bd .pb-card > header .pb-hbtn[aria-pressed="true"] { color: var(--orange); }
 :is(#page, #home).bd .pb-card > header .pb-qset { height: 30px; min-width: 30px; padding: 0 6px; color: var(--muted); }
+:is(#page, #home).bd .bd-rail button.bd-tabover { box-shadow: inset 0 2px 0 var(--orange); }

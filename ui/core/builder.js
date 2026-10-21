@@ -137,6 +137,18 @@
           const b = el("button", "", `${TAB_ICONS[t.id] || reg[first?.t]?.icon || GRID}<span>${esc(t.name)}</span>`);
           b.type = "button"; b.setAttribute("aria-current", String(t.id === active));
           b.onclick = () => showTab(t.id);
+          if (editing()) {   // Edit layout: drag a tab up / down the side bar to reorder
+            b.draggable = true;
+            b.ondragstart = e => { e.dataTransfer.setData("text/x-pb-tab", t.id); e.dataTransfer.effectAllowed = "move"; };
+            b.ondragover = e => { if ([...e.dataTransfer.types].includes("text/x-pb-tab")) { e.preventDefault(); b.classList.add("bd-tabover"); } };
+            b.ondragleave = () => b.classList.remove("bd-tabover");
+            b.ondrop = e => {
+              e.preventDefault(); b.classList.remove("bd-tabover");
+              const from = layout.tabs.findIndex(x => x.id === e.dataTransfer.getData("text/x-pb-tab")), to = layout.tabs.indexOf(t);
+              if (from < 0 || from === to) return;
+              layout.tabs.splice(to, 0, layout.tabs.splice(from, 1)[0]); changed();
+            };
+          }
           return b;
         }));
         if (editing()) {
@@ -170,12 +182,16 @@
       const bar = el("div", "bd-tabbar", `<span>Editing <b>${esc(tab.name)}</b>: drag ${PB.ic.grip} to move a panel, ${PB.ic.eye} hides it.</span>
         ${phone.matches ? "" : `<span class="bd-seg"><button type="button" data-v="0" aria-pressed="${!preview}">Desktop</button><button type="button" data-v="1" aria-pressed="${preview}">Phone</button></span>`}
         <span class="bd-sp"></span>
-        ${rail ? `<button type="button" data-a="rename">Rename tab</button><button type="button" data-a="del">Delete tab</button>` : ""}
+        ${rail ? `<button type="button" data-a="up" title="Move this tab up the side bar (or drag it there)">↑ Tab</button><button type="button" data-a="down" title="Move this tab down the side bar (or drag it there)">↓ Tab</button>
+          <button type="button" data-a="rename">Rename tab</button><button type="button" data-a="del">Delete tab</button>` : ""}
         <button type="button" data-a="reset">Reset to base layout</button><button type="button" class="bd-primary" data-a="done">Done</button>`);
       for (const b of bar.querySelectorAll("[data-v]")) b.onclick = () => { preview = b.dataset.v === "1"; build(); };
       if (phoneView()) bar.querySelector("span").innerHTML = `Phone order for <b>${esc(tab.name)}</b>: only used on small screens. Drag ${PB.ic.grip} to reorder.`;
       if (rail) {
         bar.querySelector("[data-a=rename]").onclick = () => { const n = prompt("Tab name:", tab.name); if (n) { tab.name = n.slice(0, 30); changed(); } };
+        const i = layout.tabs.indexOf(tab), move = d => { layout.tabs.splice(i + d, 0, layout.tabs.splice(i, 1)[0]); changed(); };
+        bar.querySelector("[data-a=up]").disabled = i === 0; bar.querySelector("[data-a=up]").onclick = () => move(-1);
+        bar.querySelector("[data-a=down]").disabled = i === layout.tabs.length - 1; bar.querySelector("[data-a=down]").onclick = () => move(1);
         const del = bar.querySelector("[data-a=del]");
         del.disabled = layout.tabs.length < 2;
         del.onclick = () => { if (confirm(`Delete the "${tab.name}" tab and its panels?`)) { layout.tabs = layout.tabs.filter(t => t !== tab); changed(); } };
