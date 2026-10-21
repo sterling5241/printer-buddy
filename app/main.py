@@ -4,12 +4,15 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import mimetypes
+import re
 import logging
 import os
 import secrets
 import time
 import zlib
 from pathlib import Path
+from urllib.parse import quote
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -300,6 +303,166 @@ async def ui_layout(request: Request):
             return err("bad layout")
         store.save_settings({key: layout})
     return JSONResponse({"layout": store.settings().get(key)})
+
+
+# ---- theme imported from a printer's Fluidd / Mainsail (Settings > Look) ----
+# source -> (theme folder in the config root, {our part: their file names, first found wins}, Moonraker database namespace)
+THEME_SOURCES = {
+    "fluidd": (".fluidd-theme", {"background": ["background"], "logo": ["sidebar-logo", "logo"]}, "fluidd"),
+    "mainsail": (".theme", {"background": ["main-background"], "logo": ["sidebar-logo"], "sidebar": ["sidebar-background"]}, "mainsail"),
+}
+THEME_IMG = (".png", ".jpg", ".jpeg", ".gif", ".svg")
+THEME_DIR = Path(os.path.dirname(os.path.abspath(os.getenv("DB_PATH", "data/monitor.db")))) / "theme"
+# the parts of their custom.css that aren't tied to their own page layout: selectors to look for, and what they become here
+THEME_CSS = {"page": ("html", "body"), "panel": (".v-card",), "head": (".card-heading", ".v-toolbar"),
+             "over": ("body::before", "body::after", "html::before", "html::after", "#app::before", "#app::after")}   # big faded logo
+THEME_PROP = re.compile(r"^(-webkit-)?(background(-[a-z]+)?|backdrop-filter)$")
+THEME_OVER = {"opacity", "width", "height", "top", "left", "right", "bottom", "transform"}   # also kept for the background logo
+THEME_URL = re.compile(r"""url\(\s*['"]?([^'")]+)['"]?\s*\)""")
+
+
+def _theme_css(css: str) -> dict:
+    """{page | panel | head: "prop: value; ..."} from a custom.css: backgrounds and blur only, nothing that could run or break out."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    found = {k: {} for k in THEME_CSS}
+    for sel, block in re.findall(r"([^{}@]+)\{([^{}]*)\}", css):
+        sels = [x.strip() for x in sel.split(",")]
+        for part, keys in THEME_CSS.items():
+            if not any(x == k or (k.startswith(".") and k in x) for x in sels for k in keys):
+                continue
+            if part == "head" and any(".v-card" in x for x in sels):   # a rule for cards + toolbars is the panel look, not a header tint
+                continue
+            for d in block.split(";"):
+                prop, _, val = d.partition(":")
+                prop, val = prop.strip().lower(), val.replace("!important", "").strip()
+                if (not (THEME_PROP.match(prop) or (part == "over" and prop in THEME_OVER)) or not val or val in ("transparent", "none", "initial", "inherit")
+                        or re.search(r"[<>{}\\]|expression\(|javascript:", val, re.I)):
+                    continue
+                found[part][prop] = val   # later rules win, like in css
+    return {k: "; ".join(f"{p}: {v}" for p, v in d.items()) for k, d in found.items() if d}
+
+
+def _config_url(u: str) -> str | None:
+    """A url() in their css that points at the printer's config folder -> the path inside it."""
+    m = re.match(r"^/?server/files/config/(.+)$", u.strip())
+    return m.group(1) if m and ".." not in m.group(1).split("/") else None
+
+
+async def _read_file_bytes(client, path: str, cap: int) -> bytes:
+    up = await client.read_file("config", path)
+    data = bytearray()
+    try:
+        async for chunk in up.chunks():
+            data += chunk
+            if len(data) > cap:
+                raise ValueError(f"{path} is too big")
+    finally:
+        up.close()
+    return bytes(data)
+
+
+async def _read_theme(client, source: str) -> dict:
+    """What a printer's Fluidd / Mainsail theme has: colour, dark / light, picture files (paths in the config root) and css parts."""
+    folder, parts, ns = THEME_SOURCES[source]
+    out = {"source": source, "color": None, "mode": None, "files": {}, "css": {}}
+    logo = None
+    with contextlib.suppress(Exception):
+        ui = (await client.rpc("server.database.get_item", {"namespace": ns, "key": "uiSettings"}, timeout=10) or {}).get("value") or {}
+        if source == "fluidd":
+            t = ui.get("theme") or {}
+            out["color"], out["mode"] = t.get("color"), (None if t.get("isDark") is None else "dark" if t["isDark"] else "light")
+            logo = _config_url(str((t.get("logo") or {}).get("src") or ""))
+        else:
+            out["color"], out["mode"] = ui.get("primary"), ui.get("mode")
+    names = set()
+    with contextlib.suppress(Exception):
+        names = {f.get("filename", "") for f in (await client.rpc("server.files.get_directory", {"path": f"config/{folder}"}, timeout=10) or {}).get("files", [])}
+    for part, bases in parts.items():
+        hit = next((b + x for b in bases for x in THEME_IMG if b + x in names), None)
+        if hit:
+            out["files"][part] = f"{folder}/{hit}"
+    if logo and logo.startswith(folder + "/") and logo.split("/", 1)[1] in names:   # Fluidd's own logo setting, if that file is there
+        out["files"]["logo"] = logo
+    if "custom.css" in names:
+        with contextlib.suppress(Exception):
+            out["css"] = _theme_css((await _read_file_bytes(client, f"{folder}/custom.css", 500_000)).decode("utf-8", "replace"))
+    if not isinstance(out["color"], str) or not out["color"].startswith("#"):
+        out["color"] = None
+    return out
+
+
+async def _copy_theme_file(client, path: str, name: str) -> str:
+    name += os.path.splitext(path)[1].lower()
+    (THEME_DIR / name).write_bytes(await _read_file_bytes(client, path, 15_000_000))
+    return name
+
+
+async def printer_theme(request: Request):
+    """GET: preview the printer's Fluidd / Mainsail theme (?source=). PUT {source, parts}: copy those parts to this box."""
+    client, e = _online_client(request)
+    if e:
+        return e
+    b = await body(request) if request.method == "PUT" else {}
+    source = request.query_params.get("source") if request.method == "GET" else b.get("source")
+    if source not in THEME_SOURCES:
+        return err("source must be fluidd or mainsail")
+    found = await _read_theme(client, source)
+    if request.method == "GET":   # pictures in the css point at the printer for the preview
+        pid = request.path_params["pid"]
+
+        def to(m):
+            p = _config_url(m.group(1))
+            return f'url("/api/printers/{pid}/file?root=config&path={quote(p)}")' if p else m.group(0) if m.group(1).startswith("http") else "none"
+        found["css"] = {k: THEME_URL.sub(to, v) for k, v in found["css"].items()}
+        return JSONResponse(found)
+    parts = set(b.get("parts") or [])
+    theme = {"source": source}
+    if "color" in parts and found["color"]:
+        theme["color"] = found["color"]
+    if "mode" in parts and found["mode"] in ("dark", "light"):
+        theme["mode"] = found["mode"]
+    THEME_DIR.mkdir(parents=True, exist_ok=True)
+    for f in THEME_DIR.iterdir():
+        f.unlink()
+    try:
+        for part, path in found["files"].items():
+            if part in parts:
+                theme[part] = await _copy_theme_file(client, path, part)
+        css = {}
+        for part, decls in found["css"].items():
+            if part not in parts:
+                continue
+            urls, n = {}, 0   # their pictures come along too
+            for u in THEME_URL.findall(decls):
+                if u not in urls:
+                    p = _config_url(u)
+                    urls[u] = f'url("/api/ui/theme/{await _copy_theme_file(client, p, f"{part}-{n}")}")' if p else f'url("{u}")' if u.startswith("http") else "none"
+                    n += 1
+            css[part] = THEME_URL.sub(lambda m: urls[m.group(1)], decls)
+        if css:
+            theme["css"] = css
+    except Exception as ex:
+        return err(f"couldn't copy the theme: {ex}", 502)
+    store.save_settings({"ui_theme": theme})
+    return JSONResponse({"theme": theme})
+
+
+async def ui_theme(request: Request):
+    """GET: the imported theme ({} = Printer Buddy's own look). DELETE: back to Printer Buddy's own look."""
+    if request.method == "DELETE":
+        if THEME_DIR.exists():
+            for f in THEME_DIR.iterdir():
+                f.unlink()
+        store.save_settings({"ui_theme": {}})
+    return JSONResponse({"theme": store.settings().get("ui_theme") or {}})
+
+
+async def ui_theme_file(request: Request):
+    name = request.path_params["name"]
+    path = THEME_DIR / name
+    if "/" in name or "\\" in name or not path.is_file():
+        return err("not found", 404)
+    return FileResponse(path, headers={"Cache-Control": "no-cache"})
 
 
 KV_KEYS = ("presets", "notes", "maintenance", "console_filters")
@@ -859,6 +1022,8 @@ async def printer_file(request: Request):
     if request.query_params.get("download") == "1":
         headers["Content-Disposition"] = f'attachment; filename="{name}"'
     ctype = "text/plain; charset=utf-8" if root != "gcodes" or request.query_params.get("download") != "1" else "application/octet-stream"
+    if name.lower().endswith(THEME_IMG) and request.query_params.get("download") != "1":   # pictures (theme preview, file view)
+        ctype = mimetypes.guess_type(name)[0] or ctype
     return StreamingResponse(relay(), media_type=ctype, headers=headers)
 
 
@@ -1111,7 +1276,10 @@ _app = Starlette(routes=[
     Route("/share/printer/{pid:int}/{code}/stream", share_stream),
     Route("/api/timelapse/settings", timelapse_settings, methods=["GET", "PUT"]),
     Route("/api/ai/settings", ai_settings, methods=["GET", "PUT"]),
-    Route("/api/ui/layout", ui_layout, methods=["GET", "PUT"]),    Route("/api/news", news),
+    Route("/api/ui/layout", ui_layout, methods=["GET", "PUT"]),
+    Route("/api/ui/theme", ui_theme, methods=["GET", "DELETE"]),
+    Route("/api/ui/theme/{name}", ui_theme_file),
+    Route("/api/printers/{pid:int}/theme", printer_theme, methods=["GET", "PUT"]),    Route("/api/news", news),
     Route("/api/ai/reload", ai_reload, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/check", ai_check, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/save", ai_save, methods=["POST"]),

@@ -27,13 +27,16 @@ PB.panel("fans", {
     function build(p) {
       const fans = (p.sensors || []).filter(s => s.kind === "fan"), outs = p.outputs || [];
       ctl.innerHTML = fans.map(f => `<label class="pb-speed" data-id="${esc(f.id)}"><span class="pb-lab">${esc(f.name)}</span>
-          ${settable(f) ? `<input type="range" min="0" max="100" step="1">` : `<span class="pb-bar"><i></i></span>`}<output></output></label>`).join("")
-        + outs.map(o => o.kind === "pin" ? `<label class="pb-speed" data-id="${esc(o.id)}"><span class="pb-lab">${esc(o.name)}</span>
+          ${settable(f) ? `<input type="range" min="0" max="100" step="1">` : ""}<output${settable(f) ? "" : ' class="pb-auto"'}></output></label>`).join("")
+        + outs.map(o => o.kind === "pin" && o.onoff ? `<label class="pb-speed" data-id="${esc(o.id)}"><span class="pb-lab">${esc(o.name)}</span>
+          <input type="checkbox" class="pb-switch" role="switch"><output></output></label>`
+          : o.kind === "pin" ? `<label class="pb-speed" data-id="${esc(o.id)}"><span class="pb-lab">${esc(o.name)}</span>
           <input type="range" min="0" max="100" step="1"><output></output></label>`
           : `<label class="pb-speed" data-id="${esc(o.id)}"><span class="pb-lab">${esc(o.name)}</span><input type="color"><output></output></label>`).join("")
         || `<p class="pb-muted">No fans or outputs found.</p>`;
       for (const row of ctl.querySelectorAll("[data-id]")) {
-        const id = row.dataset.id, r = row.querySelector("input[type=range]"), c = row.querySelector("input[type=color]");
+        const id = row.dataset.id, r = row.querySelector("input[type=range]"), c = row.querySelector("input[type=color]"), t = row.querySelector(".pb-switch");
+        if (t) t.onchange = () => gcode(`SET_PIN PIN=${fanName(id)} VALUE=${t.checked ? 1 : 0}`);   // on / off pins
         if (r) {
           r.oninput = () => { busy.add(id); row.querySelector("output").textContent = `${r.value}%`; };
           r.onchange = () => {
@@ -74,13 +77,13 @@ PB.panel("fans", {
         for (const f of fans) {
           const row = ctl.querySelector(`[data-id="${CSS.escape(f.id)}"]`); if (!row || busy.has(f.id)) continue;
           const pct = Math.round((f.speed || 0) * 100);
-          row.querySelector("output").textContent = live ? `${pct}%` : "—";
+          row.querySelector("output").textContent = !live ? "—" : settable(f) ? `${pct}%` : pct ? `${pct} %` : "Off";   // automatic fans: text only, like Fluidd
           const r = row.querySelector("input[type=range]"); if (r) { r.value = pct; r.disabled = !live; }
-          const bar = row.querySelector(".pb-bar i"); if (bar) bar.style.width = `${pct}%`;
         }
         for (const o of outs) {
           const row = ctl.querySelector(`[data-id="${CSS.escape(o.id)}"]`); if (!row || busy.has(o.id)) continue;
-          if (o.kind === "pin") { const pct = Math.round((o.value || 0) * 100); row.querySelector("output").textContent = `${pct}%`; const r = row.querySelector("input"); r.value = pct; r.disabled = !live; }
+          if (o.kind === "pin" && o.onoff) { const t = row.querySelector(".pb-switch"); t.checked = (o.value || 0) > 0; t.disabled = !live; row.querySelector("output").textContent = t.checked ? "On" : "Off"; }
+          else if (o.kind === "pin") { const pct = Math.round((o.value || 0) * 100); row.querySelector("output").textContent = `${pct}%`; const r = row.querySelector("input"); r.value = pct; r.disabled = !live; }
           else { const c = row.querySelector("input"); if (document.activeElement !== c) c.value = "#" + o.color.slice(0, 3).map(x => Math.round((x || 0) * 255).toString(16).padStart(2, "0")).join(""); c.disabled = !live; }
         }
       },

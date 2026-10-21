@@ -308,6 +308,8 @@ class MoonrakerClient:
                     if k.startswith("gcode_macro ")}
             params = {k[len("gcode_macro "):]: _macro_params((v or {}).get("gcode") or "") for k, v in settings.items()
                       if k.startswith("gcode_macro ")}
+            # output pins without pwm: True are only on / off (a toggle in the Fans & outputs panel, not a slider)
+            self.onoff_pins = {k for k, v in settings.items() if k.startswith("output_pin ") and not (v or {}).get("pwm")}
         except (RPCError, asyncio.TimeoutError):
             params = {}
         self.macros = sorted(({"name": n.upper(), "description": desc.get(n.lower()) or desc.get(n) or None,
@@ -570,7 +572,8 @@ class MoonrakerClient:
         for n in getattr(self, "outputs", []):
             st = self.status.get(n, {})
             if n.startswith("output_pin "):
-                out.append({"id": n, "name": _pretty(n), "kind": "pin", "value": st.get("value")})
+                out.append({"id": n, "name": _pretty(n), "kind": "pin", "value": st.get("value"),
+                            "onoff": n.lower() in getattr(self, "onoff_pins", set())})
             else:
                 c = (st.get("color_data") or [[0, 0, 0, 0]])[0]
                 out.append({"id": n, "name": _pretty(n), "kind": "led", "color": list(c)})

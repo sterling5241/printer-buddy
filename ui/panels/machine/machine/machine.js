@@ -1,4 +1,5 @@
-// Machine panel: host load / temperature / memory / disk, restart Klipper / Moonraker, reboot or shut down, logs.
+// Machine panel: host load / temperature / memory / disk, restart Klipper / Moonraker, reboot or shut down,
+// services (each one Moonraker may manage: state + restart / stop / start, like Fluidd's list), logs.
 PB.panel("machine", {
   title: "Machine", desc: "Host load, restarts, reboot and logs", cls: "adv",
   icon: PB.icon('<rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'),
@@ -7,6 +8,7 @@ PB.panel("machine", {
       <div class="pb-sub-h">Restart</div>
       <div class="pb-row"><button type="button" data-r="klipper">Klipper</button><button type="button" data-r="firmware">Firmware</button><button type="button" data-r="moonraker">Moonraker</button></div>
       <div class="pb-row"><button type="button" data-r="reboot">Reboot host</button><button type="button" data-r="shutdown">Shut down host</button></div>
+      <div class="pb-sub-h">Services</div><div class="pb-svcs"></div>
       <div class="pb-sub-h">Logs</div>
       <div class="pb-row"><a class="pb-dl pb-dlw" data-log="klippy.log">${PB.ic.download}klippy.log</a><a class="pb-dl pb-dlw" data-log="moonraker.log">${PB.ic.download}moonraker.log</a></div>`;
     const kv = host.querySelector(".pb-mach");
@@ -24,6 +26,28 @@ PB.panel("machine", {
         kv.innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
       } catch (e) { kv.innerHTML = `<div><dt>Couldn't read the host</dt><dd>${esc(e.message)}</dd></div>`; }
     }
+    // ---- services: Moonraker's available_services + their state ----
+    const svcs = host.querySelector(".pb-svcs");
+    async function services() {
+      if (pageId === null) return;
+      try {
+        const si = (await PB.rpc("machine.system_info"))?.system_info || {}, st = si.service_state || {};
+        const list = [...(si.available_services || [])].sort();
+        svcs.innerHTML = list.map(n => {
+          const s = st[n] || {}, on = s.active_state === "active";
+          return `<div class="pb-li"><div class="pb-lmain"><div class="pb-lname">${esc(n)}</div>
+              <div class="pb-lsub">${esc([s.active_state, s.sub_state].filter(Boolean).join(" · ") || "unknown")}</div></div>
+            <div class="pb-lbtn"><button type="button" data-svc="${esc(n)}" data-act="restart">Restart</button>
+              <button type="button" data-svc="${esc(n)}" data-act="${on ? "stop" : "start"}">${on ? "Stop" : "Start"}</button></div></div>`;
+        }).join("") || `<p class="pb-muted">Moonraker doesn't list any services.</p>`;
+        for (const b of svcs.querySelectorAll("[data-svc]")) b.onclick = async () => {
+          const { svc, act } = b.dataset;
+          if ((act !== "start" || busy) && !confirm(`${act[0].toUpperCase() + act.slice(1)} ${svc}?${busy ? " A print is running." : ""}`)) return;
+          try { await PB.rpc(`machine.services.${act}`, { service: svc }); toast(`${svc}: ${act} sent`); } catch (e) { toast(e.message); }
+          setTimeout(services, 2000);
+        };
+      } catch (e) { svcs.innerHTML = `<p class="pb-muted">${esc(e.message)}</p>`; }
+    }
     const ACT = {
       klipper: ["Restart Klipper?", "printer.restart"], firmware: ["Firmware restart (MCU reset)?", "printer.firmware_restart"],
       moonraker: ["Restart Moonraker?", "machine.services.restart", { service: "moonraker" }],
@@ -38,7 +62,7 @@ PB.panel("machine", {
     };
     return {
       open() { for (const a of host.querySelectorAll("[data-log]")) a.href = PB.fileUrl("logs", a.dataset.log, true); },
-      shown() { load(); clearInterval(timer); timer = setInterval(load, 5000); },
+      shown() { load(); services(); clearInterval(timer); timer = setInterval(load, 5000); },
       update(p) {
         busy = p.state === "printing" || p.state === "paused";
         for (const b of host.querySelectorAll("button")) b.disabled = p.connection !== "online";
