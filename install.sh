@@ -11,6 +11,7 @@ RUN_USER="${SUDO_USER:-$USER}"
 ENV_FILE="$DIR/printer-buddy.env"
 BACKUP_DIR="$DIR/backups"
 PARTS_STATE="$DIR/data/parts"
+ASVC="$(getent passwd "$RUN_USER" | cut -d: -f6)/printer_data/moonraker.asvc"
 PORT_GIVEN=""
 INTERACTIVE=0
 
@@ -310,6 +311,15 @@ fetch_parts() {
   return $bad
 }
 
+moonraker_service() {
+  [ -f "$ASVC" ] || return 0
+  if [ "$1" = add ]; then
+    grep -qx "$SERVICE" "$ASVC" || { echo "$SERVICE" >> "$ASVC"; echo "Added $SERVICE to Moonraker's services."; }
+  else
+    sed -i "/^$SERVICE\$/d" "$ASVC"
+  fi
+}
+
 do_install() {
   echo; echo "Installing..."
   ensure_env
@@ -326,6 +336,7 @@ do_install() {
   choose_port || return 1
   write_unit
   sudo systemctl daemon-reload && sudo systemctl enable -q "$SERVICE" || return 1
+  moonraker_service add
   hard_restart || return 1
   echo "Printer Buddy is running: $(url)  (open dashboards reload themselves)"
 }
@@ -393,6 +404,7 @@ do_remove() {
   yesno "Stop and remove the Printer Buddy service?" || { echo "Nothing changed."; return 0; }
   sudo systemctl disable --now -q "$SERVICE"; sudo rm -f "$UNIT_FILE"; sudo systemctl daemon-reload
   echo "Service removed."
+  moonraker_service remove
   if [ -d "$DIR/.venv" ] && yesno "Also delete the Python environment (.venv)?"; then rm -rf "$DIR/.venv" && echo "Deleted .venv."; fi
   if [ -d "$DIR/data" ] && yesno "Also delete your printers and settings (data/)? Make a backup first if unsure."; then rm -rf "$DIR/data" && echo "Deleted data/."; fi
 }

@@ -8,6 +8,7 @@ import re
 import logging
 import os
 import secrets
+import signal
 import time
 import zlib
 from pathlib import Path
@@ -24,6 +25,7 @@ from .printers.manager import Manager
 from .core.net import get_json, http_get, http_stream
 from .core.notify import ALL_EVENTS, PROGRESS_STEPS, SERVICES, Notifier, advanced as notify_advanced
 from .core.store import Store
+from .core import components as comp
 from .media import timelapse as tl
 from .media.timelapse import Timelapse
 from .ai import detector as ai_mod
@@ -630,6 +632,35 @@ async def ai_save(request: Request):
     await manager.collect.send_now()
     item = manager.collect._read(item["id"]) or item
     return JSONResponse({**item, "sharing": manager.collect.sharing(), "error": manager.collect.last_error}, status_code=201)
+
+
+async def components_list(request: Request):
+    return JSONResponse(await asyncio.to_thread(comp.components, manager.ai.info().get("tag")))
+
+
+async def components_action(request: Request):
+    """POST {update: core|parts|ai} | {channel} | {part, tier} | {ai: kind}. Settings changes re-fetch, then restart."""
+    b = await body(request)
+    what = b.get("update")
+    if "channel" in b:
+        if b["channel"] not in ("stable", "nightly"):
+            return err("channel must be stable or nightly")
+        comp.env_set("PB_CHANNEL", b["channel"]); what = "parts"
+    elif "tier" in b:
+        var, tiers, _ = comp.PARTS.get(b.get("part"), (None, (), None))
+        if not var or b["tier"] not in tiers:
+            return err("bad part or tier")
+        comp.env_set(var, b["tier"]); what = "parts"
+    elif "ai" in b:
+        if b["ai"] not in comp.AI_KINDS:
+            return err("bad AI choice")
+        comp.env_set("PB_AI", b["ai"]); what = "ai" if b["ai"] != "off" else None
+    if what not in ("core", "parts", "ai", None):
+        return err("update must be core, parts or ai")
+    ok, out = await asyncio.to_thread(comp.run, what) if what else (True, "")
+    if ok:
+        asyncio.get_running_loop().call_later(1.5, os.kill, os.getpid(), signal.SIGTERM)
+    return JSONResponse({"ok": ok, "output": out, "restarting": ok})
 
 
 async def ai_reload(request: Request):
@@ -1260,6 +1291,8 @@ _app = Starlette(routes=[
     Route("/api/ui/theme/{name}", ui_theme_file),
     Route("/api/printers/{pid:int}/theme", printer_theme, methods=["GET", "PUT"]),    Route("/api/news", news),
     Route("/api/ai/reload", ai_reload, methods=["POST"]),
+    Route("/api/components", components_list),
+    Route("/api/components", components_action, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/check", ai_check, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/save", ai_save, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/overlay", ai_overlay, methods=["POST"]),

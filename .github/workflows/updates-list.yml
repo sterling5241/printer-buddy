@@ -1,0 +1,33 @@
+name: updates list
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Put this release in updates.txt
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          case "$TAG" in
+            ai-*-*)    rest="${TAG#ai-}"; key="ai ${rest%%-*}"; line="$key ${rest#*-}" ;;
+            *-nightly) key="${TAG%-nightly} nightly"; line="$key $(date -u +%Y-%m-%d)" ;;
+            *-v*)      key="${TAG%%-v*} stable"; line="$key v${TAG#*-v}" ;;
+            *)         echo "not a part or AI release: $TAG"; exit 0 ;;
+          esac
+          touch updates.txt
+          { tr -d '\r' < updates.txt | grep -v "^$key " | grep -v '^$'; echo "$line"; } | sort > updates.new
+          mv updates.new updates.txt
+          git diff --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "updates.txt: $line"
+          for try in 1 2 3; do git pull --rebase -q && git push && break; sleep 5; done
