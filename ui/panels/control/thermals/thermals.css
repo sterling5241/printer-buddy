@@ -4,6 +4,12 @@
 .pb-temps td { padding: 4px; border-bottom: 1px solid var(--bd-line); height: 34px; }
 .pb-temps .r { text-align: right; }
 .pb-temps .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 8px; }
+:is(#page, #home).bd .pb-temps .pb-tname { height: auto; padding: 0; border: 0; background: none; color: inherit; font: inherit;
+                  text-align: left; cursor: pointer; display: inline-flex; align-items: center; }
+/* hidden from the graph: the whole row greys out */
+.pb-temps tr.off td { color: var(--muted); opacity: .5; }
+.pb-temps tr.off .pb-tname { text-decoration: line-through; }
+.pb-temps tr.off .dot { background: var(--muted) !important; }
 .pb-temps input { width: 64px; height: 26px; background: var(--bd-deep); border: 1px solid var(--bd-line); border-radius: 3px;
                   color: var(--text); padding: 0 6px; text-align: right; font: inherit; }
 .pb-pres { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }

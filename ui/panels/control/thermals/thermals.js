@@ -22,6 +22,7 @@ PB.panel("thermals", {
     const COLORS = { extruder: "#FF8A1F", heater_bed: "#8B5CF6" }, EXTRA = ["#4FD1C5", "#F6E05E", "#FC8181", "#90CDF4", "#68D391", "#C4A7FF"];
     const SPAN = cfg.span * 60 * 1000;
     let chart = null, series = {}, lastPush = 0, key = "", order = [];
+    const hidden = new Set(PB.store.get("pb-thermals-hidden", []));   // sensors left off the graph (click a name)
     const colorOf = id => COLORS[id] || EXTRA[Math.max(0, order.indexOf(id) - (order.includes("extruder") ? 1 : 0) - (order.includes("heater_bed") ? 1 : 0)) % EXTRA.length];
     if (!cfg.chart) { /* no chart */ }
     else if (window.echarts) {
@@ -33,6 +34,7 @@ PB.panel("thermals", {
       if (!chart) return;
       const out = [], legend = [];
       for (const [id, s] of Object.entries(series)) {
+        if (hidden.has(id)) continue;
         const color = colorOf(id);
         legend.push(s.name);
         out.push({ name: s.name, type: "line", showSymbol: false, data: s.temp, lineStyle: { width: 2, color }, itemStyle: { color } });
@@ -74,15 +76,23 @@ PB.panel("thermals", {
       },
       shown() { chart?.resize(); },
       update(p) {
-        const list = p.sensors || [], live = p.connection === "online" && p.klippy_state === "ready";
+        // temperatures only: fans have their own panel
+        const list = (p.sensors || []).filter(s => s.kind !== "fan"), live = p.connection === "online" && p.klippy_state === "ready";
         const k = list.map(s => s.id).join("|");
         if (k !== key) {
-          key = k; order = list.filter(s => s.kind !== "fan").map(s => s.id);
-          body.innerHTML = list.length ? list.map(s => `<tr data-s="${esc(s.id)}"><td><span class="dot" style="background:${s.kind === "fan" ? "#555" : colorOf(s.id)}"></span>${esc(s.name)}</td>
+          key = k; order = list.map(s => s.id);
+          body.innerHTML = list.length ? list.map(s => `<tr data-s="${esc(s.id)}"${hidden.has(s.id) ? ' class="off"' : ""}><td><button type="button" class="pb-tname" title="Show or hide on the graph"><span class="dot" style="background:${colorOf(s.id)}"></span>${esc(s.name)}</button></td>
             <td class="r pb-muted" data-f="pw"></td><td class="r" data-f="now"></td>
             <td class="r">${s.target != null ? `<input type="number" min="0" max="400" inputmode="numeric" aria-label="${esc(s.name)} target °C">` : `<span class="pb-muted">—</span>`}</td></tr>`).join("")
             : `<tr><td colspan="4" class="pb-muted">No temperatures (printer offline?)</td></tr>`;
           for (const row of body.querySelectorAll("tr[data-s]")) {
+            row.querySelector(".pb-tname").onclick = () => {
+              const id = row.dataset.s;
+              if (hidden.has(id)) hidden.delete(id); else hidden.add(id);
+              PB.store.set("pb-thermals-hidden", [...hidden]);
+              row.classList.toggle("off", hidden.has(id));
+              draw();
+            };
             const inp = row.querySelector("input"); if (!inp) continue;
             inp.onkeydown = e => {
               if (e.key !== "Enter" || inp.value === "") return;
@@ -93,7 +103,7 @@ PB.panel("thermals", {
         }
         for (const s of list) {
           const row = body.querySelector(`tr[data-s="${CSS.escape(s.id)}"]`); if (!row) continue;
-          row.querySelector("[data-f=now]").textContent = !live ? "—" : s.kind === "fan" ? `${Math.round((s.speed || 0) * 100)}%` : s.temp != null ? `${s.temp.toFixed(1)}°` : "—";
+          row.querySelector("[data-f=now]").textContent = !live ? "—" : s.temp != null ? `${s.temp.toFixed(1)}°` : "—";
           row.querySelector("[data-f=pw]").textContent = live && s.kind === "heater" && s.power != null ? `${Math.round(s.power * 100)}%` : "";
           const inp = row.querySelector("input");
           if (inp) { if (document.activeElement !== inp) inp.placeholder = s.target ? `${Math.round(s.target)}` : "off"; inp.disabled = !live || isBasic(); }
@@ -101,7 +111,7 @@ PB.panel("thermals", {
         if (!chart || Date.now() - lastPush < 1000 || !live) return;
         const now = lastPush = Date.now();
         for (const s of list) {
-          if (s.kind === "fan" || s.temp == null) continue;
+          if (s.temp == null) continue;
           const ser = series[s.id] ||= { name: s.name, hasTarget: s.target != null, temp: [], target: [] };
           ser.temp.push([now, s.temp]); if (ser.hasTarget) ser.target.push([now, s.target ?? 0]);
           while (ser.temp.length && ser.temp[0][0] < now - SPAN) ser.temp.shift();

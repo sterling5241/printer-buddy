@@ -70,7 +70,7 @@ PB.panel("fans", {
       shown: loadPower,
       update(p) {
         const fans = (p.sensors || []).filter(s => s.kind === "fan"), outs = p.outputs || [];
-        const k = fans.map(f => f.id).concat(outs.map(o => o.id)).join("|");
+        const k = fans.map(f => f.id).concat(outs.map(o => `${o.id}:${o.onoff}`)).join("|");
         if (k !== key) { key = k; build(p); }
         effects(p);
         const live = p.connection === "online" && p.klippy_state === "ready";
