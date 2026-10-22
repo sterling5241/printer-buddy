@@ -10,6 +10,7 @@ UNIT_FILE="/etc/systemd/system/$SERVICE.service"
 RUN_USER="${SUDO_USER:-$USER}"
 ENV_FILE="$DIR/printer-buddy.env"
 BACKUP_DIR="$DIR/backups"
+PARTS_STATE="$DIR/data/parts"
 PORT_GIVEN=""
 INTERACTIVE=0
 
@@ -20,6 +21,7 @@ PARTS=(
   "video|PB_VIDEO|Video|snapshots live timelapse"
   "notify|PB_NOTIFY|Notifications|basic advanced"
   "remote|PB_REMOTE|Remote access|off on"
+  "channel|PB_CHANNEL|Release channel|stable nightly"
 )
 declare -A DESC=(
   [ui.basic]="dashboard, Quick View, printer status page"
@@ -34,8 +36,10 @@ declare -A DESC=(
   [notify.advanced]="Basic + more services and progress updates"
   [remote.off]="only on your home network"
   [remote.on]="reach it from anywhere, with a login"
+  [channel.stable]="tested releases (v1.x)"
+  [channel.nightly]="newest builds, may have bugs"
 )
-BUILT=" ui.basic ui.advanced ai.off ai.basic video.snapshots notify.basic notify.advanced video.live video.timelapse remote.off remote.on "
+BUILT=" ui.basic ui.advanced ai.off ai.basic video.snapshots notify.basic notify.advanced video.live video.timelapse remote.off remote.on channel.stable channel.nightly "
 
 W=55
 hr()    { printf '|%s|\n' "$(printf '%*s' $((W + 2)) '' | tr ' ' '-')"; }
@@ -260,9 +264,56 @@ ensure_ai() {
   return 0
 }
 
+fetch_part() {   # part, release asset, path inside the package, where it goes
+  local channel; channel="$(get_env PB_CHANNEL)"
+  python3 - "$@" "${channel:-stable}" "$PARTS_STATE" <<'PY' || { echo "Couldn't get the $1 part, kept what was there."; return 1; }
+import io, json, os, shutil, sys, tarfile, tempfile, urllib.request
+name, asset, inner, dest, channel, state = sys.argv[1:7]
+hdr = {"User-Agent": "printer-buddy", "Accept": "application/vnd.github+json"}
+api = "https://api.github.com/repos/sterling5241/printer-buddy/releases?per_page=100"
+rels = json.load(urllib.request.urlopen(urllib.request.Request(api, headers=hdr), timeout=30))
+want = (lambda t: t == f"{name}-nightly") if channel == "nightly" else (lambda t: t.startswith(f"{name}-v"))
+rel = next((r for r in rels if want(r["tag_name"]) and not r.get("draft")), None)
+if not rel:
+    sys.exit(f"no {channel} release of {name} yet")
+a = next((x for x in rel.get("assets", []) if x["name"] == asset), None)
+if not a:
+    sys.exit(f"{rel['tag_name']} has no {asset}")
+stamp = f"{rel['tag_name']} {a['updated_at']}"
+mark = os.path.join(state, name)
+if os.path.exists(dest) and os.path.exists(mark) and open(mark).read() == stamp:
+    sys.exit(0)
+data = urllib.request.urlopen(urllib.request.Request(a["browser_download_url"], headers=hdr), timeout=300).read()
+tmp = tempfile.mkdtemp()
+with tarfile.open(fileobj=io.BytesIO(data)) as t:
+    t.extractall(tmp)
+src = os.path.join(tmp, inner)
+if os.path.isdir(src):
+    shutil.rmtree(dest, ignore_errors=True)
+    shutil.copytree(src, dest)
+else:
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    shutil.copyfile(src, dest)
+shutil.rmtree(tmp)
+os.makedirs(state, exist_ok=True)
+open(mark, "w").write(stamp)
+print(f"{name}: {rel['tag_name']}")
+PY
+}
+
+fetch_parts() {
+  local ui notify bad=0
+  ui="$(part_value "${PARTS[0]}")"; notify="$(part_value "${PARTS[3]}")"
+  fetch_part ui "print-buddy-ui-$ui.tar.gz" print-buddy-ui "$DIR/ui" || bad=1
+  fetch_part notify "print-buddy-notify-$notify.tar.gz" print-buddy-notify/pb_notify/__init__.py "$DIR/app/core/notify.py" || bad=1
+  fetch_part timelapse print-buddy-timelapse.tar.gz print-buddy-timelapse/pb_timelapse/__init__.py "$DIR/app/media/timelapse.py" || bad=1
+  return $bad
+}
+
 do_install() {
   echo; echo "Installing..."
   ensure_env
+  fetch_parts || return 1
   if ! python3 -c "import venv, ensurepip" 2>/dev/null; then
     echo "Installing python3-venv..."
     sudo apt-get update && sudo apt-get install -y python3-venv || { echo "Couldn't install python3-venv."; return 1; }
@@ -289,6 +340,7 @@ do_update() {
 }
 
 after_code_change() {
+  fetch_parts
   if [ -x "$DIR/.venv/bin/pip" ]; then "$DIR/.venv/bin/pip" install -r "$DIR/requirements.txt" -q || return 1; fi
   [ -x "$DIR/.venv/bin/pip" ] && ensure_ai
   if installed; then write_unit; hard_restart || return 1; fi
@@ -540,7 +592,7 @@ setup_menu() {
     c="$(ask "Pick a part: ")"
     case "$c" in
       b|back|"")
-        if [ $changed -eq 1 ] && installed; then ensure_ffmpeg; ensure_ai; hard_restart && echo "Restarted with the new setup."; sleep 1; fi
+        if [ $changed -eq 1 ] && installed; then fetch_parts; ensure_ffmpeg; ensure_ai; hard_restart && echo "Restarted with the new setup."; sleep 1; fi
         return ;;
     esac
     [[ "$c" =~ ^[0-9]+$ ]] && [ "$c" -ge 1 ] && [ "$c" -le ${#PARTS[@]} ] || continue
@@ -584,12 +636,13 @@ declare -A GIVEN=()
 while [ $# -gt 0 ]; do
   case "$1" in
     -y|--yes) shift ;;
-    -h|--help) echo "Usage: ./install.sh [-y] [--port N] [--ui basic|advanced] [--ai off|basic|heavy] [--video snapshots|live|timelapse] [--notify basic|advanced] [--remote off|on]"; exit 0 ;;
+    -h|--help) echo "Usage: ./install.sh [-y] [--port N] [--ui basic|advanced] [--ai off|basic|heavy] [--video snapshots|live|timelapse] [--notify basic|advanced] [--remote off|on] [--channel stable|nightly] [--parts]"; exit 0 ;;
+    --parts) ensure_env; fetch_parts; exit $? ;;
     --port)
       [ $# -ge 2 ] || { echo "--port needs a number"; exit 1; }
       valid_port "$2" || { echo "--port must be a number from 1024 to 65535"; exit 1; }
       PORT_GIVEN="$2"; shift 2 ;;
-    --ui|--ai|--video|--notify|--remote)
+    --ui|--ai|--video|--notify|--remote|--channel)
       [ $# -ge 2 ] || { echo "$1 needs a value"; exit 1; }
       GIVEN[${1#--}]="${2,,}"; shift 2 ;;
     *) echo "Unknown option: $1 (try --help)"; exit 1 ;;

@@ -5,6 +5,7 @@ cd "$DIR"
 git fetch
 git reset --hard
 git reset --hard "origin/$(git rev-parse --abbrev-ref HEAD)"
+bash "$DIR/install.sh" --parts
 "$DIR/.venv/bin/pip" install -r requirements.txt -q
 sudo systemctl restart printer-buddy
 echo "Updated to $(git log -1 --format='%h %s')"
