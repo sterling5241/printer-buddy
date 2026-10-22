@@ -50,5 +50,7 @@ UNIT
   enable) systemctl enable -q --now "$STREAMER" ;;
   restart) systemctl restart "$STREAMER" ;;
   disable) systemctl disable -q --now "$STREAMER" 2>/dev/null || true ;;
-  *) echo "usage: $0 pkg <package> | deps light|basic|full | unit <printer-buddy dir> <user> | enable | restart | disable"; exit 2 ;;
+  reboot) systemctl reboot ;;
+  shutdown) systemctl poweroff ;;
+  *) echo "usage: $0 pkg <package> | deps light|basic|full | unit <printer-buddy dir> <user> | enable | restart | disable | reboot | shutdown"; exit 2 ;;
 esac

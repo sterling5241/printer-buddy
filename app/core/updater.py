@@ -56,6 +56,15 @@ def env(key: str) -> str:
     return v if not choices or v in choices else choices[0]
 
 
+def dev_parts() -> set[str]:
+    """Parts set to dev/beta (nightly) builds while the rest follow the channel."""
+    return {x.strip() for x in env("PB_NIGHTLY").split(",") if x.strip()}
+
+
+def channel(name: str) -> str:
+    return "nightly" if env("PB_CHANNEL") == "nightly" or name in dev_parts() else "stable"
+
+
 def git(*args) -> str:
     return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True).stdout.strip()
 
@@ -68,7 +77,7 @@ def core_branch() -> str:
     """The branch core updates follow: the channel's, unless another branch was picked in the installer."""
     cur = git("rev-parse", "--abbrev-ref", "HEAD")
     if cur in ("", "HEAD", "main", *CHANNEL_BRANCH.values()):
-        return CHANNEL_BRANCH[env("PB_CHANNEL")]
+        return CHANNEL_BRANCH[channel("core")]
     return cur
 
 
@@ -130,20 +139,20 @@ def missing_needs(rel: dict) -> list[str]:
 
 
 def fetch_part(name: str, asset: str, inner: str, dest: Path) -> bool:
-    channel = env("PB_CHANNEL")
+    ch = channel(name)
     try:
         rels = releases()
     except OSError as e:
         say(f"Couldn't get the {name} part ({e}), kept what was there.")
         return False
-    want = (lambda t: t == f"{name}-nightly") if channel == "nightly" else (lambda t: t.startswith(f"{name}-v"))
+    want = (lambda t: t == f"{name}-nightly") if ch == "nightly" else (lambda t: t.startswith(f"{name}-v"))
     rel = next((r for r in rels if want(r["tag_name"]) and not r.get("draft")), None)
     a = rel and next((x for x in rel.get("assets", []) if x["name"] == asset), None)
     if not a:
-        why = f"{rel['tag_name']} has no {asset}" if rel else f"no {channel} release yet"
+        why = f"{rel['tag_name']} has no {asset}" if rel else f"no {ch} release yet"
         say(f"Couldn't get the {name} part ({why}), kept what was there.")
         return False
-    if channel != "nightly" and dest.exists() and (miss := missing_needs(rel)):
+    if ch != "nightly" and dest.exists() and (miss := missing_needs(rel)):
         say(f"{name}: {rel['tag_name']} needs {', '.join(miss)} first, kept what was there")
         return True
     stamp = f"{rel['tag_name']} {a['updated_at']} {asset}"

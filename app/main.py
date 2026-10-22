@@ -639,13 +639,20 @@ async def components_list(request: Request):
 
 
 async def components_action(request: Request):
-    """POST {update: core|parts|ai} | {channel} | {part, tier} | {ai: kind}. Settings changes re-fetch, then restart."""
+    """POST {update: core|parts|ai} | {channel} | {part, tier} | {part, dev} | {ai: kind}. Settings changes re-fetch, then restart."""
     b = await body(request)
     what = b.get("update")
     if "channel" in b:
         if b["channel"] not in ("stable", "nightly"):
             return err("channel must be stable or nightly")
         comp.env_set("PB_CHANNEL", b["channel"]); what = "parts"
+    elif "dev" in b:
+        part = b.get("part")
+        if part not in (*comp.PARTS, "core"):
+            return err("bad part")
+        dev = comp.updater.dev_parts() - {part} | ({part} if b["dev"] else set())
+        comp.env_set("PB_NIGHTLY", ",".join(sorted(dev)))
+        what = "core" if part == "core" else "streamer" if part == "streamer" else "parts"
     elif "tier" in b:
         var, tiers, _ = comp.PARTS.get(b.get("part"), (None, (), None))
         if not var or b["tier"] not in tiers:
@@ -662,6 +669,21 @@ async def components_action(request: Request):
     if restart:
         asyncio.get_running_loop().call_later(1.5, os.kill, os.getpid(), signal.SIGTERM)
     return JSONResponse({"ok": ok, "output": out, "restarting": restart})
+
+
+async def system_list(request: Request):
+    return JSONResponse(await asyncio.to_thread(comp.system))
+
+
+async def system_action(request: Request):
+    """POST {action: restart|start|stop, service} | {action: reboot|shutdown}."""
+    b = await body(request)
+    action, service = b.get("action"), b.get("service")
+    if (action, service) == ("restart", "printer-buddy"):
+        asyncio.get_running_loop().call_later(1.5, os.kill, os.getpid(), signal.SIGTERM)
+        return JSONResponse({"ok": True, "output": "", "restarting": True})
+    ok, out = await asyncio.to_thread(comp.system_action, action, service)
+    return JSONResponse({"ok": ok, "output": out, "restarting": False})
 
 
 async def ai_reload(request: Request):
@@ -1294,6 +1316,8 @@ _app = Starlette(routes=[
     Route("/api/ai/reload", ai_reload, methods=["POST"]),
     Route("/api/components", components_list),
     Route("/api/components", components_action, methods=["POST"]),
+    Route("/api/system", system_list),
+    Route("/api/system", system_action, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/check", ai_check, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/save", ai_save, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/overlay", ai_overlay, methods=["POST"]),

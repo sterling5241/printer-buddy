@@ -132,14 +132,19 @@ def components(ai_tag: str | None) -> dict:
     channel = env_get("PB_CHANNEL", "stable") or "stable"
     avail = latest()
     have = _installed()
-    need = (lambda tag: _missing(avail.get(("needs", tag), []), have)) if channel == "stable" else (lambda tag: [])
+    dev = updater.dev_parts()
+
+    def need(tag, ch="stable"):
+        return _missing(avail.get(("needs", tag), []), have) if ch == "stable" else []
     parts = []
     for name, (var, tiers, path) in PARTS.items():
         tag, when = _stamp(name)
         if var and env_get(var, tiers[0]) == "off":
-            parts.append({"name": name, "installed": "off", "latest": None, "update": False, "tier": "off", "tiers": list(tiers)})
+            parts.append({"name": name, "installed": "off", "latest": None, "update": False, "tier": "off", "tiers": list(tiers),
+                          "dev": name in dev})
             continue
-        if channel == "nightly":
+        ch = updater.channel(name)
+        if ch == "nightly":
             new = avail.get((name, "nightly"))
             update = bool(new) and (tag != f"{name}-nightly" or when[:10] < new)
             show_new = f"nightly {new}" if new else None
@@ -148,18 +153,19 @@ def components(ai_tag: str | None) -> dict:
             new = avail.get((name, "stable"))
             update = bool(new) and (not tag.startswith(f"{name}-v") or _newer(new, tag.removeprefix(f"{name}-")))
             show_new, installed = new, tag.removeprefix(f"{name}-")
-        miss = need(f"{name}-{new}") if update else []
+        miss = need(f"{name}-{new}", ch) if update else []
         parts.append({"name": name, "installed": installed or ("present" if path.exists() else None), "latest": show_new,
                       "update": update and not miss, "needs": miss, "tier": env_get(var, tiers[0]) if var else None,
-                      "tiers": list(tiers)})
+                      "tiers": list(tiers), "dev": name in dev})
     kind = env_get("PB_AI", "off") or "off"
     ai_new = avail.get(("ai", kind))
     ai_up = bool(ai_new) and kind != "off" and (not (ai_tag or "").removeprefix("ai-").startswith(f"{kind}-")
                                                  or _newer(ai_new, (ai_tag or "").removeprefix("ai-").removeprefix(f"{kind}-")))
     ai_miss = need(f"ai-{kind}-{ai_new}") if ai_up else []
     c = core()
-    c["needs"] = need(f"core-{c['version']}") if c["update"] and c["version"] else []
+    c["needs"] = need(f"core-{c['version']}", updater.channel("core")) if c["update"] and c["version"] else []
     c["update"] = c["update"] and not c["needs"]
+    c["dev"] = "core" in dev
     return {"channel": channel, "core": c, "parts": parts,
             "ai": {"kind": kind, "kinds": list(AI_KINDS), "installed": ai_tag, "latest": ai_new and f"{kind}-{ai_new}",
                    "update": ai_up and not ai_miss, "needs": ai_miss}}
@@ -177,3 +183,40 @@ def run(what: str) -> tuple[bool, str]:
         return False, str(ex)
     _cache.clear()
     return p.returncode == 0, (p.stdout + p.stderr).strip()[-2000:]
+
+
+SERVICES = ("printer-buddy", "printer-buddy-streamer")
+# (action, service) -> root helper job; Printer Buddy restarting itself is done by the caller
+SYSTEM_JOBS = {("restart", "printer-buddy-streamer"): "restart", ("start", "printer-buddy-streamer"): "enable",
+               ("stop", "printer-buddy-streamer"): "disable", ("reboot", None): "reboot", ("shutdown", None): "shutdown"}
+
+
+def system() -> dict:
+    """Printer Buddy's own services, as systemd reports them."""
+    out = []
+    for name in SERVICES:
+        try:
+            p = subprocess.run(["systemctl", "show", name, "-p", "LoadState,ActiveState,SubState"],
+                               capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        s = dict(line.split("=", 1) for line in p.stdout.splitlines() if "=" in line)
+        if s.get("LoadState") == "loaded":
+            out.append({"name": name, "active_state": s.get("ActiveState", ""), "sub_state": s.get("SubState", "")})
+    return {"services": out, "helper": bool(updater.helper())}
+
+
+def system_action(action: str, service: str | None) -> tuple[bool, str]:
+    job = SYSTEM_JOBS.get((action, service))
+    if not job:
+        return False, f"can't {action} {service or 'the host'}"
+    helper = updater.helper()
+    if not helper:
+        return False, "The root helper isn't set up yet: run ./install.sh and pick Update once."
+    try:
+        p = subprocess.run(["sudo", "-n", helper, job], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as ex:
+        return False, str(ex)
+    if p.returncode == 2 and job in ("reboot", "shutdown"):
+        return False, "This box's root helper is older: run ./install.sh and pick Update once."
+    return p.returncode == 0, (p.stdout + p.stderr).strip()[-500:]
