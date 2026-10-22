@@ -1,0 +1,4 @@
+.pb-big { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.pb-big span { color: var(--muted); font-size: 12.5px; }
+.pb-big b { font-size: 24px; font-variant-numeric: tabular-nums; font-family: var(--bd-mono); }
+.pb-big small { color: var(--muted); }

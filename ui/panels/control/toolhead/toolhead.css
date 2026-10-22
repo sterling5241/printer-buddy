@@ -1,0 +1,35 @@
+.pb-th { display: flex; justify-content: center; align-items: center; gap: 14px; margin: 4px 0 10px; }
+.pb-th[hidden] { display: none; }
+.pb-thx { display: grid; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 46px); gap: 6px; }
+.pb-thz { display: grid; grid-template-columns: 58px; grid-template-rows: repeat(3, 46px); gap: 6px; }
+.pb-thhxy { display: grid; grid-template-columns: 58px; grid-template-rows: repeat(2, 46px); gap: 6px; align-content: center; }
+:is(#page, #home).bd .pb-th button { width: 100%; height: 100%; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                                     gap: 1px; font-size: 11px; line-height: 1.1; }
+.pb-th button .pb-ic { width: 18px; height: 18px; }
+:is(#page, #home).bd .pb-th .pb-thh { color: var(--muted); }
+:is(#page, #home).bd .pb-th .pb-thh.need { color: var(--orange); border-color: var(--orange); }
+.pb-thpos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; font-size: 12.5px; color: var(--muted); }
+.pb-thpos[hidden] { display: none; }
+.pb-thpos label { display: flex; align-items: center; gap: 4px; }
+.pb-thpos input { width: 76px; height: 28px; min-height: 0; background: var(--bd-deep); color: var(--text); border: 1px solid var(--bd-line); border-radius: 4px;
+                  padding: 0 6px; font-family: var(--bd-mono); font-size: 12.5px; }
+.pb-thpos input:focus { border-color: var(--orange); outline: none; }
+:is(#page, #home).bd .pb-thpos button { height: 28px; padding: 0 10px; font-size: 12px; }
+.pb-thbars { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.pb-thbars[hidden] { display: none; }
+.pb-thbar { display: flex; gap: 4px; }
+:is(#page, #home).bd .pb-thbar button { flex: 1 1 0; min-width: 0; height: 34px; padding: 0 2px; font-size: 11.5px; }
+:is(#page, #home).bd .pb-thbar .pb-thh { flex: 0 0 52px; flex-direction: row; display: flex; align-items: center; justify-content: center; gap: 3px; }
+.pb-thbar .pb-thh .pb-ic { width: 14px; height: 14px; }
+.pb-thbar button[data-jog$="-"] + button[data-jog$="+"] { margin-left: 6px; }
+.pb-thc { flex: 0 1 250px; min-width: 150px; }
+.pb-thc svg { display: block; width: 100%; height: auto; }
+.pb-thtag { fill: var(--muted); font-size: 12px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.pb-thseg { cursor: pointer; }
+.pb-thseg path, .pb-thseg circle { fill: var(--bd-deep); stroke: var(--bd-line); stroke-width: 1; }
+.pb-thseg:hover path, .pb-thseg:hover circle { fill: var(--bd-hover); stroke: var(--orange); }
+.pb-thseg text { fill: var(--text); font-size: 11px; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.pb-thseg.need circle { stroke: var(--orange); }
+.pb-thseg.need text { fill: var(--orange); }
+.pb-thoff .pb-thseg { cursor: default; opacity: .5; }
+.pb-seg > span { align-self: center; font-size: 12px; margin-right: 4px; }

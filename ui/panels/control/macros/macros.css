@@ -1,0 +1,11 @@
+.pb-macs { display: flex; flex-wrap: wrap; gap: 6px; }
+.pb-mac { display: inline-flex; }
+:is(#page, #home).bd .pb-mac button { height: 28px; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+:is(#page, #home).bd .pb-mac .x { display: none; padding: 0 8px; margin-left: -1px; }
+.pb-macedit .pb-mac .x { display: inline-block !important; }
+.pb-maclinks { margin-top: 8px; display: flex; gap: 12px; }
+:is(#page, #home).bd .pb-link { height: auto; padding: 0; border: 0; background: none; color: var(--muted); font-weight: 500; font-size: 12px; }
+.pb-macform { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.pb-macform label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); font-family: var(--bd-mono, monospace); }
+.pb-macform input { height: 30px; background: #2a2a2f; color: var(--text); border: 1px solid #3a3a40; border-radius: 4px; padding: 0 8px; font: inherit; }
+html[data-theme="light"] .pb-macform input { background: #fff; color: #1c1b20; border-color: #dcdce2; }

@@ -1,0 +1,9 @@
+.pb-cross { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.pb-cross[hidden] { display: none; }
+.pb-cross::before, .pb-cross::after { content: ""; position: absolute; background: rgba(255, 138, 31, .85); }
+.pb-cross::before { left: 50%; top: 0; bottom: 0; width: 1px; }
+.pb-cross::after { top: 50%; left: 0; right: 0; height: 1px; }
+.pb-camedit { position: absolute; right: 10px; bottom: 10px; z-index: 3; opacity: 0; transition: opacity .15s; }
+.pg-cam:hover .pb-camedit, .pb-camedit:focus { opacity: 1; }
+#page.bd .pb-camedit { height: 28px; padding: 0 10px; font-size: 12px; background: rgba(0, 0, 0, .6); color: #fff; border-color: rgba(255, 255, 255, .2); }
+@media (hover: none) { .pb-camedit { opacity: .8; } }

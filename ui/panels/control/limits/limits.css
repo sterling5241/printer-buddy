@@ -1,0 +1,2 @@
+.pb-col2 { display: grid; grid-template-columns: 1fr; gap: 6px; }
+.pb-col2 label { justify-content: space-between; }

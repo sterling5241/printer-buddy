@@ -1,0 +1,5 @@
+.pb-throt { padding: 6px 10px; margin-bottom: 8px; border-radius: 4px; background: rgba(246, 195, 68, .14); color: #f6c344; font-size: 13px; }
+.pb-mcus { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.pb-mcu { padding: 8px 10px; border-radius: 4px; background: rgba(127, 127, 140, .08); font-size: 12.5px; display: flex; flex-direction: column; gap: 3px; }
+.pb-mcuh { display: flex; justify-content: space-between; gap: 6px; font-size: 13px; }
+.pb-mcuv { color: var(--text); }

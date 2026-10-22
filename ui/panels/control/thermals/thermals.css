@@ -1,0 +1,26 @@
+.pb-temps { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.pb-temps th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 4px; border-bottom: 1px solid var(--bd-line); }
+.pb-temps td { padding: 4px; border-bottom: 1px solid var(--bd-line); height: 34px; }
+.pb-temps .r { text-align: right; }
+.pb-temps .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 8px; }
+:is(#page, #home).bd .pb-temps .pb-tname { height: auto; padding: 0; border: 0; background: none; color: inherit; font: inherit;
+                  text-align: left; cursor: pointer; display: inline-flex; align-items: center; }
+.pb-temps tr.off td { color: var(--muted); opacity: .5; }
+.pb-temps tr.off .pb-tname { text-decoration: line-through; }
+.pb-temps tr.off .dot { background: var(--muted) !important; }
+.pb-temps input { width: 64px; height: 26px; background: var(--bd-deep); border: 1px solid var(--bd-line); border-radius: 3px;
+                  color: var(--text); padding: 0 6px; text-align: right; font: inherit; }
+.pb-pres { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+:is(#page, #home).bd .pb-pres button { height: 28px; padding: 0 10px; }
+.pb-presdlg { width: min(640px, 94vw); }
+:is(#page, #home).bd .pb-card > header .pb-presbtn { height: 30px; padding: 0 8px; border: 0; background: transparent; color: var(--text); font-weight: 500; font-size: 13px; }
+:is(#page, #home).bd .pb-card > header .pb-presbtn:hover { background: var(--bd-hover); }
+.pb-presbtn > svg.pb-ic:first-child { color: var(--orange); }
+.pb-presmenu { min-width: 210px; display: flex; flex-direction: column; padding: 4px; }
+.pb-presmenu button { display: flex !important; align-items: center; justify-content: flex-start !important; gap: 10px; height: 34px; }
+.pb-presmenu button svg.pb-ic { color: var(--orange); }
+.pb-presmenu [data-cool] svg.pb-ic { color: #42a5f5; }
+.pb-presmenu [data-edit] { color: var(--muted); } .pb-presmenu [data-edit] svg.pb-ic { color: var(--muted); }
+.pb-presmenu small { margin-left: auto; color: var(--muted); font-family: var(--bd-mono, monospace); font-size: 12px; }
+.pb-presmenu hr { border: 0; border-top: 1px solid rgba(255, 255, 255, .08); margin: 4px 0; }
+.pb-pres:empty { display: none; }

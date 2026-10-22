@@ -1,0 +1,1794 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Printer Buddy</title>
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0B0B0D">
+<link rel="icon" href="/static/assets/icon-192.png"><link rel="apple-touch-icon" href="/static/assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B0B0D; --card: #17161B; --card2: #1F1E24; --line: #26242C; --track: #2A2830;
+    --text: #F4F2F8; --muted: #8E8A99; --purple: #7C3AED; --lilac: #C4A7FF;
+    --orange: #FF8A1F; --red: #C9372C; --red-text: #FF6B61;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 Lato, system-ui, -apple-system, Segoe UI, sans-serif; }
+  main { max-width: 1500px; margin: 0 auto; padding: 24px 24px 48px; }
+  .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; margin-bottom: 24px; }
+  h1 { margin: 0; font-size: 24px; font-weight: 900; }
+  h1 span { color: var(--orange); }
+  .brand-sub { color: var(--muted); font-size: 14px; font-weight: 700; margin-top: 2px; }
+  button { font: inherit; font-weight: 700; min-height: 44px; padding: 0 16px; border-radius: 8px; border: 0;
+           background: var(--card2); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--purple); color: #fff; font-weight: 900; }
+  button:disabled { opacity: .55; cursor: default; }
+  input { font: inherit; min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line);
+          background: var(--bg); color: var(--text); min-width: 0; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 20px; }
+  .panel h2 { font-size: 16px; margin: 0 0 12px; }
+  .muted { color: var(--muted); }
+  .found { display: grid; gap: 8px; }
+  .found label { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;
+                 padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+  .found .key { grid-column: 2 / -1; }
+
+  .grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; }
+  .card { flex: 0 1 340px; min-width: 280px; background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .cam { position: relative; aspect-ratio: 4 / 3; background: var(--card2); }
+  .cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .nocam { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+           gap: 10px; color: var(--muted); font-weight: 700; }
+  .tag { position: absolute; left: 10px; top: 10px; padding: 5px 10px; border-radius: 6px; font-size: 13px; font-weight: 900;
+         letter-spacing: .04em; text-transform: uppercase; background: var(--track); color: var(--text); }
+  .tag.orange { background: var(--orange); color: #1A1005; }
+  .tag.purple { background: var(--purple); color: #fff; }
+  .tag.red { background: var(--red); color: #fff; }
+  .tag.grey { color: var(--muted); }
+  .aib { position: absolute; left: 10px; top: 44px; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 900;
+         letter-spacing: .04em; background: rgba(11,11,13,.8); color: var(--muted); }
+  .aib.warn { color: var(--orange); }
+  .aib.hot { background: var(--red); color: #fff; }
+  .grid.list .aib { left: 6px; top: 30px; font-size: 11px; padding: 2px 6px; }
+  body.no-ai .ai { display: none !important; }
+  .pg-ai { padding: 12px 14px; border-radius: 8px; background: var(--card2); display: flex; flex-direction: column; gap: 10px; }
+  .pg-ai .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .pg-ai .head strong { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .pg-ai .head .ctl2 { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .pg-ai .head button { min-height: 36px; padding: 0 12px; background: var(--track); font-weight: 700; }
+  .ai-rows.idle { opacity: .45; }
+  .pg-ai .ask { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 700; color: var(--red-text); }
+  .pg-ai .ask button { min-height: 36px; padding: 0 14px; font-weight: 900; }
+  .pg-ai .ask .yes { background: var(--red); color: #fff; }
+  .sev { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .sev button { min-height: 34px; min-width: 34px; padding: 0 6px; font-weight: 900; background: var(--track); }
+  .sev button:hover { background: var(--orange); color: #1A1005; }
+  .ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .ph { background: var(--card2); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 12px; display: flex; flex-direction: column; }
+  .ph.pending { border-color: var(--orange); }
+  .ph img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; background: var(--card); }
+  .ph .b { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .ph select { font: inherit; min-height: 34px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  .ph .v-right { color: var(--lilac); font-weight: 700; }
+  .ph .v-false_alarm, .ph .v-missed { color: var(--red-text); font-weight: 700; }
+  .ph .del { min-height: 30px; background: transparent; color: var(--red-text); padding: 0; text-align: left; }
+  .pg-ai select { font: inherit; font-weight: 700; min-height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line);
+                  background: var(--card); color: var(--text); }
+  .ai-rows { display: grid; grid-template-columns: auto minmax(0, 1fr) 44px; gap: 6px 10px; align-items: center; font-size: 13px; }
+  .ai-rows .lb { color: var(--muted); text-transform: capitalize; }
+  .ai-rows .lb.alert { color: var(--text); font-weight: 700; }
+  .ai-rows .tr { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+  .ai-rows .tr > div { height: 100%; background: var(--lilac); transition: width .5s; }
+  .ai-rows .tr > div.alert { background: var(--orange); }
+  .ai-rows .tr > div.hot { background: var(--red); }
+  .ai-rows .v { text-align: right; font-weight: 700; }
+  .pg-ai .note { font-size: 13px; color: var(--muted); }
+  .pg-ai .note.hot { color: var(--red-text); font-weight: 700; }
+  .iconbtn { position: absolute; right: 10px; top: 10px; width: 44px; padding: 0; display: flex; align-items: center;
+             justify-content: center; background: rgba(11,11,13,.8); }
+  .caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 28px 14px 12px; display: flex; align-items: flex-end;
+             justify-content: space-between; gap: 12px; background: linear-gradient(to top, rgba(11,11,13,.92), rgba(11,11,13,0)); }
+  .caption .name { font-size: 20px; font-weight: 900; text-shadow: 0 1px 3px rgba(0,0,0,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .caption .pct { font-size: 26px; font-weight: 900; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  .bar { height: 6px; background: var(--track); }
+  .bar > div { height: 100%; width: 0; transition: width .5s; }
+  .status { padding: 12px 14px 0; font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status .file { color: var(--muted); font-weight: 400; }
+  .stats { margin: 0; padding: 10px 14px 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .stats div { display: flex; flex-direction: column; gap: 2px; }
+  .stats dt { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .stats dd { margin: 0; font-weight: 700; }
+  .menu { position: absolute; right: 10px; top: 60px; background: var(--card2); border: 1px solid var(--line); border-radius: 10px;
+          padding: 6px; display: flex; flex-direction: column; min-width: 150px; z-index: 2; }
+  .menu button { background: transparent; text-align: left; }
+  .menu button.danger { color: var(--red-text); }
+  .card.dim .cam img, .card.dim .stats { opacity: .45; }
+  .viewbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .seg { display: flex; padding: 3px; border-radius: 10px; background: var(--card2); }
+  .seg button { min-height: 38px; padding: 0 14px; background: transparent; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--track); color: var(--text); }
+  .viewbar select { font: inherit; font-weight: 700; min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card2); color: var(--text); }
+  .viewbar input[type="search"] { width: 200px; }
+  .lname { display: none; }
+  body.ui-basic .adv { display: none !important; }
+  .setup-line { text-align: center; font-size: 13px; margin-top: 32px; }
+  .nset { display: grid; gap: 14px; max-width: 680px; }
+  .nset label.field { display: grid; gap: 6px; font-weight: 700; }
+  .nset .hint { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .nset .checks { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .nset .checks label { display: flex; align-items: center; gap: 8px; min-height: 40px; font-weight: 400; }
+  .nset .checks input { min-height: 0; width: 18px; height: 18px; accent-color: var(--orange); }
+  body.notify-basic .nadv { display: none !important; }
+  body.no-timelapse .vtl { display: none !important; }
+  body.no-remote .rmt { display: none !important; }
+  dialog#shareDlg { width: min(560px, calc(100% - 32px)); padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--text); }
+  dialog#shareDlg::backdrop { background: rgba(5,5,7,.8); }
+  #shareDlg h2 { margin: 0 0 6px; font-size: 18px; }
+  #shareDlg .sub { margin: 0 0 14px; font-size: 14px; color: var(--muted); }
+  #shareDlg select { font: inherit; min-height: 44px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card2); color: var(--text); }
+  .share-new { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .share-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .share-item { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+  .share-item input { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  .share-item .exp { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+  .share-item .revoke { background: transparent; color: var(--red-text); }
+  .tl { display: flex; flex-direction: column; gap: 14px; }
+  .tl-set { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  .tl-set label { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+  .tl-set select { font: inherit; min-height: 44px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card2); color: var(--text); }
+  .tl-rec { display: inline-flex; align-items: center; gap: 8px; font-weight: 900; color: var(--red-text); }
+  .tl-rec::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #FF4D4D; }
+  .tl video { width: 100%; max-height: 520px; background: #000; border-radius: 10px; }
+  .nset fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; margin: 0; }
+  .nset legend { font-weight: 900; padding: 0 6px; }
+  .nset .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .nset select { font: inherit; min-height: 44px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card2); color: var(--text); }
+  .nset .svc-test { justify-self: start; }
+  .nset .active { font-size: 13px; color: var(--muted); }
+  .setup-line .soon { color: var(--orange); }
+  .fps { position: absolute; top: 10px; right: 62px; padding: 4px 8px; border-radius: 6px; background: rgba(11,11,13,.8);
+         font: 700 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text); pointer-events: none; }
+  .qv-cam .fps, .pg-cam .fps, .ctl-cam .fps { right: auto; left: 12px; top: 12px; }
+  img[hidden] ~ .fps, .grid.list .fps { display: none; }
+  .ctl-camsec { grid-column: 1 / -1; padding: 0 !important; overflow: hidden; }
+  .ctl-cam { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 440px; background: #000; overflow: hidden; }
+  .ctl-cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .cam, .qv-cam, .pg-cam { overflow: hidden; }
+  .camgrid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; background: #000; }
+  .camtile { position: relative; overflow: hidden; background: #000; }
+  .camtile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .camtile .fps { left: 8px; top: 8px; right: auto; }
+  .camname { position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 6px; background: rgba(11,11,13,.8); font-size: 12px; font-weight: 700; }
+  .camsw { position: absolute; left: 12px; bottom: 12px; z-index: 2; display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 10px; background: rgba(11,11,13,.82); }
+  .camsw button { min-height: 36px; padding: 0 12px; background: transparent; font-size: 14px; }
+  .camsw button[aria-pressed="true"] { background: var(--orange); color: #1A1005; }
+  dialog#camDlg { width: min(420px, calc(100% - 32px)); padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--text); }
+  dialog#camDlg::backdrop { background: rgba(5,5,7,.8); }
+  #camDlg h2 { margin: 0 0 14px; font-size: 18px; }
+  #camDlg form { display: flex; flex-direction: column; gap: 12px; }
+  #camDlg .chk { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+  #camDlg .chk input { min-height: 0; width: 18px; height: 18px; accent-color: var(--orange); }
+  #camDlg label.sel { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  #camDlg select { font: inherit; min-height: 44px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card2); color: var(--text); }
+  #camDlg .dlg-btns { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 6px; }
+  .grp-head { flex: 0 0 100%; margin: 10px 0 -6px; font-size: 13px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .grp-head:first-child { margin-top: 0; }
+  .grid.list .grp-head { margin: 10px 0 0; }
+  .card[draggable="true"] { cursor: grab; }
+  .card.dragging { opacity: .4; }
+  .card.drop-before { box-shadow: -4px 0 0 0 var(--orange); }
+  .grid.list .card.drop-before { box-shadow: 0 -3px 0 0 var(--orange); }
+  .grid.list { flex-direction: column; flex-wrap: nowrap; gap: 8px; }
+  .grid.list .card { flex: none; width: 100%; min-width: 0; display: grid; grid-template-columns: 128px minmax(150px, 1.3fr) minmax(220px, 2fr) auto;
+                     grid-template-rows: auto auto; align-items: center; column-gap: 18px; row-gap: 6px; padding: 0 14px 0 0; }
+  .grid.list .cam { grid-column: 1; grid-row: 1 / 3; align-self: stretch; aspect-ratio: auto; min-height: 96px; }
+  .grid.list .caption, .grid.list .nocam span { display: none; }
+  .grid.list .tag { left: 6px; top: 6px; font-size: 11px; padding: 3px 7px; }
+  .grid.list .iconbtn { top: auto; bottom: 6px; right: 6px; width: 36px; min-height: 36px; }
+  .grid.list .menu { top: 8px; left: 140px; right: auto; }
+  .grid.list .lname { display: flex; align-items: baseline; gap: 10px; grid-column: 2; grid-row: 1; padding-top: 12px; min-width: 0; }
+  .grid.list .lname .name { font-size: 17px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .grid.list .lname .pct { font-weight: 900; }
+  .grid.list .status { grid-column: 2; grid-row: 2; padding: 0 0 12px; font-size: 14px; }
+  .grid.list .bar { grid-column: 3; grid-row: 1; align-self: end; border-radius: 3px; }
+  .grid.list .stats { grid-column: 3; grid-row: 2; padding: 0 0 12px; }
+  .grid.list .actions { grid-column: 4; grid-row: 1 / 3; padding: 0; display: flex; }
+  @media (max-width: 760px) {
+    .grid.list .card { grid-template-columns: 96px minmax(0, 1fr); padding: 0; }
+    .grid.list .lname, .grid.list .status { grid-column: 2; padding-right: 12px; }
+    .grid.list .bar, .grid.list .stats, .grid.list .actions { grid-column: 1 / -1; grid-row: auto; }
+    .grid.list .stats, .grid.list .actions { padding: 0 12px 12px; }
+  }
+  .empty { text-align: center; padding: 48px 16px; }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+           padding: 10px 16px; border-radius: 8px; font-weight: 700; display: none; max-width: calc(100% - 32px); }
+  .actions { padding: 0 14px 14px; margin-top: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .actions button { font-weight: 900; }
+  .actions button.outline { background: transparent; border: 1.5px solid var(--orange); color: var(--orange); }
+  #page { max-width: 1500px; margin: 0 auto; padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 18px; }
+  .pg-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+  .pg-back { display: flex; align-items: center; gap: 6px; min-height: 44px; padding-right: 8px; color: var(--muted); font-weight: 700; text-decoration: none; }
+  .pg-head h1 { font-size: 26px; }
+  .pg-head .tag { position: static; }
+  .pg-body { display: flex; flex-wrap: wrap; gap: 18px; align-items: stretch; }
+  .pg-cambox { flex: 999 1 640px; min-width: 0; border-radius: 12px; overflow: hidden; background: var(--card); border: 1px solid var(--line); }
+  .pg-cam { position: relative; aspect-ratio: 16 / 9; background: #000; }
+  .pg-cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .pg-cam .ai-probe { position: absolute; inset: 0; width: 100%; height: 100%; visibility: hidden; pointer-events: none; }
+  .pg-cam .ai-probe i { position: absolute; }
+  .pg-cam .ai-box { position: absolute; border: 3px solid #ff2828; border-radius: 4px; box-shadow: 0 0 0 1px rgba(0,0,0,.5); pointer-events: none; }
+  .pg-cam .ai-box span { position: absolute; left: -3px; bottom: 100%; background: #ff2828; color: #fff; font-size: 12px; font-weight: 700; padding: 2px 6px; border-radius: 4px 4px 0 0; white-space: nowrap; }
+  .pg-cam .ai-box.low span { bottom: auto; top: 100%; border-radius: 0 0 4px 4px; }
+  :is(#pgAiBoxAlways, #pgAiBoxFail)[aria-pressed="true"] { background: rgba(255, 40, 40, .18); border-color: #ff2828; color: #ff6b61; }
+  .pg-full { position: absolute; right: 12px; top: 12px; width: 44px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(11,11,13,.82); }
+  .pg-side { flex: 1 1 340px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); padding: 22px; display: flex; flex-direction: column; gap: 20px; }
+  .pg-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .pg-file { font-weight: 700; overflow-wrap: anywhere; }
+  .pg-big { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .pg-pct { font-size: 64px; font-weight: 900; line-height: .9; }
+  .pg-pct small { font-size: 28px; }
+  .pg-times { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 15px; }
+  .pg-stats { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .pg-stats div { padding: 12px 14px; border-radius: 8px; background: var(--card2); display: flex; flex-direction: column; gap: 2px; }
+  .pg-stats dt { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .pg-stats dd { margin: 0; font-size: 22px; font-weight: 900; }
+  .pg-btns { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+  .pg-btns .row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .pg-btns button { min-height: 48px; font-weight: 900; }
+  .pg-btns .outline { background: transparent; border: 1.5px solid var(--orange); color: var(--orange); }
+  .pg-btns .stop { background: var(--red); color: #fff; }
+  .pg-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+  .pg-tabs button { background: transparent; border-radius: 8px 8px 0 0; color: var(--muted); border-bottom: 3px solid transparent; }
+  .pg-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--orange); }
+  .ctl { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+  .ctl section { border-radius: 12px; background: var(--card); border: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .ctl h2 { margin: 0; font-size: 17px; font-weight: 900; }
+  .ctl .note { font-size: 14px; color: var(--muted); margin: 0; }
+  .heat { display: grid; grid-template-columns: 70px 1fr auto auto auto; gap: 8px; align-items: center; }
+  .heat .now { font-weight: 900; font-size: 18px; }
+  .heat input { width: 100%; }
+  .heat-label { color: var(--muted); font-size: 14px; }
+  .pre { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .steps { display: flex; gap: 6px; flex-wrap: wrap; }
+  .steps button[aria-pressed="true"] { background: var(--orange); color: #1A1005; }
+  .jog { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .jog button, .homes button, .pre button { font-weight: 900; }
+  .homes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .speed { display: flex; align-items: center; gap: 14px; }
+  .speed input { flex-grow: 1; accent-color: var(--orange); min-height: 44px; border: 0; padding: 0; }
+  .speed output { min-width: 56px; text-align: right; font-weight: 900; font-size: 18px; }
+  .con { border-radius: 12px; background: var(--card); border: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .con-log { height: 440px; overflow-y: auto; background: #0E0D11; border: 1px solid var(--line); border-radius: 8px; padding: 12px;
+             font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .con-log .sent { color: var(--orange); }
+  .con-log .err { color: var(--red-text); }
+  .con-log .resp { color: var(--text); }
+  .con-log .empty { color: var(--muted); }
+  .con-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .con-quick button { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; }
+  .con-form { display: flex; gap: 8px; }
+  .con-form input { flex-grow: 1; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .files-msg { font-size: 14px; color: var(--muted); }
+  .files-list { overflow-x: auto; }
+  .files-list table { width: 100%; border-collapse: collapse; min-width: 560px; }
+  .files-list th { text-align: left; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  .files-list td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .files-list td.name { font-weight: 700; overflow-wrap: anywhere; }
+  .files-list td.num { color: var(--muted); white-space: nowrap; }
+  .files-list td.btns { white-space: nowrap; text-align: right; }
+  .files-list td.btns button { margin-left: 6px; font-weight: 900; }
+  .files-list td.btns .del { background: transparent; color: var(--red-text); }
+  .hist-box { border-radius: 12px; background: var(--card); border: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .res { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; background: var(--track); color: var(--muted); }
+  .res.done { background: var(--purple); color: #fff; }
+  .res.failed { background: var(--red); color: #fff; }
+  .res.running { background: var(--orange); color: #1A1005; }
+  dialog#qv { width: min(980px, calc(100% - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 14px;
+              background: var(--card); color: var(--text); }
+  dialog#qv::backdrop { background: rgba(5,5,7,.88); }
+  .qv-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 20px; }
+  .qv-head h2 { margin: 0; font-size: 22px; font-weight: 900; }
+  .qv-head .tag { position: static; }
+  .qv-head .spacer { flex-grow: 1; }
+  .qv-close { width: 44px; padding: 0; display: flex; align-items: center; justify-content: center; }
+  .qv-cam { position: relative; aspect-ratio: 16 / 9; background: #000; }
+  .qv-cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .qv-cam .nocam { color: var(--muted); }
+  .qv-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 18px 20px 20px; }
+  .qv-info { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .qv-info .line { font-weight: 700; }
+  .qv-info .sub { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+  .qv-temps { margin: 0; display: flex; gap: 28px; }
+  .qv-temps div { display: flex; flex-direction: column; gap: 2px; }
+  .qv-temps dt { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .qv-temps dd { margin: 0; font-size: 18px; font-weight: 700; }
+  .qv-btns { display: flex; gap: 8px; }
+  .qv-btns button { min-height: 48px; font-weight: 900; }
+  .qv-btns .outline { background: transparent; border: 1.5px solid var(--orange); color: var(--orange); }
+  .qv-btns .stop { background: var(--red); color: #fff; }
+</style>
+<link rel="stylesheet" href="/static/styles/builder.css">
+<link rel="stylesheet" href="/static/panels/print/status/status.css">
+<link rel="stylesheet" href="/static/panels/print/files/files.css">
+<link rel="stylesheet" href="/static/panels/print/queue/queue.css">
+<link rel="stylesheet" href="/static/panels/print/history/history.css">
+<link rel="stylesheet" href="/static/panels/print/gcodeview/gcodeview.css">
+<link rel="stylesheet" href="/static/panels/print/exclude/exclude.css">
+<link rel="stylesheet" href="/static/panels/print/timelapse/timelapse.css">
+<link rel="stylesheet" href="/static/panels/print/spoolman/spoolman.css">
+<link rel="stylesheet" href="/static/panels/print/ai/ai.css">
+<link rel="stylesheet" href="/static/panels/control/toolhead/toolhead.css">
+<link rel="stylesheet" href="/static/panels/control/zoffset/zoffset.css">
+<link rel="stylesheet" href="/static/panels/control/extruder/extruder.css">
+<link rel="stylesheet" href="/static/panels/control/thermals/thermals.css">
+<link rel="stylesheet" href="/static/panels/control/fans/fans.css">
+<link rel="stylesheet" href="/static/panels/control/macros/macros.css">
+<link rel="stylesheet" href="/static/panels/control/limits/limits.css">
+<link rel="stylesheet" href="/static/panels/control/actions/actions.css">
+<link rel="stylesheet" href="/static/panels/control/endstops/endstops.css">
+<link rel="stylesheet" href="/static/panels/control/bedmesh/bedmesh.css">
+<link rel="stylesheet" href="/static/panels/control/fsensors/fsensors.css">
+<link rel="stylesheet" href="/static/panels/camera/camera/camera.css">
+<link rel="stylesheet" href="/static/panels/machine/machine/machine.css">
+<link rel="stylesheet" href="/static/panels/machine/system/system.css">
+<link rel="stylesheet" href="/static/panels/machine/config/config.css">
+<link rel="stylesheet" href="/static/panels/machine/updates/updates.css">
+<link rel="stylesheet" href="/static/panels/machine/devices/devices.css">
+<link rel="stylesheet" href="/static/panels/machine/sensors/sensors.css">
+<link rel="stylesheet" href="/static/panels/machine/explorer/explorer.css">
+<link rel="stylesheet" href="/static/panels/machine/console/console.css">
+<link rel="stylesheet" href="/static/panels/machine/ksensors/ksensors.css">
+<link rel="stylesheet" href="/static/core/extras/extras.css">
+</head>
+<body>
+<main>
+  <div class="top">
+    <div class="brand"><h1>Printer <span>Buddy</span></h1><div class="brand-sub">Printer Selection</div></div>
+    <div class="row">
+      <div class="viewbar">
+        <div class="seg adv" role="group" aria-label="View">
+          <button id="viewCards" aria-pressed="true">Cards</button><button id="viewList" aria-pressed="false">List</button>
+        </div>
+        <label><span class="muted" style="font-weight:700">Sort </span><select id="sortBy">
+          <option value="status">Status</option><option value="name">Name</option><option value="progress">Progress</option><option value="custom" class="adv">Custom (drag)</option>
+        </select></label>
+        <input type="search" id="search" placeholder="Search printers" aria-label="Search printers">
+      </div>
+      <button id="aiBtn" class="ai">AI</button>
+      <button id="notifyBtn">Notifications</button>
+      <button id="manualBtn">Add by IP</button>
+      <button id="scanBtn" class="primary">Scan network</button>
+    </div>
+  </div>
+
+  <section id="notifyPanel" class="panel" hidden>
+    <h2>Notifications</h2>
+    <form id="notifyForm" class="nset">
+      <label class="field">ntfy topic URL
+        <input name="ntfy_url" placeholder="https://ntfy.sh/my-printers" autocomplete="off">
+        <span class="hint">Install the ntfy app on your phone and subscribe to the same topic. Use a topic name only you know.</span></label>
+      <label class="field">ntfy access token <span class="hint">only for protected topics or your own ntfy server</span>
+        <input name="ntfy_token" type="password" autocomplete="off"></label>
+      <label class="field">Discord webhook URL
+        <input name="discord_webhook" placeholder="https://discord.com/api/webhooks/..." autocomplete="off"></label>
+      <div class="field"><strong>Notify me when…</strong><div class="checks" id="eventChecks"></div></div>
+      <div class="checks"><label><input type="checkbox" name="attach_snapshot"> Attach a webcam snapshot</label></div>
+
+      <fieldset class="nadv"><legend>Progress updates</legend>
+        <label class="field">Send an update every <select name="progress_step" id="progressStep"></select></label>
+      </fieldset>
+      <fieldset class="nadv"><legend>Telegram</legend>
+        <div class="two">
+          <label class="field">Bot token <input name="telegram_token" type="password" autocomplete="off"></label>
+          <label class="field">Chat ID <input name="telegram_chat" autocomplete="off"></label>
+        </div>
+        <span class="hint">Make a bot with @BotFather, send it a message, then use your chat ID (for example from @userinfobot).</span>
+        <button type="button" class="svc-test" data-test="telegram">Send test to Telegram</button>
+      </fieldset>
+      <fieldset class="nadv"><legend>Pushover</legend>
+        <div class="two">
+          <label class="field">User key <input name="pushover_user" autocomplete="off"></label>
+          <label class="field">App token <input name="pushover_token" type="password" autocomplete="off"></label>
+        </div>
+        <button type="button" class="svc-test" data-test="pushover">Send test to Pushover</button>
+      </fieldset>
+      <fieldset class="nadv"><legend>Email</legend>
+        <div class="two">
+          <label class="field">SMTP server <input name="smtp_host" placeholder="smtp.gmail.com" autocomplete="off"></label>
+          <label class="field">Port <input name="smtp_port" inputmode="numeric" placeholder="587"></label>
+          <label class="field">Security <select name="smtp_tls"><option value="starttls">STARTTLS</option><option value="ssl">SSL/TLS</option><option value="none">None</option></select></label>
+          <label class="field">Login <input name="smtp_user" autocomplete="off"></label>
+          <label class="field">Password <input name="smtp_pass" type="password" autocomplete="off"></label>
+          <label class="field">From <input name="smtp_from" placeholder="same as login" autocomplete="off"></label>
+          <label class="field">Send to <input name="smtp_to" placeholder="you@example.com" autocomplete="off"></label>
+        </div>
+        <button type="button" class="svc-test" data-test="email">Send test email</button>
+      </fieldset>
+      <p class="active" id="notifyActive"></p>
+      <div class="row" style="justify-content:flex-end">
+        <button type="button" id="notifyClose">Close</button>
+        <button type="button" id="notifyTest">Send test</button>
+        <button class="primary">Save</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="aiPanel" class="panel ai" hidden>
+    <h2>AI failure detection</h2>
+    <form id="aiForm" class="nset">
+      <p class="muted" id="aiModel" style="margin:0"></p>
+      <div class="two">
+        <label class="field">Alert when a problem scores at least <select name="ai_threshold"></select></label>
+        <label class="field">Check the camera every <select name="ai_interval"></select></label>
+        <label class="field">…for this many checks in a row <select name="ai_hold"></select></label>
+        <label class="field">Then wait before alerting again <select name="ai_cooldown"></select></label>
+      </div>
+      <span class="hint">Higher score or more checks in a row = fewer false alarms, but a failure is caught a little later.
+        Each printer's mode (off, alert, auto-pause) is in its menu and on its page.</span>
+      <fieldset><legend>Help improve the AI</legend>
+        <div class="checks"><label><input type="checkbox" name="ai_contribute"> Send my labelled photos to the Printer Buddy project</label></div>
+        <span class="hint">Off unless you tick it. When on, only labelled photos are sent (labelled by you, or OK because a print finished):
+          your printer's camera view, shrunk to 640px, with no location or camera details, and your box number but not your name or address.
+          They go to a private dataset used to train the next AI model. Delete any photo below before it's sent, or untick this any time.</span>
+      </fieldset>
+      <fieldset><legend>Photos for AI</legend>
+        <p id="aiStats" style="margin:0 0 6px;font-weight:700"></p>
+        <p class="muted" id="aiPhotoCounts" style="margin:0 0 10px"></p>
+        <div class="ph-grid" id="aiPhotos"></div>
+      </fieldset>
+      <div class="row" style="justify-content:flex-end">
+        <button type="button" id="aiClose">Close</button>
+        <button class="primary">Save</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="manual" class="panel" hidden>
+    <h2>Add a printer by address</h2>
+    <form id="manualForm" class="row">
+      <input name="host" placeholder="192.168.1.50" required aria-label="IP address" style="flex:2 1 160px">
+      <input name="port" placeholder="7125" inputmode="numeric" aria-label="Port" style="flex:1 1 80px">
+      <input name="api_key" placeholder="API key (if needed)" aria-label="API key" style="flex:2 1 160px">
+      <button class="primary">Add</button>
+    </form>
+  </section>
+
+  <section id="results" class="panel" hidden>
+    <h2 id="resultsTitle">Printers found</h2>
+    <div id="found" class="found"></div>
+    <div class="row" style="margin-top:12px; justify-content:flex-end">
+      <button id="closeResults">Close</button>
+      <button id="addSelected" class="primary">Add selected</button>
+    </div>
+  </section>
+
+  <div id="grid" class="grid"></div>
+  <p class="muted" id="noMatch" hidden style="text-align:center">No printers match your search.</p>
+  <p class="muted setup-line" id="setupLine"></p>
+  <div id="empty" class="panel empty" hidden>
+    <p><strong>No printers yet.</strong></p>
+    <p class="muted">Scan your network to find printers running Moonraker, then pick the ones to monitor.</p>
+  </div>
+</main>
+
+<section id="page" hidden>
+  <div class="pg-head">
+    <a href="#" class="pg-back"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Your Printers</a>
+    <h1 id="pgName"></h1><span class="tag" id="pgTag"></span>
+  </div>
+  <div class="pg-tabs" role="tablist">
+    <button role="tab" id="tabStatus" aria-selected="true" aria-controls="pgStatus">Status</button>
+    <button role="tab" class="adv" id="tabControl" aria-selected="false" aria-controls="pgControl">Control</button>
+    <button role="tab" class="adv" id="tabConsole" aria-selected="false" aria-controls="pgConsole">Console</button>
+    <button role="tab" class="vtl" id="tabTimelapse" aria-selected="false" aria-controls="pgTimelapse">Timelapses</button>
+  </div>
+  <div class="pg-body" id="pgStatus" role="tabpanel" aria-labelledby="tabStatus">
+    <div class="pg-cambox">
+      <div class="pg-cam" id="pgCam">
+        <img id="pgImg" alt="Webcam" hidden><div class="nocam" id="pgNoCam">No camera</div><span class="fps" aria-hidden="true"></span>
+        <button class="pg-full" id="pgFull" aria-label="Full screen"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      </div>
+      <div class="bar"><div id="pgBar"></div></div>
+    </div>
+    <aside class="pg-side" aria-label="Print status">
+      <div><div class="pg-label" id="pgState"></div><div class="pg-file" id="pgFile"></div></div>
+      <div class="pg-big"><span class="pg-pct" id="pgPct"></span><span class="pg-times"><strong id="pgLeft"></strong><span class="muted" id="pgDone"></span></span></div>
+      <dl class="pg-stats">
+        <div><dt>Nozzle</dt><dd id="pgNozzle"></dd></div><div><dt>Bed</dt><dd id="pgBed"></dd></div>
+        <div><dt>Elapsed</dt><dd id="pgElapsed"></dd></div><div><dt>Started</dt><dd id="pgStarted"></dd></div>
+      </dl>
+      <div class="pg-ai ai" id="pgAi" hidden>
+        <div class="head"><strong>AI watch</strong>
+          <div class="ctl2">
+            <button type="button" id="pgAiCheck" title="Score the camera once right now. Never alerts or pauses.">Check now</button>
+            <button type="button" id="pgAiBoxAlways" aria-pressed="false" title="Draw the failure box on every check, even when the AI sees no failure (26 extra model runs each check)">Box: always</button>
+            <button type="button" id="pgAiBoxFail" aria-pressed="true" title="Draw the failure box only at or above the alert threshold, so the extra model runs only happen when a failure is likely. With both box options off, the box is skipped completely, saving CPU on older Pis.">Box: on failure</button>
+            <select id="pgAiSave" aria-label="Save this camera view for the AI" title="Save the camera view right now as a training photo">
+              <option value="">Save for AI…</option><option value="ok">as OK (no problem)</option><option value="spaghetti">as spaghetti</option>
+              <option value="warping">as warping</option><option value="first_layer">as first layer</option><option value="failure">as other failure</option>
+              <option value="stringing">as stringing</option><option value="blob">as blob</option><option value="crack">as crack</option>
+            </select>
+            <select id="pgAiMode" aria-label="AI mode for this printer">
+              <option value="alert">Alert only</option><option value="pause">Alert + auto-pause</option><option value="off">Off</option>
+            </select></div></div>
+        <div class="ask" id="pgAiAsk" hidden><span id="pgAiAskText">Was it really a failure?</span>
+          <button type="button" class="yes" id="pgAiYes">Yes</button><button type="button" id="pgAiNo">No, it's fine</button></div>
+        <div class="ai-rows" id="pgAiRows"></div>
+        <div class="note" id="pgAiNote"></div>
+      </div>
+      <div class="pg-btns">
+        <button class="primary" id="pgPause">Pause</button>
+        <div class="row2"><button class="outline" id="pgCancel">Cancel</button><button class="stop" id="pgStop">E-Stop</button></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="ctl" id="pgControl" role="tabpanel" aria-labelledby="tabControl" hidden>
+    <section class="ctl-camsec" aria-label="Camera">
+      <div class="ctl-cam"><img id="ctlImg" alt="Webcam" hidden><div class="nocam" id="ctlNoCam">No camera</div><span class="fps" aria-hidden="true"></span></div>
+    </section>
+    <section aria-labelledby="ctlTempH">
+      <h2 id="ctlTempH">Temperatures</h2>
+      <div class="heat">
+        <span class="heat-label">Nozzle</span><span class="now" id="ctlNozzleNow">—</span>
+        <input type="number" id="ctlNozzle" min="0" max="350" inputmode="numeric" aria-label="Nozzle target °C" placeholder="°C">
+        <button id="ctlNozzleSet">Set</button><button id="ctlNozzleOff">Off</button>
+      </div>
+      <div class="heat">
+        <span class="heat-label">Bed</span><span class="now" id="ctlBedNow">—</span>
+        <input type="number" id="ctlBed" min="0" max="150" inputmode="numeric" aria-label="Bed target °C" placeholder="°C">
+        <button id="ctlBedSet">Set</button><button id="ctlBedOff">Off</button>
+      </div>
+      <div class="pre">
+        <button data-pre="210,60">PLA</button><button data-pre="240,80">PETG</button><button data-pre="250,100">ABS</button><button data-pre="0,0">Cool down</button>
+      </div>
+      <p class="note">Preheat: PLA 210°/60°, PETG 240°/80°, ABS 250°/100°.</p>
+    </section>
+
+    <section aria-labelledby="ctlMoveH">
+      <h2 id="ctlMoveH">Move</h2>
+      <div class="homes"><button data-home="">Home all</button><button data-home="X">Home X</button><button data-home="Y">Home Y</button><button data-home="Z">Home Z</button></div>
+      <div class="steps" role="group" aria-label="Step size">
+        <button data-step="0.1" aria-pressed="false">0.1 mm</button><button data-step="1" aria-pressed="false">1 mm</button>
+        <button data-step="10" aria-pressed="true">10 mm</button><button data-step="50" aria-pressed="false">50 mm</button>
+      </div>
+      <div class="jog">
+        <button data-jog="X-">X −</button><button data-jog="X+">X +</button><button data-jog="Y-">Y −</button><button data-jog="Y+">Y +</button>
+        <button data-jog="Z-">Z −</button><button data-jog="Z+">Z +</button>
+      </div>
+      <p class="note" id="ctlMoveNote">Homed: —</p>
+    </section>
+
+    <section aria-labelledby="ctlSpeedH">
+      <h2 id="ctlSpeedH">Speed</h2>
+      <div class="speed"><input type="range" id="ctlSpeed" min="50" max="200" step="5" value="100" aria-label="Print speed percent"><output id="ctlSpeedOut">100%</output></div>
+      <p class="note">Changes the print speed live (M220).</p>
+    </section>
+  </div>
+
+  <div class="con" id="pgConsole" role="tabpanel" aria-labelledby="tabConsole" hidden>
+    <div class="con-log" id="conLog" role="log" aria-live="polite" aria-label="Klipper console"></div>
+    <div class="con-quick">
+      <button data-cmd="M115">M115</button><button data-cmd="QUERY_ENDSTOPS">QUERY_ENDSTOPS</button>
+      <button data-cmd="GET_POSITION">GET_POSITION</button><button data-cmd="HELP">HELP</button>
+      <button data-cmd="FIRMWARE_RESTART">FIRMWARE_RESTART</button>
+    </div>
+    <form class="con-form" id="conForm">
+      <input id="conInput" autocomplete="off" spellcheck="false" aria-label="G-code command" placeholder="Type G-code, e.g. G28 — Enter to send, ↑ for history">
+      <button class="primary">Send</button>
+    </form>
+  </div>
+
+  <div class="tl" id="pgTimelapse" role="tabpanel" aria-labelledby="tabTimelapse" hidden>
+    <div class="hist-box">
+      <form class="tl-set" id="tlForm">
+        <label>Take a picture <select name="tl_mode" id="tlMode"><option value="layer">every layer</option><option value="interval">every few seconds</option></select></label>
+        <label id="tlEveryRow">every <select name="tl_interval"><option value="5">5 s</option><option value="10">10 s</option><option value="30">30 s</option></select></label>
+        <label>Video speed <select name="tl_fps"><option value="15">15 fps</option><option value="25">25 fps</option><option value="30">30 fps</option></select></label>
+        <label>Keep the last <select name="tl_keep"><option>5</option><option>10</option><option>20</option><option>50</option><option>100</option></select></label>
+      </form>
+      <div class="files-msg">Settings apply to all printers and take effect on the next print. "Every layer" needs a slicer that reports layers; otherwise use "every few seconds".</div>
+    </div>
+    <div class="hist-box">
+      <div id="tlStatus" class="files-msg" aria-live="polite"></div>
+      <video id="tlPlayer" controls hidden></video>
+      <div class="files-list" id="tlList"></div>
+    </div>
+  </div>
+</section>
+
+<dialog id="shareDlg" aria-labelledby="shareTitle">
+  <h2 id="shareTitle">Share</h2>
+  <p class="sub">Anyone with the link can watch this printer's camera and progress. They can't control it.</p>
+  <div class="share-new">
+    <label>Link works for <select id="shareExp"><option value="1h">1 hour</option><option value="1d" selected>1 day</option><option value="7d">7 days</option><option value="never">until I turn it off</option></select></label>
+    <button class="primary" id="shareCreate">Create link</button>
+  </div>
+  <div class="share-list" id="shareList"></div>
+  <div class="row" style="justify-content:flex-end; margin-top:14px"><button id="shareClose">Close</button></div>
+</dialog>
+
+<dialog id="camDlg" aria-labelledby="camDlgTitle">
+  <h2 id="camDlgTitle">Camera settings</h2>
+  <form id="camForm">
+    <label class="sel" id="camPickRow">Camera <select name="cam" id="camPick"></select></label>
+    <label class="chk" id="camMainRow"><input type="checkbox" name="main"> Show this camera on the dashboard card</label>
+    <label class="chk"><input type="checkbox" name="flip_h"> Flip horizontally</label>
+    <label class="chk"><input type="checkbox" name="flip_v"> Flip vertically</label>
+    <label class="sel">Rotate <select name="rotation"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
+    <label class="sel">Refresh every <select name="refresh"><option value="">Default (5 s cards, 2 s large)</option><option value="1">1 second</option><option value="2">2 seconds</option><option value="5">5 seconds</option><option value="10">10 seconds</option></select></label>
+    <div class="dlg-btns">
+      <button type="button" id="camReset">Use Moonraker's settings</button>
+      <button type="button" id="camCancel">Cancel</button>
+      <button class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="qv" aria-labelledby="qvName">
+  <div class="qv-head">
+    <h2 id="qvName"></h2><span class="tag" id="qvTag"></span>
+    <span class="spacer"></span>
+    <button class="qv-close" id="qvClose" aria-label="Close Quick View"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="qv-cam"><img id="qvImg" alt="Webcam" hidden><div class="nocam" id="qvNoCam">No camera</div><span class="fps" aria-hidden="true"></span></div>
+  <div class="bar"><div id="qvBar"></div></div>
+  <div class="qv-foot">
+    <div class="qv-info"><span class="line" id="qvLine"></span><span class="sub" id="qvSub"></span></div>
+    <dl class="qv-temps"><div><dt>Nozzle</dt><dd id="qvNozzle"></dd></div><div><dt>Bed</dt><dd id="qvBed"></dd></div></dl>
+    <div class="qv-btns">
+      <button class="primary" id="qvPause">Pause</button>
+      <button class="outline" id="qvCancel">Cancel</button>
+      <button class="stop" id="qvStop">E-Stop</button>
+    </div>
+  </div>
+</dialog>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const printers = new Map();
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = "none", 4000);
+}
+function confetti() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const c = document.createElement("canvas"), g = c.getContext("2d"), dpr = devicePixelRatio || 1;
+  const w = innerWidth, h = innerHeight;
+  Object.assign(c.style, { position: "fixed", inset: "0", width: "100%", height: "100%", pointerEvents: "none", zIndex: 1000 });
+  c.width = w * dpr; c.height = h * dpr; g.scale(dpr, dpr); document.body.append(c);
+  const colors = ["#FF8A1F", "#C4A7FF", "#7C3AED", "#F4F2F8", "#FFC266"];
+  const bits = Array.from({ length: 160 }, (_, i) => {
+    const left = i % 2 === 0, a = (left ? -1 : 1) * (Math.PI / 4 + Math.random() * Math.PI / 6);
+    const v = 9 + Math.random() * 9;
+    return { x: left ? 0 : w, y: h * 0.75, vx: -Math.sin(a) * v, vy: -Math.cos(a) * v, r: Math.random() * Math.PI,
+             vr: (Math.random() - .5) * .3, s: 6 + Math.random() * 6, c: colors[i % colors.length] };
+  });
+  const start = performance.now();
+  let last = start;
+  (function frame(now) {
+    const t = now - start, k = Math.min(4, (now - last) / 16.7);
+    last = now;
+    g.clearRect(0, 0, w, h);
+    g.globalAlpha = Math.max(0, Math.min(1, (3200 - t) / 800));
+    for (const b of bits) {
+      const drag = Math.pow(.99, k);
+      b.vy += .25 * k; b.vx *= drag; b.vy *= drag; b.x += b.vx * k; b.y += b.vy * k; b.r += b.vr * k;
+      g.save(); g.translate(b.x, b.y); g.rotate(b.r); g.fillStyle = b.c;
+      g.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2); g.restore();
+    }
+    if (t < 3200) requestAnimationFrame(frame); else c.remove();
+  })(start);
+}
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const data = r.status === 204 ? null : await r.json().catch(() => null);
+  if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+  return data;
+}
+const fmtTemp = t => t == null ? "—" : `${t.toFixed(0)}°`;
+// current / target, target only while heating (numbers only, safe as HTML)
+const fmtTT = (t, tg) => t == null ? "—" : tg > 0 ? `${t.toFixed(0)}°<span class="muted" style="font-weight:400"> / ${tg.toFixed(0)}°</span>` : `${t.toFixed(0)}°`;
+function fmtDur(s) {
+  if (s == null) return "—";
+  s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+function statusOf(p) {
+  if (p.connection !== "online") return p.connection === "connecting" ? "connecting" : p.connection;
+  if (p.klippy_state !== "ready") return p.klippy_state || "starting";
+  return p.state || "standby";
+}
+// state -> [tag text, tag colour, bar/percent colour, status line, status colour]
+const LOOK = {
+  printing:   ["Printing",  "orange", "var(--orange)", "Printing",               "var(--orange)"],
+  paused:     ["Paused",    "",       "var(--orange)", "Paused",                 "var(--orange)"],
+  complete:   ["Done",      "purple", "var(--purple)", "Print complete",         "var(--lilac)"],
+  cancelled:  ["Cancelled", "grey",   "var(--muted)",  "Print cancelled",        "var(--muted)"],
+  error:      ["Error",     "red",    "var(--red)",    "Print failed",           "var(--red-text)"],
+  standby:    ["Idle",      "",       "var(--orange)", "Online, ready to print", "var(--text)"],
+  shutdown:   ["Error",     "red",    "var(--red)",    "Klipper shut down",      "var(--red-text)"],
+  offline:    ["Offline",   "grey",   "var(--muted)",  "Can't reach printer",    "var(--muted)"],
+  connecting: ["Connecting","grey",   "var(--muted)",  "Connecting…",            "var(--muted)"],
+  auth_error: ["Offline",   "grey",   "var(--muted)",  "Needs a valid API key",  "var(--red-text)"],
+};
+const look = st => LOOK[st] || [st, "grey", "var(--muted)", `Klipper ${st}`, "var(--muted)"];
+const NOCAM_SVG = `<svg width="44" height="44" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.8a15 15 0 0 1 4.2-2.6M10.7 5.1A15 15 0 0 1 22 8.8M5 12.5a10 10 0 0 1 3.3-2M15.5 10.7A10 10 0 0 1 19 12.5M8.5 16a5 5 0 0 1 7 0M12 20h.01M3 3l18 18"/></svg>`;
+const MENU_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>`;
+
+function render() {
+  const grid = $("#grid");
+  $("#empty").hidden = printers.size > 0;
+  for (const el of [...grid.querySelectorAll(".card")]) if (!printers.has(+el.dataset.id)) el.remove();
+  for (const p of printers.values()) {
+    let el = grid.querySelector(`[data-id="${p.id}"]`);
+    if (!el) {
+      el = document.createElement("article");
+      el.className = "card"; el.dataset.id = p.id;
+      el.innerHTML = `<div class="cam"><img alt="" hidden><div class="nocam">${NOCAM_SVG}<span></span></div>
+          <span class="tag"></span>
+          <span class="aib ai" hidden></span>
+          <button class="iconbtn" aria-label="Printer settings" aria-expanded="false">${MENU_SVG}</button>
+          <span class="fps" aria-hidden="true"></span>
+          <div class="caption"><span class="name"></span><span class="pct"></span></div></div>
+        <div class="lname"><span class="name"></span><span class="pct"></span></div>
+        <div class="bar"><div></div></div>
+        <div class="status"></div>
+        <dl class="stats"><div><dt>Time left</dt><dd data-f="left"></dd></div>
+          <div><dt>Nozzle</dt><dd data-f="nozzle"></dd></div><div><dt>Bed</dt><dd data-f="bed"></dd></div></dl>
+        <div class="actions"><button class="primary" data-act="open">Open</button><button class="outline" data-act="qv">Quick View</button></div>
+        <div class="menu" hidden><button data-act="rename">Rename</button><button data-act="group" class="adv">Set group</button><button data-act="camera">Camera settings</button><button data-act="notify" class="nadv">Notifications: on</button><button data-act="ai" class="ai">AI: Alert only</button><button data-act="share" class="rmt">Share</button><button data-act="remove" class="danger">Remove</button></div>`;
+      const menu = el.querySelector(".menu"), mbtn = el.querySelector(".iconbtn");
+      mbtn.onclick = () => { menu.hidden = !menu.hidden; mbtn.setAttribute("aria-expanded", String(!menu.hidden)); };
+      el.querySelector("[data-act=rename]").onclick = () => { menu.hidden = true; rename(p.id); };
+      el.querySelector("[data-act=remove]").onclick = () => { menu.hidden = true; removePrinter(p.id); };
+      el.querySelector("[data-act=group]").onclick = () => { menu.hidden = true; setGroup(p.id); };
+      el.querySelector("[data-act=camera]").onclick = () => { menu.hidden = true; openCamDlg(p.id); };
+      el.querySelector("[data-act=notify]").onclick = () => { menu.hidden = true; toggleNotify(p.id); };
+      el.querySelector("[data-act=ai]").onclick = () => { menu.hidden = true; cycleAI(p.id); };
+      el.querySelector("[data-act=share]").onclick = () => { menu.hidden = true; openShare(p.id); };
+      el.addEventListener("dragstart", e => { dragId = p.id; el.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(p.id)); });
+      el.addEventListener("dragend", () => { dragId = null; el.classList.remove("dragging"); clearDrop(); });
+      el.addEventListener("dragover", e => { if (dragId === null || dragId === p.id) return; e.preventDefault(); clearDrop(); el.classList.add("drop-before"); });
+      el.addEventListener("dragleave", () => el.classList.remove("drop-before"));
+      el.addEventListener("drop", e => { e.preventDefault(); clearDrop(); dropBefore(p.id); });
+      el.querySelector("[data-act=qv]").onclick = () => openQV(p.id);
+      el.querySelector("[data-act=open]").onclick = () => { location.hash = `printer-${p.id}`; };
+      grid.append(el);
+    }
+    const st = statusOf(p);
+    const [tagText, tagColor, barColor, statusText, statusColor] = look(st);
+    const active = p.state === "printing" || p.state === "paused";
+    const showPct = active || p.state === "complete";
+    const pct = showPct ? p.progress : 0;
+    el.classList.toggle("dim", p.connection !== "online" || p.klippy_state !== "ready");
+    el.querySelector("[data-act=notify]").textContent = `Notifications: ${p.notify === false ? "off" : "on"}`;
+    el.querySelector("[data-act=ai]").textContent = `AI: ${AI_MODE_TEXT[p.ai?.mode || "alert"]}`;
+    aiBadge(el, p);
+
+    const tag = el.querySelector(".tag");
+    tag.textContent = tagText; tag.className = `tag ${tagColor}`; tag.title = p.error || "";
+    for (const n of el.querySelectorAll(".name")) n.textContent = p.name;
+    for (const pctEl of el.querySelectorAll(".pct")) {
+      pctEl.textContent = showPct ? `${Math.floor(pct * 100)}%` : "";
+      pctEl.style.color = p.state === "complete" ? "var(--lilac)" : "#fff";
+    }
+    const bar = el.querySelector(".bar > div");
+    bar.style.width = `${pct * 100}%`; bar.style.background = barColor;
+
+    const status = el.querySelector(".status");
+    const detail = p.klippy_message || (p.state === "error" && p.message) || null;
+    status.innerHTML = `<span style="color:${statusColor}">${esc(detail || statusText)}</span>` +
+      (p.filename && (active || p.state === "complete") ? ` <span class="file">· ${esc(p.filename)}</span>` : "");
+    status.title = [detail || statusText, p.filename].filter(Boolean).join(" · ");
+
+    const live = p.connection === "online";
+    el.querySelector('[data-f="left"]').textContent = active ? fmtDur(p.eta) : "—";
+    el.querySelector('[data-f="nozzle"]').innerHTML = live ? fmtTT(p.nozzle, p.nozzle_target) : "—";
+    el.querySelector('[data-f="bed"]').innerHTML = live ? fmtTT(p.bed, p.bed_target) : "—";
+
+    const img = el.querySelector(".cam img"), nocam = el.querySelector(".nocam");
+    const camOk = p.has_webcam && live;
+    img.hidden = !camOk;
+    nocam.hidden = camOk;
+    nocam.querySelector("span").textContent = !live ? "Can't reach printer" : "No camera";
+    img.dataset.camPid = p.id; img.dataset.camKind = "card"; img.dataset.camIdx = mainCam(p);
+  }
+  arrange();
+  renderQV();
+  renderPage();
+}
+
+const prefs = (() => { try { return JSON.parse(localStorage.getItem("pb-view") || "{}"); } catch { return {}; } })();
+function savePrefs() { try { localStorage.setItem("pb-view", JSON.stringify(prefs)); } catch {} }
+const RANK = { error: 0, shutdown: 0, auth_error: 0, paused: 1, printing: 2, complete: 3, cancelled: 4, standby: 5, connecting: 6, offline: 7 };
+function arrange() {
+  const grid = $("#grid"), q = ($("#search").value || "").trim().toLowerCase(), by = $("#sortBy").value;
+  const list = [...printers.values()].sort((a, b) => {
+    if (by === "status") { const d = (RANK[statusOf(a)] ?? 6) - (RANK[statusOf(b)] ?? 6); if (d) return d; }
+    if (by === "progress") { const pa = ["printing", "paused"].includes(a.state) ? a.progress : -1, pb = ["printing", "paused"].includes(b.state) ? b.progress : -1; if (pa !== pb) return pb - pa; }
+    if (by === "custom") { const d = (a.position ?? 1e9) - (b.position ?? 1e9); if (d) return d; }
+    return a.name.localeCompare(b.name);
+  });
+  const grouped = list.some(p => p.group);
+  const groups = grouped ? [...new Set(list.map(p => p.group || ""))].sort((a, b) => !a ? 1 : !b ? -1 : a.localeCompare(b)) : [""];
+  const want = [];
+  for (const g of groups) {
+    if (grouped) want.push(`g:${g}`);
+    for (const p of list) if (!grouped || (p.group || "") === g) want.push(String(p.id));
+  }
+  const have = [...grid.children].map(el => el.dataset.id ?? `g:${el.dataset.group}`);
+  if (want.join("|") !== have.join("|")) {
+    for (const h of grid.querySelectorAll(".grp-head")) h.remove();
+    for (const key of want) {
+      if (key.startsWith("g:")) {
+        const h = document.createElement("h2"); h.className = "grp-head"; h.dataset.group = key.slice(2);
+        h.textContent = key.slice(2) || "Ungrouped"; grid.append(h);
+      } else grid.append(grid.querySelector(`[data-id="${key}"]`));
+    }
+  }
+  for (const el of grid.querySelectorAll(".card")) el.draggable = by === "custom";
+  let shown = 0;
+  for (const p of list) {
+    const hit = !q || p.name.toLowerCase().includes(q);
+    grid.querySelector(`[data-id="${p.id}"]`).hidden = !hit; if (hit) shown++;
+  }
+  $("#noMatch").hidden = !(printers.size && !shown);
+  for (const h of grid.querySelectorAll(".grp-head")) {
+    let n = h.nextElementSibling, any = false;
+    while (n && !n.classList.contains("grp-head")) { if (!n.hidden) any = true; n = n.nextElementSibling; }
+    h.hidden = !any;
+  }
+}
+let dragId = null;
+const clearDrop = () => { for (const c of document.querySelectorAll(".drop-before")) c.classList.remove("drop-before"); };
+async function dropBefore(targetId) {
+  if (dragId === null || dragId === targetId) return;
+  const grid = $("#grid"), dragged = grid.querySelector(`[data-id="${dragId}"]`), target = grid.querySelector(`[data-id="${targetId}"]`);
+  grid.insertBefore(dragged, target);
+  const ids = [...grid.querySelectorAll(".card")].map(el => +el.dataset.id);
+  ids.forEach((id, i) => { const p = printers.get(id); if (p) p.position = i; });
+  try { await api("/api/printers/order", { method: "POST", body: JSON.stringify({ ids }) }); }
+  catch (e) { toast(e.message); }
+}
+async function setGroup(id) {
+  const p = printers.get(id);
+  const g = prompt(`Group for ${p.name} (leave empty for none)`, p.group || "");
+  if (g === null) return;
+  try { printers.set(id, await api(`/api/printers/${id}`, { method: "PATCH", body: JSON.stringify({ group: g.trim() }) })); render(); }
+  catch (e) { toast(e.message); }
+}
+function setView(v) {
+  prefs.view = v; savePrefs();
+  $("#grid").classList.toggle("list", v === "list");
+  $("#viewCards").setAttribute("aria-pressed", String(v !== "list"));
+  $("#viewList").setAttribute("aria-pressed", String(v === "list"));
+}
+$("#viewCards").onclick = () => setView("cards");
+$("#viewList").onclick = () => setView("list");
+$("#sortBy").onchange = () => { prefs.sort = $("#sortBy").value; savePrefs(); arrange(); };
+$("#search").oninput = arrange;
+if (prefs.sort) $("#sortBy").value = prefs.sort;
+setView(prefs.view === "list" ? "list" : "cards");
+const camState = new WeakMap();
+const mainCam = p => Math.min(p?.cam_settings?.main ?? 0, Math.max(0, (p?.cams?.length || 1) - 1));
+function camCfg(p, idx = 0) {
+  const c = p.cam_settings?.cams?.[idx] || {}, m = p.cams?.[idx] || {};
+  return { flipH: c.flip_h ?? m.flip_h ?? false, flipV: c.flip_v ?? m.flip_v ?? false,
+           rotation: c.rotation ?? m.rotation ?? 0, refresh: c.refresh ?? null, target: m.target_fps ?? null };
+}
+function applyCamTransform(img, cfg) {
+  const box = img.parentElement, w = box.clientWidth, h = box.clientHeight;
+  const key = `${cfg.flipH}|${cfg.flipV}|${cfg.rotation}|${w}x${h}`;
+  if (img.dataset.tf === key) return;
+  img.dataset.tf = key;
+  const r = ((cfg.rotation % 360) + 360) % 360, t = `rotate(${r}deg) scale(${cfg.flipH ? -1 : 1}, ${cfg.flipV ? -1 : 1})`;
+  if (r === 90 || r === 270) Object.assign(img.style, { inset: "auto", left: "50%", top: "50%", width: `${h}px`, height: `${w}px`, transform: `translate(-50%, -50%) ${t}` });
+  else Object.assign(img.style, { inset: "", left: "", top: "", width: "", height: "", transform: t });
+}
+function showFps(img, st, cfg) {
+  const badge = img.parentElement.querySelector(".fps"); if (!badge) return;
+  const now = performance.now();
+  st.frames = st.frames.filter(t => now - t < 30000);
+  const n = st.frames.length, span = n > 1 ? (st.frames[n - 1] - st.frames[0]) / 1000 : 0;
+  const fps = span > 0 ? (n - 1) / span : null;
+  badge.textContent = (fps ? `${fps < 1 ? fps.toFixed(1) : Math.round(fps)} fps` : "— fps") + (cfg.target ? ` · cam ${cfg.target}` : "");
+}
+const liveStreams = new Map();
+const liveOn = () => SETUP.video === "live" || SETUP.video === "timelapse";
+function stopLive(img) {
+  const s = liveStreams.get(img); if (!s) return;
+  s.ctrl.abort(); liveStreams.delete(img);
+}
+async function startLive(img, pid, idx, st) {
+  const ctrl = new AbortController();
+  liveStreams.set(img, { pid, idx, ctrl });
+  let prevUrl = null;
+  try {
+    const r = await fetch(`/api/printers/${pid}/stream?cam=${idx}`, { signal: ctrl.signal, cache: "no-store" });
+    if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
+    const reader = r.body.getReader();
+    let buf = new Uint8Array(0);
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const merged = new Uint8Array(buf.length + value.length); merged.set(buf); merged.set(value, buf.length); buf = merged;
+      // cut out complete JPEGs (FF D8 ... FF D9); keep only the newest one
+      let frame = null;
+      while (true) {
+        let soi = -1; for (let i = 0; i + 1 < buf.length; i++) if (buf[i] === 0xFF && buf[i + 1] === 0xD8) { soi = i; break; }
+        if (soi < 0) { buf = buf.slice(Math.max(0, buf.length - 1)); break; }
+        let eoi = -1; for (let i = soi + 2; i + 1 < buf.length; i++) if (buf[i] === 0xFF && buf[i + 1] === 0xD9) { eoi = i + 2; break; }
+        if (eoi < 0) { buf = buf.slice(soi); break; }
+        frame = buf.slice(soi, eoi); buf = buf.slice(eoi);
+        st.frames.push(performance.now());
+      }
+      if (frame) {
+        const url = URL.createObjectURL(new Blob([frame], { type: "image/jpeg" }));
+        img.src = url; if (prevUrl) URL.revokeObjectURL(prevUrl); prevUrl = url;
+      }
+      if (buf.length > 8_000_000) buf = new Uint8Array(0);
+    }
+  } catch (e) { if (ctrl.signal.aborted) return; }
+  finally { if (prevUrl) setTimeout(() => URL.revokeObjectURL(prevUrl), 2000); }
+  if (liveStreams.get(img)?.ctrl === ctrl) liveStreams.delete(img);
+  st.liveRetry = performance.now() + 10000;
+}
+
+function camTick() {
+  if (document.hidden) { for (const img of [...liveStreams.keys()]) stopLive(img); return; }
+  for (const [img, s] of [...liveStreams]) {
+    if (!img.isConnected || !img.offsetParent || +img.dataset.camPid !== s.pid || +(img.dataset.camIdx || 0) !== s.idx) stopLive(img);
+  }
+  const now = performance.now();
+  for (const img of document.querySelectorAll("img[data-cam-pid]")) {
+    const pid = +img.dataset.camPid, p = printers.get(pid);
+    if (!img.dataset.camPid || !p || !img.offsetParent) continue;
+    const idx = +(img.dataset.camIdx || 0);
+    const cfg = camCfg(p, idx), every = (cfg.refresh ?? (img.dataset.camKind === "card" ? 5 : 2)) * 1000;
+    let st = camState.get(img);
+    if (!st || st.pid !== pid || st.idx !== idx) { st = { pid, idx, last: 0, loading: false, frames: [] }; camState.set(img, st); }
+    applyCamTransform(img, cfg);
+    const wantLive = liveOn() && img.dataset.camKind === "big" && p.cams?.[idx]?.live && !(st.liveRetry > now);
+    if (wantLive) {
+      if (!liveStreams.has(img)) startLive(img, pid, idx, st);
+      showFps(img, st, cfg); continue;
+    }
+    if (liveStreams.has(img)) stopLive(img);
+    if (!st.loading && now - st.last >= every) {
+      st.loading = true; st.last = now;
+      img.onload = () => { st.loading = false; st.frames.push(performance.now()); showFps(img, st, cfg); };
+      img.onerror = () => { st.loading = false; };
+      img.src = `/api/printers/${pid}/snapshot?cam=${idx}&t=${Date.now()}`;
+    } else showFps(img, st, cfg);
+  }
+}
+setInterval(camTick, 250);
+
+function setupCamBox(box, img, p, sel) {
+  const cams = p?.cams || [], live = !!p && p.has_webcam && p.connection === "online";
+  const grid = sel === "grid" && cams.length > 1;
+  if (grid) img.hidden = true;
+  else img.dataset.camIdx = Math.min(typeof sel === "number" ? sel : 0, Math.max(0, cams.length - 1));
+  let g = box.querySelector(".camgrid");
+  if (!grid) g?.remove();
+  else {
+    if (!g) { g = document.createElement("div"); g.className = "camgrid"; box.append(g); }
+    const key = `${p.id}:${cams.map(c => c.name).join("|")}`;
+    if (g.dataset.key !== key) {
+      g.dataset.key = key;
+      g.innerHTML = cams.map((c, i) => `<div class="camtile"><img alt="${esc(c.name)}" data-cam-pid="${p.id}" data-cam-idx="${i}" data-cam-kind="big"><span class="fps" aria-hidden="true"></span><span class="camname">${esc(c.name)}</span></div>`).join("");
+    }
+    g.hidden = !live;
+  }
+  let sw = box.querySelector(".camsw");
+  if (cams.length < 2 || !live) { sw?.remove(); return; }
+  if (!sw) { sw = document.createElement("div"); sw.className = "camsw"; sw.setAttribute("role", "group"); sw.setAttribute("aria-label", "Camera"); box.append(sw); }
+  const key = `${p.id}:${cams.map(c => c.name).join("|")}:${sel}`;
+  if (sw.dataset.key === key) return;
+  sw.dataset.key = key;
+  sw.innerHTML = cams.map((c, i) => `<button type="button" data-sel="${i}" aria-pressed="${sel === i}">${esc(c.name)}</button>`).join("")
+    + `<button type="button" data-sel="grid" aria-pressed="${sel === "grid"}">Grid</button>`;
+  for (const b of sw.querySelectorAll("button")) b.onclick = () => box.dispatchEvent(new CustomEvent("campick", { detail: b.dataset.sel === "grid" ? "grid" : +b.dataset.sel }));
+}
+let qvSel = 0, pageSel = 0;
+$(".qv-cam").addEventListener("campick", e => { qvSel = e.detail; renderQV(); });
+for (const box of [$("#pgCam"), $(".ctl-cam")]) box.addEventListener("campick", e => { pageSel = e.detail; renderPage(); });
+
+let camDlgId = null, camDraft = null, camEditing = 0;
+function camFormLoad(idx) {
+  const p = printers.get(camDlgId), f = $("#camForm"), d = camDraft.cams[idx], m = p.cams?.[idx] || {};
+  camEditing = idx;
+  f.flip_h.checked = d?.flip_h ?? m.flip_h ?? false; f.flip_v.checked = d?.flip_v ?? m.flip_v ?? false;
+  f.rotation.value = String(d?.rotation ?? m.rotation ?? 0); f.refresh.value = d?.refresh ? String(d.refresh) : "";
+  f.main.checked = camDraft.main === idx;
+}
+function camFormStore() {
+  const f = $("#camForm");
+  camDraft.cams[camEditing] = { flip_h: f.flip_h.checked, flip_v: f.flip_v.checked, rotation: +f.rotation.value, refresh: f.refresh.value ? +f.refresh.value : null };
+  if (f.main.checked) camDraft.main = camEditing;
+}
+function openCamDlg(id) {
+  const p = printers.get(id); if (!p) return;
+  camDlgId = id;
+  const cs = p.cam_settings || {};
+  camDraft = { main: mainCam(p), cams: JSON.parse(JSON.stringify(cs.cams || {})) };
+  const cams = p.cams?.length ? p.cams : [{ name: "Camera 1" }];
+  $("#camPick").innerHTML = cams.map((c, i) => `<option value="${i}">${esc(c.name)}</option>`).join("");
+  $("#camPickRow").hidden = $("#camMainRow").hidden = cams.length < 2;
+  $("#camDlgTitle").textContent = `Camera settings: ${p.name}`;
+  $("#camPick").value = String(camDraft.main);
+  camFormLoad(camDraft.main);
+  $("#camDlg").showModal();
+}
+$("#camPick").onchange = () => { camFormStore(); camFormLoad(+$("#camPick").value); };
+async function saveCam(camera) {
+  try { printers.set(camDlgId, await api(`/api/printers/${camDlgId}`, { method: "PATCH", body: JSON.stringify({ camera }) })); $("#camDlg").close(); render(); }
+  catch (e) { toast(e.message); }
+}
+$("#camForm").onsubmit = e => { e.preventDefault(); camFormStore(); saveCam(camDraft); };
+$("#camReset").onclick = () => saveCam(null);
+$("#camCancel").onclick = () => $("#camDlg").close();
+
+async function rename(id) {
+  const p = printers.get(id); const name = prompt("Printer name", p.name);
+  if (!name || name === p.name) return;
+  try { printers.set(id, await api(`/api/printers/${id}`, { method: "PATCH", body: JSON.stringify({ name }) })); render(); }
+  catch (e) { toast(e.message); }
+}
+async function removePrinter(id) {
+  if (!confirm(`Stop monitoring ${printers.get(id).name}?`)) return;
+  try { await api(`/api/printers/${id}`, { method: "DELETE" }); printers.delete(id); render(); }
+  catch (e) { toast(e.message); }
+}
+
+let serverStarted = null;
+function connectEvents() {
+  const es = new EventSource("/api/events");
+  es.onopen = async () => {
+    try {
+      const { started } = await api("/api/config");
+      if (serverStarted && started !== serverStarted) location.reload();
+      serverStarted = started;
+    } catch {}
+  };
+  es.addEventListener("snapshot", e => { printers.clear(); for (const p of JSON.parse(e.data)) printers.set(p.id, p); render(); route(); });
+  es.addEventListener("printer", e => { const p = JSON.parse(e.data); printers.set(p.id, p); render(); });
+  es.addEventListener("gcode", e => { const d = JSON.parse(e.data); conAdd(d.id, d.line.startsWith("!!") ? "err" : "resp", d.line); });
+  es.addEventListener("removed", e => { printers.delete(JSON.parse(e.data).id); render(); });
+  es.addEventListener("event", e => {
+    const d = JSON.parse(e.data);
+    if (d.event === "progress") return;
+    if (d.event === "ai_failure") {
+      toast(`${d.name}: possible ${d.label.replace("_", " ")} (${Math.round(d.score * 100)}%)${d.paused ? " — print paused" : ""}`);
+      return;
+    }
+    toast(d.event === "offline" ? `${d.name} went offline mid-print` : d.event === "shutdown" ? `${d.name}: Klipper shut down` : `${d.name}: print ${d.event}`);
+  });
+}
+
+$("#scanBtn").onclick = async () => {
+  const btn = $("#scanBtn"); btn.disabled = true; btn.textContent = "Scanning…";
+  try { showResults((await api("/api/scan", { method: "POST" })).printers); }
+  catch (e) { toast(e.message); }
+  finally { btn.disabled = false; btn.textContent = "Scan network"; }
+};
+function showResults(list) {
+  $("#results").hidden = false;
+  $("#resultsTitle").textContent = list.length ? `Printers found (${list.length}) — pick the ones to monitor` : "No printers found";
+  $("#found").innerHTML = list.length ? list.map((p, i) => `
+    <label>
+      <input type="checkbox" data-i="${i}" ${p.added_id ? "disabled checked" : ""}>
+      <span><strong>${esc(p.name)}</strong> <span class="muted">${esc(p.host)}:${p.port}</span><br>
+        <span class="muted">${[p.klipper_version && "Klipper " + p.klipper_version, p.moonraker_version && "Moonraker " + p.moonraker_version,
+          p.has_webcam && "webcam", p.klippy_state && p.klippy_state !== "ready" && "klippy " + p.klippy_state].filter(Boolean).map(esc).join(" · ")}</span></span>
+      <span class="muted">${p.added_id ? "already added" : p.needs_auth ? "needs API key" : ""}</span>
+      ${p.needs_auth && !p.added_id ? `<input class="key" data-key="${i}" placeholder="Moonraker API key">` : ""}
+    </label>`).join("")
+    : `<p class="muted">Nothing answered on ports ${"7125/80"}. If Moonraker's [zeroconf] is off or the printer is on another subnet, use “Add by IP”.</p>`;
+  $("#found")._list = list;
+  $("#addSelected").hidden = !list.some(p => !p.added_id);
+}
+$("#closeResults").onclick = () => $("#results").hidden = true;
+$("#addSelected").onclick = async () => {
+  const list = $("#found")._list || [];
+  const picks = [...document.querySelectorAll("#found input[type=checkbox]:checked:not(:disabled)")].map(c => +c.dataset.i);
+  if (!picks.length) return toast("Pick at least one printer");
+  let added = 0;
+  for (const i of picks) {
+    const p = list[i]; const key = document.querySelector(`[data-key="${i}"]`)?.value.trim();
+    try {
+      const v = await api("/api/printers", { method: "POST", body: JSON.stringify({ host: p.host, port: p.port, name: p.name, api_key: key }) });
+      printers.set(v.id, v); p.added_id = v.id; added++;
+    } catch (e) { toast(`${p.name}: ${e.message}`); }
+  }
+  render(); showResults(list);
+  if (added) toast(`Added ${added} printer${added > 1 ? "s" : ""}`);
+};
+
+$("#manualBtn").onclick = () => $("#manual").hidden = !$("#manual").hidden;
+$("#manualForm").onsubmit = async e => {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  try {
+    const v = await api("/api/printers", { method: "POST", body: JSON.stringify({ host: f.host.trim(), port: f.port || 7125, api_key: f.api_key }) });
+    printers.set(v.id, v); render(); e.target.reset(); $("#manual").hidden = true; toast(`Added ${v.name}`);
+  } catch (err) { toast(err.message); }
+};
+
+let qvId = null;
+function openQV(id) {
+  qvId = id; qvSel = mainCam(printers.get(id)); $("#qvImg").removeAttribute("src"); renderQV();
+  refreshQVCam(); $("#qv").showModal();
+}
+function refreshQVCam() { const img = $("#qvImg"); camState.delete(img); img.dataset.camPid = qvId ?? ""; img.dataset.camKind = "big"; }
+function renderQV() {
+  if (qvId === null) return;
+  const p = printers.get(qvId);
+  if (!p) { $("#qv").close(); return; }
+  const st = statusOf(p);
+  const [tagText, tagColor, barColor, statusText, statusColor] = look(st);
+  const live = p.connection === "online";
+  const active = p.state === "printing" || p.state === "paused";
+  const pct = active || p.state === "complete" ? p.progress : 0;
+  $("#qvName").textContent = p.name;
+  const tag = $("#qvTag"); tag.textContent = tagText; tag.className = `tag ${tagColor}`;
+  const camOk = p.has_webcam && live;
+  $("#qvImg").hidden = !camOk; $("#qvNoCam").hidden = camOk;
+  setupCamBox($(".qv-cam"), $("#qvImg"), p, qvSel);
+  $("#qvNoCam").textContent = live ? "No camera" : "Can't reach printer";
+  $("#qvBar").style.width = `${pct * 100}%`; $("#qvBar").style.background = barColor;
+  const line = $("#qvLine"); line.textContent = (p.state === "error" && p.message) || statusText; line.style.color = statusColor;
+  $("#qvSub").textContent = [p.filename, active || p.state === "complete" ? `${Math.floor(pct * 100)}%` : null,
+                             active ? `${fmtDur(p.eta)} left` : null].filter(Boolean).join(" · ");
+  $("#qvNozzle").innerHTML = live ? fmtTT(p.nozzle, p.nozzle_target) : "—";
+  $("#qvBed").innerHTML = live ? fmtTT(p.bed, p.bed_target) : "—";
+  const pause = $("#qvPause");
+  pause.textContent = p.state === "paused" ? "Resume" : "Pause";
+  pause.disabled = !live || !active;
+  $("#qvCancel").disabled = !live || !active;
+  $("#qvStop").disabled = !live;
+}
+async function qvAction(action) { return doAction(qvId, action); }
+async function doAction(id, action) {
+  const p = printers.get(id); if (!p) return;
+  if (action === "cancel" && !confirm(`Cancel the print on ${p.name}?`)) return;
+  if (action === "estop" && !confirm(`Emergency stop ${p.name}? This halts the printer immediately and Klipper will need a restart.`)) return;
+  try { await api(`/api/printers/${p.id}/${action}`, { method: "POST" }); }
+  catch (e) { toast(`${p.name}: ${e.message}`); }
+}
+$("#qvClose").onclick = () => $("#qv").close();
+$("#qv").addEventListener("close", () => { qvId = null; });
+$("#qvPause").onclick = () => qvAction(printers.get(qvId)?.state === "paused" ? "resume" : "pause");
+$("#qvCancel").onclick = () => qvAction("cancel");
+$("#qvStop").onclick = () => qvAction("estop");
+
+
+let pageId = null;
+const hour12 = () => { try { const v = JSON.parse(localStorage.getItem("pb-clock")); return v === "12" ? true : v === "24" ? false : undefined; } catch { return undefined; } };
+const fmtClock = d => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: hour12() });
+function route() {
+  const m = location.hash.match(/^#printer-(\d+)$/);
+  pageId = m ? +m[1] : null;
+  pageSel = mainCam(printers.get(pageId));
+  $("main").hidden = pageId !== null;
+  $("#page").hidden = pageId === null;
+  $("#pgImg").removeAttribute("src"); $("#ctlImg").removeAttribute("src");
+  showTab("status");
+  renderPage(); refreshPageCam(); window.scrollTo(0, 0);
+}
+function refreshPageCam() {
+  for (const img of [$("#pgImg"), $("#ctlImg")]) { camState.delete(img); img.dataset.camPid = pageId ?? ""; img.dataset.camKind = "big"; }
+}
+function renderPage() {
+  if (pageId === null) return;
+  const p = printers.get(pageId);
+  if (!p) { if (printers.size) location.hash = ""; return; }
+  const st = statusOf(p);
+  const [tagText, tagColor, barColor, statusText, statusColor] = look(st);
+  const live = p.connection === "online";
+  const active = p.state === "printing" || p.state === "paused";
+  const showPct = active || p.state === "complete";
+  const pct = showPct ? p.progress : 0;
+  $("#pgName").textContent = p.name;
+  const tag = $("#pgTag"); tag.textContent = tagText; tag.className = `tag ${tagColor}`;
+  const camOk = p.has_webcam && live;
+  $("#pgImg").hidden = !camOk; $("#pgNoCam").hidden = camOk; $("#pgFull").hidden = !camOk;
+  setupCamBox($("#pgCam"), $("#pgImg"), p, pageSel);
+  $("#pgNoCam").textContent = live ? "No camera" : "Can't reach printer";
+  $("#pgBar").style.width = `${pct * 100}%`; $("#pgBar").style.background = barColor;
+  const state = $("#pgState"); state.textContent = p.klippy_message || (p.state === "error" && p.message) || statusText; state.style.color = statusColor;
+  $("#pgFile").textContent = showPct && p.filename ? p.filename : "";
+  const pctEl = $("#pgPct");
+  pctEl.innerHTML = showPct ? `${Math.floor(pct * 100)}<small>%</small>` : "";
+  pctEl.style.color = p.state === "complete" ? "var(--lilac)" : "var(--orange)";
+  $("#pgLeft").textContent = active && p.eta != null ? `${fmtDur(p.eta)} left` : "";
+  $("#pgDone").textContent = active && p.eta != null ? `done around ${fmtClock(new Date(Date.now() + p.eta * 1000))}` : "";
+  $("#pgNozzle").innerHTML = live ? fmtTT(p.nozzle, p.nozzle_target) : "—";
+  $("#pgBed").innerHTML = live ? fmtTT(p.bed, p.bed_target) : "—";
+  $("#pgElapsed").textContent = active && p.print_duration ? fmtDur(p.print_duration) : "—";
+  $("#pgStarted").textContent = active && p.print_duration ? fmtClock(new Date(Date.now() - p.print_duration * 1000)) : "—";
+  const pause = $("#pgPause");
+  pause.textContent = p.state === "paused" ? "Resume" : "Pause";
+  pause.disabled = !live || !active;
+  $("#pgCancel").disabled = !live || !active;
+  $("#pgStop").disabled = !live;
+  renderControl(p);
+  renderPageAI(p);
+  const conLive = p.connection === "online";
+  for (const el of $("#pgConsole").querySelectorAll("button, input")) el.disabled = !conLive;
+}
+$("#pgPause").onclick = () => doAction(pageId, printers.get(pageId)?.state === "paused" ? "resume" : "pause");
+$("#pgCancel").onclick = () => doAction(pageId, "cancel");
+$("#pgStop").onclick = () => doAction(pageId, "estop");
+$("#pgFull").onclick = () => $("#pgCam").requestFullscreen?.();
+window.addEventListener("hashchange", route);
+
+const TABS = { status: ["#tabStatus", "#pgStatus"], control: ["#tabControl", "#pgControl"], console: ["#tabConsole", "#pgConsole"], timelapse: ["#tabTimelapse", "#pgTimelapse"] };
+function showTab(name) {
+  if (name === "timelapse" && SETUP.video !== "timelapse") name = "status";
+  if (isBasic() && name !== "timelapse") name = "status";
+  for (const [key, [tab, panel]] of Object.entries(TABS)) {
+    $(tab).setAttribute("aria-selected", String(key === name));
+    $(panel).hidden = key !== name;
+  }
+  if (name === "console") { drawConsole(); $("#conInput").focus(); }
+  if (name === "timelapse") loadTimelapses();
+}
+$("#tabStatus").onclick = () => showTab("status");
+$("#tabControl").onclick = () => showTab("control");
+$("#tabConsole").onclick = () => showTab("console");
+
+const RESULT = { completed: ["Done", "done"], cancelled: ["Cancelled", ""], error: ["Failed", "failed"],
+                 klippy_shutdown: ["Failed", "failed"], klippy_disconnect: ["Failed", "failed"],
+                 interrupted: ["Interrupted", "failed"], in_progress: ["Printing", "running"], server_exit: ["Interrupted", "failed"] };
+const fmtFil = mm => mm == null ? "—" : mm >= 1000 ? `${(mm / 1000).toFixed(1)} m` : `${Math.round(mm)} mm`;
+$("#tabTimelapse").onclick = () => showTab("timelapse");
+
+async function loadTimelapseSettings() {
+  try {
+    const c = await api("/api/timelapse/settings"), f = $("#tlForm");
+    for (const k of ["tl_mode", "tl_interval", "tl_fps", "tl_keep"]) f[k].value = String(c[k]);
+    $("#tlEveryRow").hidden = c.tl_mode !== "interval";
+  } catch {}
+}
+$("#tlForm").onchange = async () => {
+  const f = $("#tlForm");
+  $("#tlEveryRow").hidden = f.tl_mode.value !== "interval";
+  try {
+    await api("/api/timelapse/settings", { method: "PUT", body: JSON.stringify({ tl_mode: f.tl_mode.value,
+      tl_interval: +f.tl_interval.value, tl_fps: +f.tl_fps.value, tl_keep: +f.tl_keep.value }) });
+    toast("Timelapse settings saved");
+  } catch (e) { toast(e.message); }
+};
+async function loadTimelapses() {
+  const id = pageId; if (id === null) return;
+  loadTimelapseSettings();
+  $("#tlPlayer").hidden = true; $("#tlPlayer").removeAttribute("src");
+  try {
+    const { timelapses, recording } = await api(`/api/printers/${id}/timelapses`);
+    if (id !== pageId) return;
+    $("#tlStatus").innerHTML = (recording !== null ? `<span class="tl-rec">Recording · ${recording} pictures so far</span> ` : "")
+      + (timelapses.length ? `${timelapses.length} timelapse${timelapses.length > 1 ? "s" : ""}` : (recording === null ? "No timelapses yet. One is recorded for every print." : ""));
+    $("#tlList").innerHTML = timelapses.length ? `<table><thead><tr><th>Print</th><th>Date</th><th>Length</th><th>Size</th><th>Result</th><th></th></tr></thead><tbody>${
+      timelapses.map((t, i) => {
+        const [label, cls] = RESULT[{ complete: "completed", cancelled: "cancelled", error: "error", standby: "completed" }[t.result]] || [t.result, ""];
+        return `<tr><td class="name">${esc(t.file || "—")}${t.error ? `<br><span class="muted" style="font-weight:400">${esc(t.error)}</span>` : ""}</td>
+          <td class="num">${fmtDate(t.started)}</td><td class="num">${t.length != null ? `${t.length}s` : "—"}</td><td class="num">${fmtSize(t.size)}</td>
+          <td><span class="res ${cls}">${esc(label)}</span></td>
+          <td class="btns">${t.video ? `<button class="primary" data-play="${i}">Play</button><a class="outline" style="display:inline-flex;align-items:center;min-height:44px;padding:0 14px;margin-left:6px;border-radius:8px;border:1.5px solid var(--orange);color:var(--orange);font-weight:900;text-decoration:none" href="/api/printers/${id}/timelapses/${t.id}.mp4?download=1">Download</a>` : ""}<button class="del" data-tdel="${i}">Delete</button></td></tr>`;
+      }).join("")
+    }</tbody></table>` : "";
+    for (const b of $("#tlList").querySelectorAll("[data-play]")) b.onclick = () => {
+      const t = timelapses[+b.dataset.play], v = $("#tlPlayer");
+      v.src = `/api/printers/${id}/timelapses/${t.id}.mp4`; v.hidden = false; v.play().catch(() => {}); v.scrollIntoView({ block: "nearest" });
+    };
+    for (const b of $("#tlList").querySelectorAll("[data-tdel]")) b.onclick = async () => {
+      const t = timelapses[+b.dataset.tdel];
+      if (!confirm(`Delete the timelapse of ${t.file || "this print"}?`)) return;
+      try { await api(`/api/printers/${id}/timelapses/${t.id}`, { method: "DELETE" }); loadTimelapses(); } catch (e) { toast(e.message); }
+    };
+  } catch (e) { if (id === pageId) $("#tlStatus").textContent = e.message; }
+}
+
+const fmtSize = b => b == null ? "—" : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
+const fmtDate = t => t ? new Date(t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: hour12() }) : "—";
+
+const conLogs = new Map();
+const conHistory = [];
+let conHistPos = -1;
+function conAdd(id, kind, text) {
+  const log = conLogs.get(id) || [];
+  log.push({ kind, text });
+  if (log.length > 500) log.splice(0, log.length - 500);
+  conLogs.set(id, log);
+  if (id === pageId && !$("#pgConsole").hidden) {
+    const box = $("#conLog"), atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+    box.querySelector(".empty")?.remove();
+    const div = document.createElement("div"); div.className = kind; div.textContent = text; box.append(div);
+    if (atBottom) box.scrollTop = box.scrollHeight;
+  }
+}
+function drawConsole() {
+  const box = $("#conLog"), log = conLogs.get(pageId) || [];
+  box.innerHTML = log.length ? "" : `<div class="empty">Klipper's replies show up here. Nothing yet since this page was opened.</div>`;
+  for (const { kind, text } of log) { const div = document.createElement("div"); div.className = kind; div.textContent = text; box.append(div); }
+  box.scrollTop = box.scrollHeight;
+}
+async function conSend(cmd) {
+  cmd = cmd.trim(); if (!cmd || pageId === null) return;
+  const id = pageId;
+  if (conHistory[conHistory.length - 1] !== cmd) conHistory.push(cmd);
+  conHistPos = -1;
+  conAdd(id, "sent", `> ${cmd}`);
+  try { await api(`/api/printers/${id}/gcode`, { method: "POST", body: JSON.stringify({ script: cmd }) }); }
+  catch (e) { conAdd(id, "err", `!! ${e.message}`); }
+}
+$("#conForm").onsubmit = e => { e.preventDefault(); const v = $("#conInput").value; $("#conInput").value = ""; conSend(v); };
+$("#conInput").onkeydown = e => {
+  if (e.key !== "ArrowUp" && e.key !== "ArrowDown" || !conHistory.length) return;
+  e.preventDefault();
+  if (e.key === "ArrowUp") conHistPos = conHistPos === -1 ? conHistory.length - 1 : Math.max(0, conHistPos - 1);
+  else conHistPos = conHistPos === -1 ? -1 : conHistPos + 1 >= conHistory.length ? -1 : conHistPos + 1;
+  $("#conInput").value = conHistPos === -1 ? "" : conHistory[conHistPos];
+};
+for (const b of document.querySelectorAll("[data-cmd]")) b.onclick = () => conSend(b.dataset.cmd);
+let jogStep = 10, speedDragging = false;
+async function gcode(script) {
+  const p = printers.get(pageId); if (!p) return;
+  try { await api(`/api/printers/${p.id}/gcode`, { method: "POST", body: JSON.stringify({ script }) }); }
+  catch (e) { toast(`${p.name}: ${e.message}`); }
+}
+const setHeater = (heater, t) => gcode(`SET_HEATER_TEMPERATURE HEATER=${heater} TARGET=${Math.max(0, Math.round(t))}`);
+$("#ctlNozzleSet").onclick = () => { const v = +$("#ctlNozzle").value; if ($("#ctlNozzle").value !== "") setHeater("extruder", v); };
+$("#ctlBedSet").onclick = () => { const v = +$("#ctlBed").value; if ($("#ctlBed").value !== "") setHeater("heater_bed", v); };
+$("#ctlNozzleOff").onclick = () => setHeater("extruder", 0);
+$("#ctlBedOff").onclick = () => setHeater("heater_bed", 0);
+for (const b of document.querySelectorAll("[data-pre]")) b.onclick = () => {
+  const [n, bed] = b.dataset.pre.split(",").map(Number);
+  gcode(`SET_HEATER_TEMPERATURE HEATER=extruder TARGET=${n}\nSET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=${bed}`);
+};
+for (const b of document.querySelectorAll("[data-home]")) b.onclick = () => gcode(`G28 ${b.dataset.home}`.trim());
+for (const b of document.querySelectorAll("[data-step]")) b.onclick = () => {
+  jogStep = +b.dataset.step;
+  for (const o of document.querySelectorAll("[data-step]")) o.setAttribute("aria-pressed", String(o === b));
+};
+for (const b of document.querySelectorAll("[data-jog]")) b.onclick = () => {
+  const axis = b.dataset.jog[0], dir = b.dataset.jog[1] === "-" ? -1 : 1;
+  const feed = axis === "Z" ? 600 : 6000;
+  gcode(`G91\nG1 ${axis}${dir * jogStep} F${feed}\nG90`);
+};
+$("#ctlSpeed").oninput = () => { speedDragging = true; $("#ctlSpeedOut").textContent = `${$("#ctlSpeed").value}%`; };
+$("#ctlSpeed").onchange = () => { speedDragging = false; gcode(`M220 S${$("#ctlSpeed").value}`); };
+function renderControl(p) {
+  const live = p.connection === "online" && p.klippy_state === "ready";
+  const printing = p.state === "printing" || p.state === "paused";
+  const camOk = p.has_webcam && p.connection === "online";
+  $("#ctlImg").hidden = !camOk; $("#ctlNoCam").hidden = camOk;
+  setupCamBox($(".ctl-cam"), $("#ctlImg"), p, pageSel);
+  $("#ctlNoCam").textContent = p.connection === "online" ? "No camera" : "Can't reach printer";
+  $("#ctlNozzleNow").textContent = live ? fmtTemp(p.nozzle) : "—";
+  $("#ctlBedNow").textContent = live ? fmtTemp(p.bed) : "—";
+  const ctlRoots = [$("#pgControl"), $("#pbToolhead")].filter(Boolean);
+  for (const r of ctlRoots) for (const el of r.querySelectorAll("button, input")) el.disabled = !live;
+  for (const r of ctlRoots) for (const el of r.querySelectorAll("[data-home], [data-jog], [data-step]")) el.disabled = !live || printing;
+  const homed = (p.homed_axes || "").toUpperCase();
+  $("#ctlMoveNote").textContent = printing ? "Moving is disabled while a print is running."
+    : `Homed: ${homed ? homed.split("").join(", ") : "none"}${homed.length < 3 ? " · home before jogging" : ""}`;
+  if (!speedDragging && p.speed_factor != null) {
+    const v = Math.round(p.speed_factor * 100);
+    $("#ctlSpeed").value = v; $("#ctlSpeedOut").textContent = `${v}%`;
+  }
+}
+
+
+const EVENT_LABELS = { started: "a print starts", paused: "a print pauses", resumed: "a print resumes", finished: "a print finishes",
+  failed: "a print fails", cancelled: "a print is cancelled", offline: "a printer goes offline mid-print", shutdown: "Klipper shuts down or errors" };
+async function loadNotify() {
+  const c = await api("/api/notify/settings"), f = $("#notifyForm");
+  f.ntfy_url.value = c.ntfy_url || ""; f.ntfy_token.value = c.ntfy_token || "";
+  f.discord_webhook.value = c.discord_webhook || ""; f.attach_snapshot.checked = !!c.attach_snapshot;
+  for (const k of ["telegram_token", "telegram_chat", "pushover_user", "pushover_token", "smtp_host", "smtp_user", "smtp_pass", "smtp_from", "smtp_to"]) f[k].value = c[k] || "";
+  f.smtp_port.value = c.smtp_port || 587; f.smtp_tls.value = c.smtp_tls || "starttls";
+  $("#progressStep").innerHTML = c.progress_steps.map(n => `<option value="${n}">${n ? n + "%" : "Off"}</option>`).join("");
+  $("#progressStep").value = String(c.progress_step ?? 0);
+  $("#notifyActive").textContent = c.active.length ? `Sending to: ${c.active.join(", ")}` : "No services set up yet.";
+  $("#eventChecks").innerHTML = c.all_events.map(e =>
+    `<label><input type="checkbox" value="${e}" ${c.events.includes(e) ? "checked" : ""}> ${esc(EVENT_LABELS[e] || e)}</label>`).join("");
+}
+function notifyBody() {
+  const f = $("#notifyForm");
+  const b = { ntfy_url: f.ntfy_url.value, ntfy_token: f.ntfy_token.value, discord_webhook: f.discord_webhook.value,
+    attach_snapshot: f.attach_snapshot.checked, events: [...$("#eventChecks").querySelectorAll("input:checked")].map(i => i.value) };
+  if (SETUP.notify === "advanced") {
+    for (const k of ["telegram_token", "telegram_chat", "pushover_user", "pushover_token", "smtp_host", "smtp_user", "smtp_pass", "smtp_from", "smtp_to", "smtp_tls"]) b[k] = f[k].value;
+    b.smtp_port = f.smtp_port.value || 587; b.progress_step = +f.progress_step.value;
+  }
+  return JSON.stringify(b);
+}
+$("#notifyBtn").onclick = async () => {
+  const panel = $("#notifyPanel"); panel.hidden = !panel.hidden;
+  if (!panel.hidden) try { await loadNotify(); } catch (e) { toast(e.message); }
+};
+$("#notifyClose").onclick = () => $("#notifyPanel").hidden = true;
+$("#notifyForm").onsubmit = async e => {
+  e.preventDefault();
+  try { await api("/api/notify/settings", { method: "PUT", body: notifyBody() }); toast("Saved"); } catch (err) { toast(err.message); }
+};
+for (const btn of document.querySelectorAll("[data-test]")) btn.onclick = async () => {
+  btn.disabled = true;
+  try {
+    await api("/api/notify/settings", { method: "PUT", body: notifyBody() });
+    const r = await api("/api/notify/test", { method: "POST", body: JSON.stringify({ service: btn.dataset.test }) });
+    toast(`Test sent to ${btn.dataset.test}${r.with_snapshot ? ", with a snapshot" : ""}`); loadNotify();
+  } catch (e) { toast(e.message); } finally { btn.disabled = false; }
+};
+async function toggleNotify(id) {
+  const p = printers.get(id); if (!p) return;
+  try { printers.set(id, await api(`/api/printers/${id}`, { method: "PATCH", body: JSON.stringify({ notify: p.notify === false }) })); render();
+        toast(`Notifications for ${p.name}: ${p.notify === false ? "on" : "off"}`); }
+  catch (e) { toast(e.message); }
+}
+$("#notifyTest").onclick = async () => {
+  const btn = $("#notifyTest"); btn.disabled = true;
+  try {
+    await api("/api/notify/settings", { method: "PUT", body: notifyBody() });
+    const r = await api("/api/notify/test", { method: "POST" });
+    toast(r.with_snapshot ? "Test sent, with a snapshot" : "Test sent");
+  } catch (e) { toast(e.message); } finally { btn.disabled = false; }
+};
+
+let shareId = null;
+async function openShare(id) {
+  const p = printers.get(id); if (!p) return;
+  shareId = id; $("#shareTitle").textContent = `Share ${p.name}`;
+  await loadShares(); $("#shareDlg").showModal();
+}
+async function loadShares() {
+  try {
+    const { shares } = await api(`/api/printers/${shareId}/shares`);
+    $("#shareList").innerHTML = shares.length ? shares.map((sh, i) => `<div class="share-item">
+        <input readonly value="${esc(sh.url)}" aria-label="Share link">
+        <button data-copy="${i}">Copy</button><button class="revoke" data-revoke="${i}">Turn off</button>
+        <span class="exp">${sh.expires_at ? `Works until ${new Date(sh.expires_at * 1000).toLocaleString()}` : "Works until you turn it off"}</span>
+      </div>`).join("") : `<p class="muted" style="margin:0">No active links for this printer.</p>`;
+    for (const b of $("#shareList").querySelectorAll("[data-copy]")) b.onclick = () => copyText(shares[+b.dataset.copy].url, b);
+    for (const b of $("#shareList").querySelectorAll("[data-revoke]")) b.onclick = async () => {
+      if (!confirm("Turn off this link? Anyone using it loses access right away.")) return;
+      try { await api(`/api/shares/${encodeURIComponent(shares[+b.dataset.revoke].code)}`, { method: "DELETE" }); loadShares(); } catch (e) { toast(e.message); }
+    };
+  } catch (e) { toast(e.message); }
+}
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); }
+  catch { const i = btn.parentElement.querySelector("input"); i.select(); document.execCommand?.("copy"); }
+  btn.textContent = "Copied"; setTimeout(() => btn.textContent = "Copy", 1500);
+}
+$("#shareCreate").onclick = async () => {
+  try {
+    const sh = await api(`/api/printers/${shareId}/shares`, { method: "POST", body: JSON.stringify({ expires: $("#shareExp").value }) });
+    await loadShares();
+    try { await navigator.clipboard.writeText(sh.url); toast("Link created and copied"); } catch { toast("Link created"); }
+  } catch (e) { toast(e.message); }
+};
+$("#shareClose").onclick = () => $("#shareDlg").close();
+
+let aiCfg = null;
+const AI_MODE_TEXT = { off: "Off", alert: "Alert only", pause: "Alert + auto-pause" };
+const aiThr = () => aiCfg?.ai_threshold ?? 0.6;
+const aiName = l => (l || "").replace("_", " ");
+function aiRecentAlert(a) { return !!a?.alerted_at && (Date.now() / 1000 - a.alerted_at) < (aiCfg?.ai_cooldown ?? 10) * 60; }
+function aiBadge(el, p) {
+  const b = el.querySelector(".aib"), a = p.ai;
+  const show = !!a && !!aiCfg?.model?.loaded && a.mode !== "off" && (a.watching || aiRecentAlert(a));
+  b.hidden = !show;
+  if (!show) return;
+  if (aiRecentAlert(a)) {
+    b.className = "aib ai hot"; b.textContent = `AI: ${aiName(a.top)}`; b.title = "The AI saw a possible failure";
+    return;
+  }
+  const s = a.score ?? 0;
+  b.className = "aib ai" + (s >= aiThr() ? " hot" : s >= aiThr() / 2 ? " warn" : "");
+  b.textContent = a.score == null ? "AI watching" : `AI ${Math.round(s * 100)}%`;
+  b.title = a.top ? `Highest: ${aiName(a.top)} ${Math.round(s * 100)}%` : "Waiting for the first check";
+}
+// Red box on the printer page's camera where the AI thinks the problem is (main camera only:
+// that's the one it watches). The box comes in the camera's own picture; a hidden copy of the
+// picture's flip/turn finds where that lands on screen.
+function drawAIBox(p) {
+  const cam = $("#pgCam"), img = $("#pgImg"), a = p?.ai;
+  const test = p && aiTest.get(p.id), fresh = !!test && Date.now() / 1000 - test.at < 120;
+  const src = a?.watching ? a : fresh ? test : null;
+  const shown = !img.hidden && +img.dataset.camIdx === mainCam(p) && img.naturalWidth;
+  let probe = cam.querySelector(".ai-probe"), mark = cam.querySelector(".ai-box");
+  if (!src?.box || !shown || a?.mode === "off") { probe?.remove(); mark?.remove(); return; }
+  if (!probe) { probe = document.createElement("div"); probe.className = "ai-probe"; probe.innerHTML = "<i></i>"; cam.append(probe); }
+  if (!mark) { mark = document.createElement("div"); mark.className = "ai-box"; mark.innerHTML = "<span></span>"; cam.append(mark); }
+  for (const k of ["inset", "left", "top", "width", "height", "transform"]) probe.style[k] = img.style[k];
+  const ew = probe.offsetWidth, eh = probe.offsetHeight, nw = img.naturalWidth, nh = img.naturalHeight;
+  const s = (getComputedStyle(img).objectFit === "cover" ? Math.max : Math.min)(ew / nw, eh / nh);
+  const cw = nw * s, ch = nh * s, ox = (ew - cw) / 2, oy = (eh - ch) / 2, [x0, y0, x1, y1] = src.box;
+  Object.assign(probe.firstChild.style, { left: `${ox + x0 * cw}px`, top: `${oy + y0 * ch}px`, width: `${(x1 - x0) * cw}px`, height: `${(y1 - y0) * ch}px` });
+  const r = probe.firstChild.getBoundingClientRect(), c = cam.getBoundingClientRect();
+  const left = Math.max(r.left, c.left), top = Math.max(r.top, c.top), right = Math.min(r.right, c.right), bottom = Math.min(r.bottom, c.bottom);
+  Object.assign(mark.style, { left: `${left - c.left}px`, top: `${top - c.top}px`, width: `${Math.max(0, right - left)}px`, height: `${Math.max(0, bottom - top)}px` });
+  mark.classList.toggle("low", top - c.top < 22);
+  mark.firstChild.textContent = `${aiName(src.top)} ${Math.round(src.score * 100)}%`;
+}
+$("#pgImg").addEventListener("load", () => drawAIBox(printers.get(pageId)));
+function renderPageAI(p) {
+  const box = $("#pgAi"), a = p.ai;
+  box.hidden = !a;
+  drawAIBox(p);
+  if (!a) return;
+  if (document.activeElement !== $("#pgAiMode")) $("#pgAiMode").value = a.mode;
+  const bm = a.box_mode || "failure";
+  $("#pgAiBoxAlways").setAttribute("aria-pressed", String(bm === "always"));
+  $("#pgAiBoxFail").setAttribute("aria-pressed", String(bm !== "off"));
+  $("#pgAiBoxFail").disabled = bm === "always";
+  const m = aiCfg?.model || {}, kinds = m.kinds || {};
+  const test = aiTest.get(p.id), fresh = !!test && Date.now() / 1000 - test.at < 120;
+  const shown = a.watching ? a.scores : fresh ? test.scores : null;
+  const labels = m.labels?.length ? m.labels : Object.keys(shown || a.scores || {});
+  $("#pgAiRows").classList.toggle("idle", !a.watching && !fresh);
+  $("#pgAiRows").innerHTML = labels.map(l => {
+    const v = shown?.[l], alert = kinds[l] === "alert", hot = alert && v >= aiThr();
+    return `<span class="lb ${alert ? "alert" : ""}">${esc(aiName(l))}</span>` +
+      `<div class="tr"><div class="${hot ? "hot" : alert ? "alert" : ""}" style="width:${(v || 0) * 100}%"></div></div>` +
+      `<span class="v">${v == null ? "—" : Math.round(v * 100) + "%"}</span>`;
+  }).join("");
+  $("#pgAiAsk").hidden = !a.alert_item;
+  if (a.alert_item) $("#pgAiAskText").textContent = `Was it really ${a.top ? aiName(a.top) : "a failure"}?`;
+  const note = $("#pgAiNote");
+  note.className = "note";
+  if (aiCfg && !m.loaded) note.textContent = m.error || "No AI model loaded.";
+  else if (aiRecentAlert(a)) {
+    note.className = "note hot";
+    note.textContent = `Possible ${aiName(a.top)} at ${fmtClock(new Date(a.alerted_at * 1000))}` + (a.mode === "pause" ? " — paused the print." : " — check the print.");
+  }
+  else if (a.watching) {
+    const every = aiCfg?.ai_interval ?? 10, fast = Math.max(2, every - 5);
+    note.textContent = `Watching. Checks every ${a.fast ? fast : every}s. Alerts after ${aiCfg?.ai_hold ?? 3} checks in a row at ${Math.round(aiThr() * 100)}% or more`
+      + (a.streak ? ` (${a.streak} so far${a.fast ? "; checking faster until it's sure" : ""}).` : ".");
+  }
+  else {
+    const why = a.mode === "off" ? "AI is off for this printer." : `Not watching — ${p.name} isn't printing. It starts by itself when a print starts.`;
+    note.textContent = fresh
+      ? `Test check at ${fmtClock(new Date(test.at * 1000))}: highest ${aiName(test.top)} ${Math.round(test.score * 100)}% (tests never alert). ${why}`
+      : why;
+  }
+}
+async function setAIMode(id, mode) {
+  try {
+    printers.set(id, await api(`/api/printers/${id}`, { method: "PATCH", body: JSON.stringify({ ai: mode }) }));
+    render(); toast(`AI for ${printers.get(id).name}: ${AI_MODE_TEXT[mode]}`);
+  } catch (e) { toast(e.message); }
+}
+function cycleAI(id) {
+  const order = ["alert", "pause", "off"], cur = printers.get(id)?.ai?.mode || "alert";
+  setAIMode(id, order[(order.indexOf(cur) + 1) % order.length]);
+}
+$("#pgAiMode").onchange = e => setAIMode(pageId, e.target.value);
+const aiTest = new Map();
+async function answerAlert(yes) {
+  const p = printers.get(pageId), iid = p?.ai?.alert_item;
+  if (!iid) return;
+  try {
+    await api(`/api/ai/photos/${iid}`, { method: "POST", body: JSON.stringify({ label: yes ? "yes" : "ok" }) });
+    confetti();
+    toast(yes ? "Thanks — saved as a real failure" : "Thanks — saved as a false alarm (very useful for training)");
+    if (!$("#aiPanel").hidden) loadPhotos();
+  } catch (e) { toast(e.message); }
+}
+$("#pgAiYes").onclick = () => answerAlert(true);
+$("#pgAiNo").onclick = () => answerAlert(false);
+$("#pgAiSave").onchange = async e => {
+  const label = e.target.value, id = pageId;
+  e.target.value = "";
+  if (!label) return;
+  try {
+    const r = await api(`/api/printers/${id}/ai/save`, { method: "POST", body: JSON.stringify({ label }) });
+    confetti();
+    const name = label === "ok" ? "OK" : aiName(label);
+    toast(r.status === "sent" ? `Sent to the AI as ${name}. Thanks!`
+      : !r.sharing ? `Saved on this box as ${name}. Turn on "Help improve the AI" (AI settings) to send it.`
+      : `Saved as ${name}, not sent yet${r.error ? `: ${r.error}` : ""}. It will retry.`);
+    if (!$("#aiPanel").hidden) loadPhotos();
+  } catch (err) { toast(err.message); }
+};
+
+let aiPhotos = null;
+const SRC_TEXT = {
+  alert: i => `AI alert: possible ${aiName(i.suggested)}`, alert_yes: () => "AI alert, you said: real failure",
+  alert_no: () => "AI alert, you said: false alarm", print: () => "During a print", print_ok: () => "Finished print",
+  print_failed: () => "Failed or cancelled print", user: () => "Saved by you",
+};
+async function loadPhotos() {
+  try { aiPhotos = await api("/api/ai/photos"); drawPhotos(); }
+  catch (e) { $("#aiPhotoCounts").textContent = e.message; }
+}
+function drawPhotos() {
+  const d = aiPhotos;
+  if (!d) return;
+  $("#aiPhotoCounts").textContent = `${d.pending} need a label · ${d.ready} labelled` +
+    (d.sharing ? ` (being sent) · ${d.sent} sent` : " (kept on this box — sharing is off)") + (d.sharing && d.error ? ` · ${d.error}` : "");
+  const st = Object.entries(d.stats || {}).map(([m, v]) => {
+    const n = v.right + v.false_alarm + v.missed;
+    return n ? `${m} on your printers: ${v.right} right · ${v.false_alarm} false alarm${v.false_alarm === 1 ? "" : "s"} · ${v.missed} missed (${Math.round(100 * v.right / n)}% right)` : "";
+  }).filter(Boolean);
+  $("#aiStats").textContent = st.length ? st.join(" — ") : "Label a few photos and you'll see how often the AI gets it right on your printers.";
+  const items = d.items.filter(i => i.status !== "sent");
+  const opts = d.labels.map(l => `<option value="${l}">${l === "ok" ? "OK (no problem)" : esc(aiName(l))}</option>`).join("");
+  $("#aiPhotos").innerHTML = items.length ? items.map(i => `<div class="ph ${i.status === "pending" ? "pending" : ""}">
+      ${i.img ? `<img src="${i.img}" alt="" loading="lazy">` : ""}
+      <div class="b"><span><b>${esc(i.printer || "")}</b> · ${fmtClock(new Date(i.at * 1000))}</span>
+        <span class="muted">${esc((SRC_TEXT[i.source] || (() => i.source))(i))}</span>
+        ${i.verdict ? `<span class="v-${i.verdict}">${{ right: "AI was right", false_alarm: "AI false alarm", missed: "AI missed it" }[i.verdict]}</span>` : ""}
+        ${i.status === "waiting" ? `<span class="muted">Labelled when the print ends</span>` :
+          `<select data-plabel="${i.id}" aria-label="Label"><option value="">${i.status === "pending" ? "Needs a label…" : "Label: " + (i.label === "ok" ? "OK" : esc(aiName(i.label)))}</option>${opts}</select>`}
+        <button type="button" class="del" data-pdel="${i.id}">Delete</button></div></div>`).join("")
+    : `<p class="muted" style="margin:0">No photos yet. They're collected during prints and AI alerts, or with "Save for AI…" on a printer's page.</p>`;
+  for (const sel of $("#aiPhotos").querySelectorAll("[data-plabel]")) sel.onchange = async () => {
+    if (!sel.value) return;
+    try { await api(`/api/ai/photos/${sel.dataset.plabel}`, { method: "POST", body: JSON.stringify({ label: sel.value }) }); confetti(); loadPhotos(); }
+    catch (e) { toast(e.message); }
+  };
+  for (const b of $("#aiPhotos").querySelectorAll("[data-pdel]")) b.onclick = async () => {
+    try { await api(`/api/ai/photos/${b.dataset.pdel}`, { method: "DELETE" }); loadPhotos(); }
+    catch (e) { toast(e.message); }
+  };
+}
+async function setAIBox(mode) {
+  const p = printers.get(pageId); if (!p?.ai) return;
+  try {
+    const r = await api(`/api/printers/${p.id}/ai/overlay`, { method: "POST", body: JSON.stringify({ mode }) });
+    p.ai.box_mode = r.box_mode; renderPage();
+    toast({ always: "Failure box on every check. Press Check now to see it right away.",
+            failure: "Failure box only when a failure is likely",
+            off: "Failure box off: no extra model runs" }[r.box_mode]);
+  } catch (e) { toast(e.message); }
+}
+$("#pgAiBoxAlways").onclick = () => setAIBox(printers.get(pageId)?.ai?.box_mode === "always" ? "failure" : "always");
+$("#pgAiBoxFail").onclick = () => setAIBox(printers.get(pageId)?.ai?.box_mode === "off" ? "failure" : "off");
+$("#pgAiCheck").onclick = async () => {
+  const btn = $("#pgAiCheck"), id = pageId;
+  btn.disabled = true; btn.textContent = "Checking…";
+  try { aiTest.set(id, await api(`/api/printers/${id}/ai/check`, { method: "POST" })); renderPage(); }
+  catch (e) { toast(e.message); }
+  finally { btn.disabled = false; btn.textContent = "Check now"; }
+};
+async function loadAI() {
+  try { aiCfg = await api("/api/ai/settings"); render(); } catch {}
+}
+function fillAIForm() {
+  const f = $("#aiForm"), m = aiCfg.model;
+  const fmt = { ai_threshold: v => `${Math.round(v * 100)}%`, ai_interval: v => `${v} seconds`,
+                ai_hold: v => v === 1 ? "1 check" : `${v} checks`, ai_cooldown: v => `${v} minutes` };
+  for (const k of Object.keys(fmt)) {
+    f[k].innerHTML = aiCfg.choices[k].map(v => `<option value="${v}">${fmt[k](v)}</option>`).join("");
+    f[k].value = String(aiCfg[k]);
+  }
+  f.ai_contribute.checked = !!aiCfg.ai_contribute;
+  loadPhotos();
+  $("#aiModel").textContent = m.loaded
+    ? `Model ${m.tag}. Alerts on: ${m.labels.filter(l => m.kinds[l] === "alert").map(aiName).join(", ")}. Warnings only: ${m.labels.filter(l => m.kinds[l] !== "alert").map(aiName).join(", ")}.`
+    : (m.error || "No AI model loaded.");
+}
+$("#aiBtn").onclick = async () => {
+  const panel = $("#aiPanel"); panel.hidden = !panel.hidden;
+  if (!panel.hidden) { await loadAI(); if (aiCfg) fillAIForm(); }
+};
+$("#aiClose").onclick = () => $("#aiPanel").hidden = true;
+$("#aiForm").onsubmit = async e => {
+  e.preventDefault();
+  const f = $("#aiForm"), b = {};
+  for (const k of ["ai_threshold", "ai_interval", "ai_hold", "ai_cooldown"]) b[k] = +f[k].value;
+  b.ai_contribute = f.ai_contribute.checked;
+  try { aiCfg = await api("/api/ai/settings", { method: "PUT", body: JSON.stringify(b) }); toast("Saved"); render(); }
+  catch (err) { toast(err.message); }
+};
+
+let SETUP = { ui: "basic" };
+const isBasic = () => SETUP.ui !== "advanced";
+const PART_NAMES = { ui: "Interface", ai: "AI detection", video: "Video", notify: "Notifications", remote: "Remote access", users: "Users" };
+async function loadConfig() {
+  try {
+    const cfg = await api("/api/config");
+    SETUP = cfg.setup;
+    document.body.classList.toggle("ui-basic", isBasic());
+    document.body.classList.toggle("notify-basic", SETUP.notify !== "advanced");
+    document.body.classList.toggle("no-timelapse", SETUP.video !== "timelapse");
+    document.body.classList.toggle("no-remote", SETUP.remote !== "on");
+    document.body.classList.toggle("no-ai", SETUP.ai !== "basic");
+    if (SETUP.ai === "basic") loadAI();
+    if (isBasic()) {
+      $("#grid").classList.remove("list");
+      if ($("#sortBy").value === "custom") { $("#sortBy").value = "status"; arrange(); }
+      showTab("status");
+    } else if (prefs.view === "list") setView("list");
+    $("#setupLine").innerHTML = "Setup: " + Object.entries(SETUP).map(([k, v]) =>
+      `${esc(PART_NAMES[k] || k)} ${esc(v)}${cfg.not_built.includes(k) ? ' <span class="soon">(coming soon)</span>' : ""}`).join(" · ")
+      + " — run ./install.sh to change";
+  } catch {}
+}
+document.body.classList.add("ui-basic", "notify-basic", "no-timelapse", "no-remote", "no-ai");
+loadConfig();
+
+connectEvents();
+render();
+</script>
+<script src="/static/vendor/echarts.min.js"></script>
+<script src="/static/vendor/echarts-gl.min.js"></script>
+<script src="/static/core/core.js"></script>
+<script src="/static/panels/print/status/status.js"></script>
+<script src="/static/panels/print/files/search.js"></script>
+<script src="/static/panels/print/files/select.js"></script>
+<script src="/static/panels/print/files/preview.js"></script>
+<script src="/static/panels/print/files/files.js"></script>
+<script src="/static/panels/print/queue/queue.js"></script>
+<script src="/static/panels/print/history/details.js"></script>
+<script src="/static/panels/print/history/charts.js"></script>
+<script src="/static/panels/print/history/csv.js"></script>
+<script src="/static/panels/print/history/maintenance.js"></script>
+<script src="/static/panels/print/history/history.js"></script>
+<script src="/static/panels/print/gcodeview/parse.js"></script>
+<script src="/static/panels/print/gcodeview/orbit.js"></script>
+<script src="/static/panels/print/gcodeview/view2d.js"></script>
+<script src="/static/panels/print/gcodeview/view3d.js"></script>
+<script src="/static/panels/print/gcodeview/gcodeview.js"></script>
+<script src="/static/panels/print/exclude/exclude.js"></script>
+<script src="/static/panels/print/timelapse/timelapse.js"></script>
+<script src="/static/panels/print/spoolman/spoolman.js"></script>
+<script src="/static/panels/print/ai/ai.js"></script>
+<script src="/static/panels/control/toolhead/toolhead.js"></script>
+<script src="/static/panels/control/zoffset/zoffset.js"></script>
+<script src="/static/panels/control/extruder/extruder.js"></script>
+<script src="/static/panels/control/thermals/presets.js"></script>
+<script src="/static/panels/control/thermals/thermals.js"></script>
+<script src="/static/panels/control/fans/fans.js"></script>
+<script src="/static/panels/control/macros/params.js"></script>
+<script src="/static/panels/control/macros/macros.js"></script>
+<script src="/static/panels/control/limits/limits.js"></script>
+<script src="/static/panels/control/actions/actions.js"></script>
+<script src="/static/panels/control/endstops/endstops.js"></script>
+<script src="/static/panels/control/bedmesh/bedmesh.js"></script>
+<script src="/static/panels/control/fsensors/fsensors.js"></script>
+<script src="/static/panels/camera/camera/camera.js"></script>
+<script src="/static/panels/machine/machine/machine.js"></script>
+<script src="/static/panels/machine/system/system.js"></script>
+<script src="/static/panels/machine/config/highlight.js"></script>
+<script src="/static/panels/machine/config/editor.js"></script>
+<script src="/static/panels/machine/config/browse.js"></script>
+<script src="/static/panels/machine/config/actions.js"></script>
+<script src="/static/panels/machine/config/config.js"></script>
+<script src="/static/panels/machine/updates/updates.js"></script>
+<script src="/static/panels/machine/devices/devices.js"></script>
+<script src="/static/panels/machine/sensors/sensors.js"></script>
+<script src="/static/panels/machine/explorer/explorer.js"></script>
+<script src="/static/panels/machine/console/filters.js"></script>
+<script src="/static/panels/machine/console/help.js"></script>
+<script src="/static/panels/machine/console/console.js"></script>
+<script src="/static/panels/machine/ksensors/ksensors.js"></script>
+<script src="/static/core/home-panels.js"></script>
+<script src="/static/core/builder.js"></script>
+<script src="/static/core/home.js"></script>
+<script src="/static/core/extras/ui-options.js"></script>
+<script src="/static/core/extras/error-card.js"></script>
+<script src="/static/core/extras/drop-upload.js"></script>
+<script src="/static/core/extras/shortcuts.js"></script>
+<script src="/static/core/extras/prompts.js"></script>
+<script src="/static/core/extras/calibration.js"></script>
+<script src="/static/core/extras/pause-layer.js"></script>
+<script src="/static/core/extras/camera-editor.js"></script>
+<script src="/static/core/extras/theme.js"></script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script>
+</body>
+</html>

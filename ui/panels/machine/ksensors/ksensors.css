@@ -1,0 +1,31 @@
+.pb-cc { width: 100%; }
+.pb-ccmsg { font-size: 12.5px; margin: 4px 0 0; }
+.pb-ccmsg:empty { display: none; }
+.pb-ccedit { width: min(640px, 94vw); }
+.pb-ccedit h4 { margin: 16px 0 4px; font-size: 13.5px; }
+.pb-cchint { font-size: 12.5px; margin: 0 0 6px; }
+.pb-ccedit input:not([type=checkbox]):not([type=color]), .pb-ccedit select { height: 32px; min-height: 0; padding: 0 8px; border-radius: 4px; box-sizing: border-box;
+                                                                            background: #2a2a2f; color: var(--text); border: 1px solid #3a3a40; font-size: 13px; }
+.pb-ccedit .bd-field input { width: 100%; }
+.pb-ccline { display: grid; grid-template-columns: 34px 1fr 120px 32px; gap: 6px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(127, 127, 140, .15); }
+.pb-ccline small { grid-column: 2 / -1; font-size: 12px; }
+.pb-ccline [data-f=formula] { grid-column: 2 / -1; font-family: var(--bd-mono, monospace); }
+.pb-ccline input[type=color] { width: 34px; height: 32px; min-height: 0; padding: 2px; border-radius: 4px; border: 1px solid #3a3a40; background: none; }
+.pb-ccedit .pb-ccline [data-x] { padding: 0; border: 0; background: none; }
+.pb-ccedit [data-a=add] { margin-top: 8px; }
+.pb-ccpick { margin-top: 8px; padding: 8px; border: 1px solid #3a3a40; border-radius: 6px; }
+.pb-ccpick input[type=search] { width: 100%; margin-bottom: 6px; }
+.pb-ccobjs { max-height: 220px; overflow: auto; display: flex; flex-direction: column; }
+.pb-xd .pb-ccobjs button { height: 28px; border: 0; border-radius: 0; background: none; text-align: left; font-weight: 400; font-family: var(--bd-mono, monospace); font-size: 12.5px; }
+.pb-xd .pb-ccobjs button:hover { background: rgba(255, 138, 31, .1); }
+.pb-ccpick .bd-check { margin: 4px 0; font-family: var(--bd-mono, monospace); font-size: 12.5px; }
+.pb-ccpick .bd-check span { margin-left: auto; }
+.pb-ccpt { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.pb-ccaxes { display: grid; grid-template-columns: auto 1fr 1fr 1fr; gap: 6px 8px; align-items: end; font-size: 12.5px; }
+.pb-ccaxes label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
+.pb-ccaxes b { align-self: center; }
+.pb-ccsize { display: flex; gap: 12px; }
+.pb-ccsize .bd-field { flex: 1; }
+.pb-ccerr { color: #ff8a8a; font-size: 13px; }
+.pb-ccerr[hidden] { display: none; }
+html[data-theme="light"] .pb-ccedit input:not([type=checkbox]):not([type=color]), html[data-theme="light"] .pb-ccedit select { background: #fff; color: #1c1b20; border-color: #dcdce2; }

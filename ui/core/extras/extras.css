@@ -1,0 +1,47 @@
+.pb-kban { margin: 8px 12px 0; border-radius: 4px; padding: 8px 10px; border: 1px solid; }
+.pb-kban.err { background: rgba(229, 72, 77, .12); border-color: rgba(229, 72, 77, .5); }
+.pb-kban.warn { background: rgba(246, 195, 68, .12); border-color: rgba(246, 195, 68, .5); }
+.pb-kbhead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pb-kban pre { margin: 6px 0 0; white-space: pre-wrap; font-family: var(--bd-mono); font-size: 12.5px; max-height: 160px; overflow: auto; }
+.pb-kblog { color: var(--orange); font-size: 12.5px; text-decoration: none; margin-right: 4px; }
+.pb-drop { position: fixed; inset: 0; z-index: 950; display: grid; place-items: center; background: rgba(10, 10, 12, .75); pointer-events: none; }
+.pb-drop[hidden] { display: none; }
+.pb-drop div { border: 2px dashed var(--orange); border-radius: 12px; padding: 40px 56px; color: #fff; font-size: 20px; font-weight: 700; }
+.pb-ktable { border-collapse: collapse; width: 100%; }
+.pb-ktable td { padding: 5px 8px 5px 0; }
+.pb-pbody p { margin: 0 0 8px; }
+.pb-pgroup { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.pb-pgroup button { flex: 1 1 auto; }
+.pb-mpz { display: flex; justify-content: space-between; gap: 8px; margin: 8px 0 12px; font-family: var(--bd-mono, monospace); font-size: 15px; }
+.pb-mpz span { flex: 1; text-align: center; padding: 6px; border-radius: 4px; background: rgba(127, 127, 140, .1); }
+.pb-mpz .now { font-size: 22px; font-weight: 700; color: var(--orange); }
+.pb-mpz small { display: block; font-family: inherit; font-size: 11px; color: var(--muted); font-weight: 400; }
+.pb-mpsteps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 6px; }
+.pb-ttable { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.pb-ttable th, .pb-ttable td { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(127, 127, 140, .2); }
+.pb-ttable tr.ok td:last-child { color: #4ade80; }
+.pb-ttable tr.bad td:last-child { color: #ff8a8a; }
+.pb-terr { color: #ff8a8a; }
+.pb-palnum { width: 80px; height: 28px; margin-left: 6px; background: #2a2a2f; color: var(--text); border: 1px solid #3a3a40; border-radius: 4px; padding: 0 6px; }
+html[data-theme="light"] .pb-palnum { background: #fff; color: #1c1b20; border-color: #dcdce2; }
+.pb-camdlg { width: min(600px, 94vw); }
+.pb-camform { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.pb-camform label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.pb-camform label.w { grid-column: 1 / -1; }
+.pb-camform input:not([type=checkbox]), .pb-camform select { height: 30px; background: #2a2a2f; color: var(--text); border: 1px solid #3a3a40; border-radius: 4px; padding: 0 8px; font: inherit; font-size: 13px; }
+html[data-theme="light"] .pb-camform input:not([type=checkbox]), html[data-theme="light"] .pb-camform select { background: #fff; color: #1c1b20; border-color: #dcdce2; }
+input[type=range].pb-unlocked { outline: 2px solid var(--orange); outline-offset: 2px; border-radius: 4px; }
+body.pb-hasbg { background-image: linear-gradient(rgba(10, 10, 12, .6), rgba(10, 10, 12, .6)), var(--pb-bgimg); background-size: cover; background-position: center; background-attachment: fixed; }
+html[data-theme="light"] body.pb-hasbg { background-image: linear-gradient(rgba(255, 255, 255, .7), rgba(255, 255, 255, .7)), var(--pb-bgimg); }
+body.pb-hasrail .bd-rail { background-image: var(--pb-railimg); background-size: cover; background-position: center; }
+.pb-logo { height: 32px; width: auto; max-width: 140px; object-fit: contain; vertical-align: middle; margin-right: 10px; }
+.pb-thm { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.pb-thm h4 { margin: 0 0 4px; }
+.pb-thm p { font-size: 13px; margin: 0 0 8px; }
+.pb-thmrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.pb-thmrow select { min-height: 36px; }
+.pb-thmpart { display: grid; grid-template-columns: 20px 170px 1fr; align-items: center; gap: 8px; padding: 6px 0; font-size: 13.5px; }
+.pb-thmpart input { min-height: 0; width: 16px; height: 16px; padding: 0; accent-color: var(--orange); }
+.pb-thmpart img { max-height: 60px; max-width: 160px; border-radius: 4px; border: 1px solid var(--line); }
+.pb-thmsw { display: inline-block; width: 18px; height: 18px; border-radius: 4px; margin-right: 6px; vertical-align: middle; }
+.pb-thmcss { display: inline-block; width: 120px; height: 40px; border-radius: 4px; border: 1px solid var(--line); background-color: #222; }

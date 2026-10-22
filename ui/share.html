@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Printer Buddy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #0B0B0D; --card: #17161B; --card2: #1F1E24; --line: #26242C; --track: #2A2830; --text: #F4F2F8;
+          --muted: #8E8A99; --purple: #7C3AED; --lilac: #C4A7FF; --orange: #FF8A1F; --red: #C9372C; --red-text: #FF6B61; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 Lato, system-ui, -apple-system, Segoe UI, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 18px 16px 40px; display: flex; flex-direction: column; gap: 14px; }
+  .brand { font-weight: 900; color: var(--muted); font-size: 14px; }
+  .brand span { color: var(--orange); }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 900; }
+  .tag { padding: 5px 10px; border-radius: 6px; font-size: 13px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; background: var(--track); }
+  .tag.orange { background: var(--orange); color: #1A1005; } .tag.purple { background: var(--purple); color: #fff; }
+  .tag.red { background: var(--red); color: #fff; } .tag.grey { color: var(--muted); }
+  .box { border-radius: 12px; overflow: hidden; background: var(--card); border: 1px solid var(--line); }
+  .cam { position: relative; aspect-ratio: 16 / 9; background: #000; }
+  .cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .nocam { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-weight: 700; }
+  .bar { height: 6px; background: var(--track); } .bar > div { height: 100%; width: 0; transition: width .5s; }
+  .info { padding: 18px; display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: flex-end; }
+  .pct { font-size: 56px; font-weight: 900; line-height: .9; color: var(--orange); }
+  .pct small { font-size: 26px; }
+  .file { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .file .state { font-weight: 700; }
+  .file .name { color: var(--muted); overflow-wrap: anywhere; }
+  dl { margin: 0; display: flex; flex-wrap: wrap; gap: 10px 28px; }
+  dl div { display: flex; flex-direction: column; gap: 2px; }
+  dt { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  dd { margin: 0; font-size: 20px; font-weight: 900; }
+  .note { color: var(--muted); font-size: 13px; text-align: center; }
+  .gone { text-align: center; padding: 80px 16px; }
+  .gone h1 { margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">Printer <span>Buddy</span> · shared view</div>
+  <section id="view" hidden>
+    <div class="head"><h1 id="name"></h1><span class="tag" id="tag"></span></div>
+    <div class="box" style="margin-top:14px">
+      <div class="cam"><img id="img" alt="Live view of the printer" hidden><div class="nocam" id="nocam">No camera</div></div>
+      <div class="bar"><div id="bar"></div></div>
+      <div class="info">
+        <span class="pct" id="pct"></span>
+        <div class="file"><span class="state" id="state"></span><span class="name" id="file"></span></div>
+        <dl>
+          <div><dt>Time left</dt><dd id="left">—</dd></div>
+          <div><dt>Layer</dt><dd id="layer">—</dd></div>
+          <div><dt>Nozzle</dt><dd id="nozzle">—</dd></div>
+          <div><dt>Bed</dt><dd id="bed">—</dd></div>
+        </dl>
+      </div>
+    </div>
+    <p class="note" id="expires"></p>
+  </section>
+  <section class="gone" id="gone" hidden>
+    <h1>Link not available</h1>
+    <p class="note" id="goneMsg">This share link has expired or was turned off.</p>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const base = location.pathname.replace(/\/+$/, "");   // works both on the box and behind printerbuddy.stream
+const LOOK = {
+  printing: ["Printing", "orange", "var(--orange)", "Printing"], paused: ["Paused", "", "var(--orange)", "Paused"],
+  complete: ["Done", "purple", "var(--purple)", "Print complete"], cancelled: ["Cancelled", "grey", "var(--muted)", "Print cancelled"],
+  error: ["Error", "red", "var(--red)", "Print failed"], standby: ["Idle", "", "var(--orange)", "Ready to print"],
+};
+const fmtDur = s => { if (s == null) return "—"; s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h}h ${m}m` : `${m}m`; };
+const fmtTemp = t => t == null ? "—" : `${Math.round(t)}°`;
+// current / target, target only while heating (numbers only, safe as HTML)
+const fmtTT = (t, tg) => t == null ? "—" : tg > 0 ? `${Math.round(t)}°<span style="color:#8E8A99;font-weight:400"> / ${Math.round(tg)}°</span>` : `${Math.round(t)}°`;
+let camMode = null, snapTimer = null;
+
+function setCamera(p) {
+  const online = p.connection === "online", idx = Math.min(p.main_cam || 0, Math.max(0, (p.cams || []).length - 1));
+  const ok = p.has_webcam && online;
+  $("#img").hidden = !ok; $("#nocam").hidden = ok;
+  $("#nocam").textContent = online ? "No camera" : "Printer is offline";
+  if (!ok) { camMode = null; clearInterval(snapTimer); return; }
+  const live = p.video_live && p.cams?.[idx]?.live;
+  const mode = `${live ? "live" : "snap"}:${idx}`;
+  if (mode === camMode) return;
+  camMode = mode; clearInterval(snapTimer);
+  if (live) {
+    $("#img").src = `${base}/stream?cam=${idx}`;
+    $("#img").onerror = () => { camMode = "snap:" + idx; startSnaps(idx); };
+  } else startSnaps(idx);
+}
+function startSnaps(idx) {
+  clearInterval(snapTimer);
+  const load = () => { if (!document.hidden) $("#img").src = `${base}/snapshot?cam=${idx}&t=${Date.now()}`; };
+  load(); snapTimer = setInterval(load, 3000);
+}
+
+async function refresh() {
+  let r;
+  try { r = await fetch(`${base}/status`, { cache: "no-store" }); } catch { return; }
+  if (!r.ok) {
+    const msg = await r.json().catch(() => null);
+    $("#view").hidden = true; $("#gone").hidden = false;
+    if (msg?.error) $("#goneMsg").textContent = msg.error;
+    clearInterval(snapTimer); $("#img").removeAttribute("src");
+    return;
+  }
+  const p = await r.json();
+  const online = p.connection === "online" && p.klippy_state === "ready";
+  const st = !online ? "offline" : (p.state || "standby");
+  const [tag, color, bar, line] = LOOK[st] || ["Offline", "grey", "var(--muted)", "Printer is offline"];
+  const active = p.state === "printing" || p.state === "paused", showPct = online && (active || p.state === "complete");
+  document.title = `${p.name} · Printer Buddy`;
+  $("#view").hidden = false; $("#gone").hidden = true;
+  $("#name").textContent = p.name;
+  $("#tag").textContent = tag; $("#tag").className = `tag ${color}`;
+  $("#bar").style.width = `${showPct ? p.progress * 100 : 0}%`; $("#bar").style.background = bar;
+  $("#pct").innerHTML = showPct ? `${Math.floor(p.progress * 100)}<small>%</small>` : "";
+  $("#pct").style.color = p.state === "complete" ? "var(--lilac)" : "var(--orange)";
+  $("#state").textContent = line;
+  $("#file").textContent = showPct && p.filename ? p.filename : "";
+  $("#left").textContent = online && active ? fmtDur(p.eta) : "—";
+  $("#layer").textContent = online && active && p.layer != null ? `${p.layer}${p.total_layers ? " / " + p.total_layers : ""}` : "—";
+  $("#nozzle").innerHTML = online ? fmtTT(p.nozzle, p.nozzle_target) : "—";
+  $("#bed").innerHTML = online ? fmtTT(p.bed, p.bed_target) : "—";
+  $("#expires").textContent = p.expires_at ? `This link stops working ${new Date(p.expires_at * 1000).toLocaleString()}.` : "";
+  setCamera(p);
+}
+refresh(); setInterval(refresh, 3000);
+</script>
+</body>
+</html>

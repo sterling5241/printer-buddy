@@ -1,0 +1,4 @@
+.pb-qstate { font-size: 12.5px; }
+@media (max-width: 760px) { .pb-qstate { flex-basis: 100%; } }
+.pb-qcount { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; }
+.pb-qcount b { min-width: 28px; text-align: center; font-size: 13px; }

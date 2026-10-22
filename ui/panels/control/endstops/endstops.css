@@ -1,0 +1,5 @@
+.pb-endst { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
+.pb-es { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 4px; background: rgba(127, 127, 140, .1); border: 1px solid transparent; font-size: 13px; }
+.pb-es span { color: var(--muted); font-size: 12px; }
+.pb-es.on { border-color: var(--orange); background: rgba(255, 138, 31, .12); }
+.pb-es.on span { color: var(--orange); font-weight: 700; }
