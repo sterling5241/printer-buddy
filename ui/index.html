@@ -1192,9 +1192,11 @@ function renderPage() {
   $("#pgBed").innerHTML = live ? fmtTT(p.bed, p.bed_target) : "—";
   $("#pgElapsed").textContent = active && p.print_duration ? fmtDur(p.print_duration) : "—";
   $("#pgStarted").textContent = active && p.print_duration ? fmtClock(new Date(Date.now() - p.print_duration * 1000)) : "—";
-  const pause = $("#pgPause");
-  pause.textContent = p.state === "paused" ? "Resume" : "Pause";
-  pause.disabled = !live || !active;
+  const pause = $("#pgPause"), clearable = canClear(p);
+  pause.textContent = p.state === "paused" ? "Resume" : clearable ? "Clear" : "Pause";
+  pause.title = clearable ? "Clear the finished print: back to idle, file and progress cleared" : "";
+  pause.dataset.mode = p.state === "paused" ? "resume" : clearable ? "clear" : "pause";
+  pause.disabled = !live || !(active || clearable);
   $("#pgCancel").disabled = !live || !active;
   $("#pgStop").disabled = !live;
   renderControl(p);
@@ -1202,7 +1204,15 @@ function renderPage() {
   const conLive = p.connection === "online";
   for (const el of $("#pgConsole").querySelectorAll("button, input")) el.disabled = !conLive;
 }
-$("#pgPause").onclick = () => doAction(pageId, printers.get(pageId)?.state === "paused" ? "resume" : "pause");
+// A finished, cancelled or failed print stays shown until it's cleared
+function canClear(p) {
+  return p.connection === "online" && p.klippy_state === "ready" && ["complete", "cancelled", "error"].includes(p.state);
+}
+$("#pgPause").onclick = () => {
+  const p = printers.get(pageId);
+  if (p && canClear(p)) gcode("SDCARD_RESET_FILE");
+  else doAction(pageId, p?.state === "paused" ? "resume" : "pause");
+};
 $("#pgCancel").onclick = () => doAction(pageId, "cancel");
 $("#pgStop").onclick = () => doAction(pageId, "estop");
 $("#pgFull").onclick = () => $("#pgCam").requestFullscreen?.();
