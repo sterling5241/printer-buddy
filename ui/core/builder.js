@@ -135,7 +135,7 @@
         rail.replaceChildren(...layout.tabs.map(t => {
           const first = items(t)[0];
           const b = el("button", "", `${TAB_ICONS[t.id] || reg[first?.t]?.icon || GRID}<span>${esc(t.name)}</span>`);
-          b.type = "button"; b.setAttribute("aria-current", String(t.id === active));
+          b.type = "button"; b.setAttribute("aria-current", String(t.id === active)); b.title = t.name;
           b.onclick = () => showTab(t.id);
           if (editing()) {   // Edit layout: drag a tab up / down the side bar to reorder
             b.draggable = true;
@@ -151,6 +151,15 @@
           }
           return b;
         }));
+        // compact rail (icons only), remembered per browser; phones and tablets lay the rail out themselves
+        const fold = el("button", "bd-fold"); fold.type = "button";
+        const setFold = compact => {
+          rail.classList.toggle("bd-compact", compact);
+          fold.innerHTML = `${icon(compact ? '<path d="M9 6l6 6-6 6"/>' : '<path d="M15 6l-6 6 6 6"/>')}<span>Collapse</span>`;
+          fold.title = compact ? "Expand the sidebar" : "Collapse the sidebar";
+        };
+        setFold(PB.store.get("pb-rail-compact", false));
+        fold.onclick = () => { const c = !rail.classList.contains("bd-compact"); PB.store.set("pb-rail-compact", c); setFold(c); };
         if (editing()) {
           const add = el("button", "bd-add", `${icon('<path d="M12 5v14M5 12h14"/>')}<span>Add tab</span>`);
           add.onclick = () => {
@@ -160,6 +169,7 @@
           };
           rail.append(add);
         }
+        rail.prepend(fold);
       }
       main.replaceChildren(...layout.tabs.map(tab => {
         const sec = el("section", "bd-tab"); sec.hidden = tab.id !== active;
@@ -326,7 +336,7 @@
 
     function showTab(id) {
       active = id; PB.store.set(o.tabKey, id);
-      if (rail) for (const [i, b] of [...rail.querySelectorAll("button:not(.bd-add)")].entries()) b.setAttribute("aria-current", String(layout.tabs[i]?.id === id));
+      if (rail) for (const [i, b] of [...rail.querySelectorAll("button:not(.bd-add):not(.bd-fold)")].entries()) b.setAttribute("aria-current", String(layout.tabs[i]?.id === id));
       for (const [i, s] of [...main.children].entries()) s.hidden = layout.tabs[i]?.id !== id;
       PB.shown(insts.get(id) || []);
     }

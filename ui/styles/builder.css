@@ -48,6 +48,11 @@ html:not([data-theme="light"]) body { background: #121214; }
   :is(#page, #home).bd .bd-rail button span { display: none; }
 }
 :is(#page, #home).bd .bd-rail .bd-add { color: var(--orange); }
+.bd-rail.bd-compact { width: 60px; }
+:is(#page, #home).bd .bd-rail.bd-compact button { justify-content: center; padding: 0; }
+:is(#page, #home).bd .bd-rail.bd-compact button span { display: none; }
+:is(#page, #home).bd .bd-rail .bd-fold { flex: none; margin-bottom: 4px; }
+@media (max-width: 1100px) { :is(#page, #home).bd .bd-rail .bd-fold { display: none; } }
 .bd-main { flex: 1; min-width: 0; padding: 16px; }
 .bd-tab { display: flex; flex-direction: column; gap: 16px; }
 .bd-row { display: grid; gap: 16px; align-items: start; position: relative; }
