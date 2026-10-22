@@ -6,3 +6,6 @@ data/
 printer-buddy.env
 backups/
 Claude outputs/
+ui/
+app/media/timelapse.py
+app/core/notify.py
