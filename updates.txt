@@ -1,6 +1,7 @@
 ai basic v1.5
 ai heavy v1.5
 ai lite v1.5
+core stable v1.0
 notify nightly 2026-10-22
 notify stable v1.0
 streamer nightly 2026-10-22
