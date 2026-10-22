@@ -294,6 +294,40 @@ if not rel:
 a = next((x for x in rel.get("assets", []) if x["name"] == asset), None)
 if not a:
     sys.exit(f"{rel['tag_name']} has no {asset}")
+need = next((l.split(":", 1)[1] for l in (rel.get("body") or "").splitlines() if l.lower().startswith("needs:")), "")
+if channel != "nightly" and need.strip() and os.path.exists(dest):
+    import glob, subprocess
+    root = os.path.dirname(os.path.dirname(state))
+    env = {}
+    if os.path.exists(os.path.join(root, "printer-buddy.env")):
+        env = dict(l.strip().split("=", 1) for l in open(os.path.join(root, "printer-buddy.env")) if "=" in l)
+    git = lambda *a: subprocess.run(["git", "-C", root, *a], capture_output=True, text=True).stdout.strip()
+    nums = lambda v: [int(x) for x in v.lstrip("v").replace("-", ".").split(".") if x.isdigit()]
+    def have(c):   # None = off or not installed, so it doesn't count
+        if c == "core":
+            return "nightly" if git("rev-parse", "--abbrev-ref", "HEAD") == "nightly" else                 git("describe", "--tags", "--abbrev=0", "--match", "core-v*").split("core-", 1)[-1]
+        if c == "ai":
+            if env.get("PB_AI", "off") == "off":
+                return None
+            tags = sorted(json.load(open(m)).get("tag", "") for m in glob.glob(os.path.join(root, "data", "ai", "*", "model.json")))
+            return tags[-1].rsplit("-", 1)[-1] if tags else None
+        if c == "streamer" and env.get("PB_STREAM", "off") == "off":
+            return None
+        try:
+            t = open(os.path.join(state, c)).read().split()[0]
+        except (OSError, IndexError):
+            return None
+        return "nightly" if t.endswith("-nightly") else t.split("-", 1)[-1]
+    miss = []
+    for item in need.split(","):
+        bits = item.split()
+        if len(bits) == 2:
+            h = have(bits[0])
+            if h != "nightly" and h is not None and (not h or nums(bits[1]) > nums(h)):
+                miss.append(item.strip())
+    if miss:
+        print(f"{name}: {rel['tag_name']} needs {', '.join(miss)} first, kept what was there")
+        sys.exit(0)
 stamp = f"{rel['tag_name']} {a['updated_at']} {asset}"
 mark = os.path.join(state, name)
 if os.path.exists(dest) and os.path.exists(mark) and open(mark).read() == stamp:

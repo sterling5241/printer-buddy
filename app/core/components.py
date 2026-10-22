@@ -71,14 +71,16 @@ def _cached(key: str, ttl: float, fn):
 
 
 def latest() -> dict:
-    """updates.txt: {(part, channel or tier): version}."""
+    """updates.txt: {(part, channel or tier): version, ("needs", tag): [(component, min version)]}."""
     def fetch():
         req = urllib.request.Request(UPDATES_URL, headers={"User-Agent": "printer-buddy", "Cache-Control": "no-cache"})
         text = urllib.request.urlopen(req, timeout=15).read().decode()
         out = {}
         for line in text.splitlines():
             bits = line.split()
-            if len(bits) == 3 and not line.startswith("#"):
+            if len(bits) == 4 and bits[0] == "needs":
+                out.setdefault(("needs", bits[1]), []).append((bits[2], bits[3]))
+            elif len(bits) == 3 and not line.startswith("#"):
                 out[(bits[0], bits[1])] = bits[2]
         return out
     return _cached("updates", 600, fetch) or {}
@@ -104,7 +106,7 @@ def core() -> dict:
     remote = _cached(f"core:{want}", 600, lambda: (_git("ls-remote", "origin", f"refs/heads/{want}").split() or [""])[0][:7])
     have = _git("rev-parse", "--short=7", "HEAD")
     ver = latest().get(("core", "stable")) if want == "builds" else None
-    return {"installed": f"{cur} {have}", "latest": f"{want} {ver or remote}" if remote else None,
+    return {"installed": f"{cur} {have}", "latest": f"{want} {ver or remote}" if remote else None, "version": ver,
             "update": bool(remote) and (cur != want or remote != have)}
 
 
@@ -113,6 +115,26 @@ def _newer(a: str, b: str) -> bool:
     def nums(v):
         return [int(x) for x in v.lstrip("v").replace("-", ".").split(".") if x.isdigit()]
     return nums(a) > nums(b)
+
+
+def _installed(ai_tag: str | None) -> dict[str, str]:
+    """component -> installed version ("nightly", "v1.2", or "" if unknown). Turned-off parts are left out."""
+    have = {}
+    for name, (var, tiers, _) in PARTS.items():
+        if not (var and env_get(var, tiers[0]) == "off"):
+            tag, _ = _stamp(name)
+            have[name] = "nightly" if tag.endswith("-nightly") else tag.removeprefix(f"{name}-")
+    if _git("rev-parse", "--abbrev-ref", "HEAD") == "nightly":
+        have["core"] = "nightly"
+    else:
+        have["core"] = _git("describe", "--tags", "--abbrev=0", "--match", "core-v*").removeprefix("core-")
+    if ai_tag and env_get("PB_AI", "off") != "off":
+        have["ai"] = ai_tag.rsplit("-", 1)[-1]
+    return have
+
+
+def _missing(needs: list, have: dict) -> list[str]:
+    return [f"{c} {v}" for c, v in needs if c in have and have[c] != "nightly" and (not have[c] or _newer(v, have[c]))]
 
 
 def _stamp(name: str) -> tuple[str, str]:
@@ -126,6 +148,8 @@ def _stamp(name: str) -> tuple[str, str]:
 def components(ai_tag: str | None) -> dict:
     channel = env_get("PB_CHANNEL", "stable") or "stable"
     avail = latest()
+    have = _installed(ai_tag)
+    need = (lambda tag: _missing(avail.get(("needs", tag), []), have)) if channel == "stable" else (lambda tag: [])
     parts = []
     for name, (var, tiers, path) in PARTS.items():
         tag, when = _stamp(name)
@@ -141,14 +165,21 @@ def components(ai_tag: str | None) -> dict:
             new = avail.get((name, "stable"))
             update = bool(new) and (not tag.startswith(f"{name}-v") or _newer(new, tag.removeprefix(f"{name}-")))
             show_new, installed = new, tag.removeprefix(f"{name}-")
+        miss = need(f"{name}-{new}") if update else []
         parts.append({"name": name, "installed": installed or ("present" if path.exists() else None), "latest": show_new,
-                      "update": update, "tier": env_get(var, tiers[0]) if var else None, "tiers": list(tiers)})
+                      "update": update and not miss, "needs": miss, "tier": env_get(var, tiers[0]) if var else None,
+                      "tiers": list(tiers)})
     kind = env_get("PB_AI", "off") or "off"
     ai_new = avail.get(("ai", kind))
-    return {"channel": channel, "core": core(), "parts": parts,
+    ai_up = bool(ai_new) and kind != "off" and (not (ai_tag or "").removeprefix("ai-").startswith(f"{kind}-")
+                                                 or _newer(ai_new, (ai_tag or "").removeprefix("ai-").removeprefix(f"{kind}-")))
+    ai_miss = need(f"ai-{kind}-{ai_new}") if ai_up else []
+    c = core()
+    c["needs"] = need(f"core-{c['version']}") if c["update"] and c["version"] else []
+    c["update"] = c["update"] and not c["needs"]
+    return {"channel": channel, "core": c, "parts": parts,
             "ai": {"kind": kind, "kinds": list(AI_KINDS), "installed": ai_tag, "latest": ai_new and f"{kind}-{ai_new}",
-                   "update": bool(ai_new) and kind != "off" and (not (ai_tag or "").removeprefix("ai-").startswith(f"{kind}-")
-                                                                 or _newer(ai_new, (ai_tag or "").removeprefix("ai-").removeprefix(f"{kind}-")))}}
+                   "update": ai_up and not ai_miss, "needs": ai_miss}}
 
 
 def run(what: str) -> tuple[bool, str]:
