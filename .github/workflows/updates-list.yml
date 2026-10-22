@@ -2,7 +2,8 @@ name: updates list
 
 on:
   release:
-    types: [published]
+    types: [published, deleted]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -10,24 +11,42 @@ permissions:
 jobs:
   list:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
 
-      - name: Put this release in updates.txt
-        env:
-          TAG: ${{ github.event.release.tag_name }}
+      - name: Rebuild updates.txt from every release
         run: |
-          case "$TAG" in
-            ai-*-*)    rest="${TAG#ai-}"; key="ai ${rest%%-*}"; line="$key ${rest#*-}" ;;
-            *-nightly) key="${TAG%-nightly} nightly"; line="$key $(date -u +%Y-%m-%d)" ;;
-            *-v*)      key="${TAG%%-v*} stable"; line="$key v${TAG#*-v}" ;;
-            *)         echo "not a part or AI release: $TAG"; exit 0 ;;
-          esac
-          touch updates.txt
-          { tr -d '\r' < updates.txt | grep -v "^$key " | grep -v '^$'; echo "$line"; } | sort > updates.new
-          mv updates.new updates.txt
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate > releases.json
+          python3 - <<'PY'
+          import json, re
+          best = {}
+          for r in json.load(open("releases.json")):
+              tag = r["tag_name"]
+              if r.get("draft"):
+                  continue
+              if m := re.fullmatch(r"ai-([a-z]+)-(v[\d.]+)", tag):
+                  key, ver, when = ("ai", m[1]), m[2], r["published_at"]
+              elif m := re.fullmatch(r"([a-z]+)-nightly", tag):
+                  key, ver, when = (m[1], "nightly"), r["published_at"][:10], r["published_at"]
+              elif m := re.fullmatch(r"([a-z]+)-(v[\d.]+)", tag):
+                  key, ver, when = (m[1], "stable"), m[2], r["published_at"]
+              else:
+                  continue
+              nums = [int(x) for x in re.findall(r"\d+", ver)]
+              if key not in best or (nums, when) > best[key][0]:
+                  best[key] = ((nums, when), ver)
+          lines = sorted(f"{a} {b} {v}" for (a, b), (_, v) in best.items())
+          open("updates.txt", "w").write("\n".join(lines) + "\n")
+          PY
+          rm releases.json
+          cat updates.txt
           git diff --quiet && exit 0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "updates.txt: $line"
-          for try in 1 2 3; do git pull --rebase -q && git push && break; sleep 5; done
+          git commit -am "Update updates.txt"
+          for try in 1 2 3; do git pull --rebase -q && git push && exit 0; sleep 5; done
+          exit 1

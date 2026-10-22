@@ -93,6 +93,13 @@ def core() -> dict:
     return {"installed": have, "latest": remote, "update": bool(remote and have and remote != have)}
 
 
+def _newer(a: str, b: str) -> bool:
+    """Is version a (e.g. v1.10) newer than b (v1.9)?"""
+    def nums(v):
+        return [int(x) for x in v.lstrip("v").replace("-", ".").split(".") if x.isdigit()]
+    return nums(a) > nums(b)
+
+
 def _stamp(name: str) -> tuple[str, str]:
     try:
         tag, _, when = (STATE / name).read_text().strip().partition(" ")
@@ -114,7 +121,7 @@ def components(ai_tag: str | None) -> dict:
             installed = f"nightly {when[:10]}" if tag == f"{name}-nightly" else tag.removeprefix(f"{name}-")
         else:
             new = avail.get((name, "stable"))
-            update = bool(new) and tag != f"{name}-{new}"
+            update = bool(new) and (not tag.startswith(f"{name}-v") or _newer(new, tag.removeprefix(f"{name}-")))
             show_new, installed = new, tag.removeprefix(f"{name}-")
         parts.append({"name": name, "installed": installed or ("present" if path.exists() else None), "latest": show_new,
                       "update": update, "tier": env_get(var, tiers[0]) if var else None, "tiers": list(tiers)})
@@ -122,7 +129,8 @@ def components(ai_tag: str | None) -> dict:
     ai_new = avail.get(("ai", kind))
     return {"channel": channel, "core": core(), "parts": parts,
             "ai": {"kind": kind, "kinds": list(AI_KINDS), "installed": ai_tag, "latest": ai_new and f"{kind}-{ai_new}",
-                   "update": bool(ai_new) and kind != "off" and (ai_tag or "").removeprefix("ai-") != f"{kind}-{ai_new}"}}
+                   "update": bool(ai_new) and kind != "off" and (not (ai_tag or "").removeprefix("ai-").startswith(f"{kind}-")
+                                                                 or _newer(ai_new, (ai_tag or "").removeprefix("ai-").removeprefix(f"{kind}-")))}}
 
 
 def run(what: str) -> tuple[bool, str]:
