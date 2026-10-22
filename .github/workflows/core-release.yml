@@ -1,0 +1,24 @@
+name: core release
+
+on:
+  push:
+    tags: ["core-v*"]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Publish
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --latest=false \
+            --title "Printer Buddy ${GITHUB_REF_NAME#core-}" --notes "Core $GITHUB_REF_NAME ($GITHUB_SHA). Stable installs follow the builds branch."
+
+      # releases made with github.token don't start other workflows, so start updates list here
+      - name: Update updates.txt
+        run: gh workflow run updates-list.yml --repo "$GITHUB_REPOSITORY"

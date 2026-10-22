@@ -205,6 +205,13 @@ github_login() {
 
 version() { git -C "$DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown"; }
 branch() { git -C "$DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"; }
+# the branch updates follow: the channel's, unless another branch was picked with G) Switch branch
+core_branch() {
+  case "$(branch)" in
+    nightly|builds|main|HEAD|unknown) [ "$(get_env PB_CHANNEL)" = nightly ] && echo nightly || echo builds ;;
+    *) branch ;;
+  esac
+}
 
 hard_restart() {
   local port; port="$(get_env PORT)"; port="${port:-8080}"
@@ -383,8 +390,10 @@ do_install() {
 
 do_update() {
   echo; echo "Updating..."
-  git -C "$DIR" fetch || { echo "Couldn't get the latest from GitHub. Nothing was changed."; return 1; }
-  git -C "$DIR" reset --hard && git -C "$DIR" reset --hard "origin/$(branch)" || { echo "Update failed."; return 1; }
+  local b; b="$(core_branch)"
+  git -C "$DIR" config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+  git -C "$DIR" fetch --prune origin || { echo "Couldn't get the latest from GitHub. Nothing was changed."; return 1; }
+  git -C "$DIR" reset --hard && git -C "$DIR" checkout -q -B "$b" "origin/$b" && git -C "$DIR" branch -q -u "origin/$b"     || { echo "Update failed."; return 1; }
   after_code_change || return 1
   echo "Updated to $(git -C "$DIR" log -1 --format='%h %s')"
   check_updates

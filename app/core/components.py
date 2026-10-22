@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = ROOT / "printer-buddy.env"
 STATE = ROOT / "data" / "parts"
-UPDATES_URL = "https://raw.githubusercontent.com/sterling5241/printer-buddy/main/updates.txt"
+UPDATES_URL = "https://raw.githubusercontent.com/sterling5241/printer-buddy/HEAD/updates.txt"
 # part -> (env var holding its tier, tiers, file or folder it installs)
 PARTS = {
     "ui": ("PB_UI", ("basic", "advanced"), ROOT / "ui"),
@@ -88,11 +88,24 @@ def _git(*args) -> str:
     return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=20).stdout.strip()
 
 
+CHANNEL_BRANCH = {"stable": "builds", "nightly": "nightly"}
+
+
+def core_branch() -> str:
+    """The branch core updates follow: the channel's, unless another branch was picked in the installer."""
+    cur = _git("rev-parse", "--abbrev-ref", "HEAD")
+    if cur in ("", "HEAD", "main", *CHANNEL_BRANCH.values()):
+        return CHANNEL_BRANCH.get(env_get("PB_CHANNEL", "stable"), "builds")
+    return cur
+
+
 def core() -> dict:
-    branch = _git("rev-parse", "--abbrev-ref", "HEAD")
-    remote = _cached("core", 600, lambda: _git("ls-remote", "origin", f"refs/heads/{branch}").split()[0][:7])
+    cur, want = _git("rev-parse", "--abbrev-ref", "HEAD"), core_branch()
+    remote = _cached(f"core:{want}", 600, lambda: (_git("ls-remote", "origin", f"refs/heads/{want}").split() or [""])[0][:7])
     have = _git("rev-parse", "--short=7", "HEAD")
-    return {"installed": have, "latest": remote, "update": bool(remote and have and remote != have)}
+    ver = latest().get(("core", "stable")) if want == "builds" else None
+    return {"installed": f"{cur} {have}", "latest": f"{want} {ver or remote}" if remote else None,
+            "update": bool(remote) and (cur != want or remote != have)}
 
 
 def _newer(a: str, b: str) -> bool:
@@ -141,7 +154,9 @@ def components(ai_tag: str | None) -> dict:
 def run(what: str) -> tuple[bool, str]:
     """core | parts | ai | streamer: do the update, return (ok, output)."""
     if what == "core":
-        cmd = ["bash", "-c", 'git fetch -q && git reset -q --hard && git reset -q --hard "origin/$(git rev-parse --abbrev-ref HEAD)"'
+        b = core_branch()
+        cmd = ["bash", "-c", 'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && git fetch -q --prune origin'
+               f' && git reset -q --hard && git checkout -q -B {b} origin/{b} && git branch -q -u origin/{b}'
                ' && bash install.sh --parts && .venv/bin/pip install -q -r requirements.txt']
     elif what == "streamer":
         cmd = ["bash", "install.sh", "--streamer"]
