@@ -1,7 +1,7 @@
 // Pause at layer: SET_PAUSE_NEXT_LAYER / SET_PAUSE_AT_LAYER (the standard pause-at-layer macros).
 (() => {
   const { el } = PB, { onPage, cur, send, live, dialog, pageHook } = PB.x;
-  const pl = dialog("pb-pal");
+  const pl = dialog("pb-paldlg");
   PB.pauseAtLayer = async () => {
     const p = cur(); if (!p?.pause_layer) return;
     const st = p.pause_layer, layer = p.layer || 0, total = p.total_layers || 0;
