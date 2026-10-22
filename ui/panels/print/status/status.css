@@ -1,4 +1,3 @@
-/* status panel */
 .pb-st { display: flex; gap: 12px; align-items: center; }
 .pb-thumb { width: 64px; height: 64px; border-radius: 4px; object-fit: contain; background: var(--bd-hover); flex: none; }
 .pb-file { font-weight: 600; overflow-wrap: anywhere; }

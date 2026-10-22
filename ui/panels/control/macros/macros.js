@@ -1,5 +1,3 @@
-// Macros panel: every macro on the printer as a button (Klipper's _HIDDEN ones skipped); hide the ones you don't use.
-// Macros that read parameters (params.TEMP|default(200) …) open a small form first; "…" marks them.
 PB.panel("macros", {
   title: "Macros", desc: "Your printer's macros as buttons", cls: "adv",
   icon: PB.icon('<path d="M13 2L3 14h9l-1 8 10-12h-9z"/>'),
@@ -34,7 +32,7 @@ PB.panel("macros", {
         const all = PB.store.get("pb-macros-hidden", {}); (all[pid] ||= []).push(b.dataset.hide); PB.store.set("pb-macros-hidden", all); draw();
       };
     }
-    const params = PB.parts.macroParams(), form = params.form;   // params.js
+    const params = PB.parts.macroParams(), form = params.form;
     host.querySelector("[data-a=edit]").onclick = e => { const on = host.classList.toggle("pb-macedit"); e.target.textContent = on ? "Done" : "Hide some…"; };
     host.querySelector("[data-a=show]").onclick = () => { const all = PB.store.get("pb-macros-hidden", {}); delete all[pid]; PB.store.set("pb-macros-hidden", all); draw(); };
     return {

@@ -1,4 +1,3 @@
-// Camera panel: the page's own camera box (live stream, camera switcher, grid, full screen all keep working).
 PB.panel("camera", {
   title: "Camera", desc: "Live camera with grid and full screen", single: true, flush: true,
   gear: true,
@@ -13,13 +12,11 @@ PB.panel("camera", {
     const box = PB.take(".pg-cambox");
     host.append(box);
     host.dataset.aspect = cfg.aspect; host.dataset.fit = cfg.fit;
-    // crosshair: a thin + in the middle of the picture, for lining up the nozzle (e.g. a nozzle camera)
     const cross = PB.el("div", "pb-cross"); cross.hidden = !cfg.cross; box.querySelector(".pg-cam")?.append(cross);
-    // ✎ cameras: add / edit / remove the printer's cameras in Moonraker (same list Mainsail and Fluidd use)
     const edit = PB.el("button", "pb-camedit pb-iconbtn", `${PB.ic.pencil}Cameras`); edit.type = "button"; edit.title = "Add or edit this printer's cameras";
     box.querySelector(".pg-cam")?.append(edit);
     edit.onclick = e => { e.stopPropagation(); PB.editCameras?.(); };
-    const pick = p => {   // the chosen camera when a printer opens; the camera buttons can still switch after that
+    const pick = p => {
       if (cfg.cam === "main") return;
       const n = p?.cams?.length || 0;
       pageSel = cfg.cam === "grid" ? (n > 1 ? "grid" : 0) : Math.min(+cfg.cam, Math.max(0, n - 1));

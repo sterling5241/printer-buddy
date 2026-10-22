@@ -1,4 +1,3 @@
-// Fans & outputs panel: fan speeds, output pins, LED colours, and Moonraker power devices (smart plugs etc).
 PB.panel("fans", {
   title: "Fans & outputs", desc: "Fan speeds, pins, LEDs and power devices", cls: "adv",
   icon: PB.icon('<circle cx="12" cy="12" r="2"/><path d="M12 10c0-4 1-7 4-7 2 0 2 3 0 5M14 12c4 0 7 1 7 4 0 2-3 2-5 0M12 14c0 4-1 7-4 7-2 0-2-3 0-5M10 12c-4 0-7-1-7-4 0-2 3-2 5 0"/>'),
@@ -7,7 +6,7 @@ PB.panel("fans", {
     host.innerHTML = `<div class="pb-ctl"></div><div class="pb-fx"></div><div class="pb-pow"></div>`;
     const ctl = host.querySelector(".pb-ctl"), pow = host.querySelector(".pb-pow"), fx = host.querySelector(".pb-fx");
     let fxKey = "";
-    function effects(p) {   // led_effect plugin: one toggle per effect, plus stop all
+    function effects(p) {
       const list = p.led_effects || [], k = list.map(e => `${e.name}:${e.enabled}`).join("|");
       if (k === fxKey) return; fxKey = k;
       fx.innerHTML = list.length ? `<div class="pb-sub-h">LED effects</div><div class="pb-fxrow">${list.map(e =>
@@ -36,7 +35,7 @@ PB.panel("fans", {
         || `<p class="pb-muted">No fans or outputs found.</p>`;
       for (const row of ctl.querySelectorAll("[data-id]")) {
         const id = row.dataset.id, r = row.querySelector("input[type=range]"), c = row.querySelector("input[type=color]"), t = row.querySelector(".pb-switch");
-        if (t) t.onchange = () => gcode(`SET_PIN PIN=${fanName(id)} VALUE=${t.checked ? 1 : 0}`);   // on / off pins
+        if (t) t.onchange = () => gcode(`SET_PIN PIN=${fanName(id)} VALUE=${t.checked ? 1 : 0}`);
         if (r) {
           r.oninput = () => { busy.add(id); row.querySelector("output").textContent = `${r.value}%`; };
           r.onchange = () => {
@@ -63,7 +62,7 @@ PB.panel("fans", {
           try { await PB.rpc("machine.device_power.post_device", { device: b.dataset.dev, action: b.dataset.act }); loadPower(); }
           catch (e) { toast(e.message); }
         };
-      } catch { pow.innerHTML = ""; }   // no [power] devices set up in moonraker.conf
+      } catch { pow.innerHTML = ""; }
     }
     return {
       open() { key = ""; fxKey = ""; fx.innerHTML = ""; },
@@ -77,7 +76,7 @@ PB.panel("fans", {
         for (const f of fans) {
           const row = ctl.querySelector(`[data-id="${CSS.escape(f.id)}"]`); if (!row || busy.has(f.id)) continue;
           const pct = Math.round((f.speed || 0) * 100);
-          row.querySelector("output").textContent = !live ? "—" : settable(f) ? `${pct}%` : pct ? `${pct} %` : "Off";   // automatic fans: text only, like Fluidd
+          row.querySelector("output").textContent = !live ? "—" : settable(f) ? `${pct}%` : pct ? `${pct} %` : "Off";
           const r = row.querySelector("input[type=range]"); if (r) { r.value = pct; r.disabled = !live; }
         }
         for (const o of outs) {

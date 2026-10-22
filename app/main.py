@@ -1,4 +1,3 @@
-"""HTTP API + web UI.  Run:  uvicorn app.main:app --host 0.0.0.0 --port 8080"""
 from __future__ import annotations
 
 import asyncio
@@ -44,7 +43,7 @@ class _QuietShutdown(logging.Filter):
 
 
 logging.getLogger("uvicorn.error").addFilter(_QuietShutdown())
-STATIC = Path(__file__).resolve().parent.parent / "ui"   # the web app (served at /static/)
+STATIC = Path(__file__).resolve().parent.parent / "ui"
 
 store = Store(os.getenv("DB_PATH", "data/monitor.db"))
 manager = Manager(store, Notifier(store))
@@ -76,9 +75,7 @@ def _pid(request: Request) -> int | None:
     return pid if pid in manager.clients else None
 
 
-# ---- pages -------------------------------------------------------------------
 async def manifest(request: Request):
-    """Lets phones and computers install Printer Buddy as an app ("Add to home screen" / "Install")."""
     return JSONResponse({
         "name": "Printer Buddy", "short_name": "Printer Buddy", "start_url": "/", "scope": "/", "display": "standalone",
         "background_color": "#0B0B0D", "theme_color": "#0B0B0D",
@@ -99,13 +96,10 @@ async def service_worker(request: Request):
 
 
 async def index(request: Request):
-    # no-cache: the browser always checks for a newer page after an update
     return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
-# ---- discovery -----------------------------------------------------------------
 async def scan(request: Request):
-    """Find printers on the LAN. Lists them only; nothing gets subscribed."""
     if scan_lock.locked():
         return err("a scan is already running", 409)
     async with scan_lock:
@@ -117,7 +111,6 @@ async def scan(request: Request):
 
 
 async def probe(request: Request):
-    """Check a single host (manual add by IP)."""
     b = await body(request)
     host = str(b.get("host", "")).strip()
     if not host:
@@ -131,7 +124,6 @@ async def probe(request: Request):
     return err(f"no Moonraker found at {host}", 404)
 
 
-# ---- selected printers ---------------------------------------------------------
 async def list_printers(request: Request):
     return JSONResponse({"printers": manager.views()})
 
@@ -244,7 +236,6 @@ async def snapshot(request: Request):
 
 
 async def live_stream(request: Request):
-    """Live MJPEG from the printer's camera, passed through this box."""
     pid = _pid(request)
     if pid is None:
         return err("not found", 404)
@@ -293,8 +284,6 @@ async def ai_settings(request: Request):
 
 
 async def ui_layout(request: Request):
-    """The builder's layout (tabs, rows, columns, panels), saved on this box so every device shows the same.
-    ?scope=home is the home (all printers) page; otherwise the printer page."""
     key = "ui_layout_home" if request.query_params.get("scope") == "home" else "ui_layout"
     if request.method == "PUT":
         b = await body(request)
@@ -305,7 +294,6 @@ async def ui_layout(request: Request):
     return JSONResponse({"layout": store.settings().get(key)})
 
 
-# ---- theme imported from a printer's Fluidd / Mainsail (Settings > Look) ----
 # source -> (theme folder in the config root, {our part: their file names, first found wins}, Moonraker database namespace)
 THEME_SOURCES = {
     "fluidd": (".fluidd-theme", {"background": ["background"], "logo": ["sidebar-logo", "logo"]}, "fluidd"),
@@ -313,11 +301,10 @@ THEME_SOURCES = {
 }
 THEME_IMG = (".png", ".jpg", ".jpeg", ".gif", ".svg")
 THEME_DIR = Path(os.path.dirname(os.path.abspath(os.getenv("DB_PATH", "data/monitor.db")))) / "theme"
-# the parts of their custom.css that aren't tied to their own page layout: selectors to look for, and what they become here
 THEME_CSS = {"page": ("html", "body"), "panel": (".v-card",), "head": (".card-heading", ".v-toolbar"),
-             "over": ("body::before", "body::after", "html::before", "html::after", "#app::before", "#app::after")}   # big faded logo
+             "over": ("body::before", "body::after", "html::before", "html::after", "#app::before", "#app::after")}
 THEME_PROP = re.compile(r"^(-webkit-)?(background(-[a-z]+)?|backdrop-filter)$")
-THEME_OVER = {"opacity", "width", "height", "top", "left", "right", "bottom", "transform"}   # also kept for the background logo
+THEME_OVER = {"opacity", "width", "height", "top", "left", "right", "bottom", "transform"}
 THEME_URL = re.compile(r"""url\(\s*['"]?([^'")]+)['"]?\s*\)""")
 
 
@@ -330,7 +317,7 @@ def _theme_css(css: str) -> dict:
         for part, keys in THEME_CSS.items():
             if not any(x == k or (k.startswith(".") and k in x) for x in sels for k in keys):
                 continue
-            if part == "head" and any(".v-card" in x for x in sels):   # a rule for cards + toolbars is the panel look, not a header tint
+            if part == "head" and any(".v-card" in x for x in sels):
                 continue
             for d in block.split(";"):
                 prop, _, val = d.partition(":")
@@ -338,12 +325,11 @@ def _theme_css(css: str) -> dict:
                 if (not (THEME_PROP.match(prop) or (part == "over" and prop in THEME_OVER)) or not val or val in ("transparent", "none", "initial", "inherit")
                         or re.search(r"[<>{}\\]|expression\(|javascript:", val, re.I)):
                     continue
-                found[part][prop] = val   # later rules win, like in css
+                found[part][prop] = val
     return {k: "; ".join(f"{p}: {v}" for p, v in d.items()) for k, d in found.items() if d}
 
 
 def _config_url(u: str) -> str | None:
-    """A url() in their css that points at the printer's config folder -> the path inside it."""
     m = re.match(r"^/?server/files/config/(.+)$", u.strip())
     return m.group(1) if m and ".." not in m.group(1).split("/") else None
 
@@ -362,7 +348,6 @@ async def _read_file_bytes(client, path: str, cap: int) -> bytes:
 
 
 async def _read_theme(client, source: str) -> dict:
-    """What a printer's Fluidd / Mainsail theme has: colour, dark / light, picture files (paths in the config root) and css parts."""
     folder, parts, ns = THEME_SOURCES[source]
     out = {"source": source, "color": None, "mode": None, "files": {}, "css": {}}
     logo = None
@@ -381,7 +366,7 @@ async def _read_theme(client, source: str) -> dict:
         hit = next((b + x for b in bases for x in THEME_IMG if b + x in names), None)
         if hit:
             out["files"][part] = f"{folder}/{hit}"
-    if logo and logo.startswith(folder + "/") and logo.split("/", 1)[1] in names:   # Fluidd's own logo setting, if that file is there
+    if logo and logo.startswith(folder + "/") and logo.split("/", 1)[1] in names:
         out["files"]["logo"] = logo
     if "custom.css" in names:
         with contextlib.suppress(Exception):
@@ -398,7 +383,6 @@ async def _copy_theme_file(client, path: str, name: str) -> str:
 
 
 async def printer_theme(request: Request):
-    """GET: preview the printer's Fluidd / Mainsail theme (?source=). PUT {source, parts}: copy those parts to this box."""
     client, e = _online_client(request)
     if e:
         return e
@@ -407,7 +391,7 @@ async def printer_theme(request: Request):
     if source not in THEME_SOURCES:
         return err("source must be fluidd or mainsail")
     found = await _read_theme(client, source)
-    if request.method == "GET":   # pictures in the css point at the printer for the preview
+    if request.method == "GET":
         pid = request.path_params["pid"]
 
         def to(m):
@@ -432,7 +416,7 @@ async def printer_theme(request: Request):
         for part, decls in found["css"].items():
             if part not in parts:
                 continue
-            urls, n = {}, 0   # their pictures come along too
+            urls, n = {}, 0
             for u in THEME_URL.findall(decls):
                 if u not in urls:
                     p = _config_url(u)
@@ -448,7 +432,6 @@ async def printer_theme(request: Request):
 
 
 async def ui_theme(request: Request):
-    """GET: the imported theme ({} = Printer Buddy's own look). DELETE: back to Printer Buddy's own look."""
     if request.method == "DELETE":
         if THEME_DIR.exists():
             for f in THEME_DIR.iterdir():
@@ -469,7 +452,6 @@ KV_KEYS = ("presets", "notes", "maintenance", "console_filters")
 
 
 async def ui_eta(request: Request):
-    """How "time left" is worked out for every printer on this box: file | slicer | filament (Settings > Look)."""
     mr = _mr
     if request.method == "PUT":
         mode = (await body(request)).get("mode")
@@ -481,8 +463,6 @@ async def ui_eta(request: Request):
 
 
 async def printer_kv(request: Request):
-    """Small per-printer lists saved on this box (temperature presets, history notes, maintenance, console filters).
-    GET/PUT /api/printers/{pid}/kv?key=presets  body {value: ...}"""
     pid, key = request.path_params["pid"], request.query_params.get("key", "")
     if key not in KV_KEYS:
         return err("unknown key", 404)
@@ -499,8 +479,6 @@ _notices = {"at": 0.0, "items": []}
 
 
 async def notices(request: Request):
-    """Moonraker's own notices from every online printer, for the bell: warnings, failed components and the official
-    Klipper / Moonraker announcements (server.announcements). Cached 10 minutes."""
     if time.time() - _notices["at"] < 600 and request.query_params.get("refresh") != "1":
         return JSONResponse({"items": _notices["items"]})
     names = {p["id"]: p["name"] for p in store.list()}
@@ -534,7 +512,7 @@ async def notices(request: Request):
 
     groups = await asyncio.gather(*(one(pid, c) for pid, c in list(manager.clients.items())))
     seen, items = set(), []
-    for g in groups:   # the same announcement on several printers: show it once
+    for g in groups:
         for it in g:
             key = it["id"].split("-", 2)[0] + it["title"].split(": ", 1)[-1] + (it.get("body") or "")[:80]
             if it["id"].startswith("a-") and key in seen:
@@ -549,7 +527,6 @@ _news = {"at": 0.0, "items": []}
 
 
 async def news(request: Request):
-    """Printer Buddy news (the bell): fetched from printerbuddy.stream at most every 6 hours, nothing about this box is sent."""
     if time.time() - _news["at"] > 6 * 3600 or request.query_params.get("refresh") == "1":
         domain = os.getenv("PB_SHARE_DOMAIN", "").strip().strip("/") or "printerbuddy.stream"
         try:
@@ -558,7 +535,7 @@ async def news(request: Request):
                 _news["items"] = [n for n in data["items"] if isinstance(n, dict) and n.get("id") and n.get("title")][:50]
             _news["at"] = time.time()
         except Exception:
-            _news["at"] = time.time() - 5.5 * 3600   # offline: try again in ~30 minutes
+            _news["at"] = time.time() - 5.5 * 3600
     return JSONResponse({"items": _news["items"]})
 
 
@@ -613,14 +590,14 @@ async def ai_photo_image(request: Request):
 
 async def ai_photo_label(request: Request):
     b = await body(request)
-    if "severity" in b and "label" not in b:      # just "how bad was it?"
+    if "severity" in b and "label" not in b:
         item = manager.collect.set_severity(request.path_params["iid"], b["severity"])
         return JSONResponse(item) if item else err("can't rate that photo (needs a failure label, 1-10)")
     label = b.get("label")
     item = manager.collect.set_label(request.path_params["iid"], label)
     if not item:
         return err("can't label that photo (unknown label, already sent, or gone)")
-    for st in manager.ai.state.values():            # answered: stop asking about it
+    for st in manager.ai.state.values():
         if st.get("alert_item") == item["id"]:
             st["alert_item"] = None
     if item.get("pid") in manager.rows:
@@ -650,7 +627,7 @@ async def ai_save(request: Request):
     item = await manager.save_for_ai(pid, label)
     if not item:
         return err("Couldn't get a picture from this printer's camera", 409)
-    await manager.collect.send_now()                  # send it now, so the toast can say whether it went
+    await manager.collect.send_now()
     item = manager.collect._read(item["id"]) or item
     return JSONResponse({**item, "sharing": manager.collect.sharing(), "error": manager.collect.last_error}, status_code=201)
 
@@ -699,7 +676,6 @@ async def delete_timelapse(request: Request):
     return Response(status_code=204)
 
 
-# ---- share links ---------------------------------------------------------------------
 SHARE_EXPIRY = {"1h": 3600, "1d": 86400, "7d": 7 * 86400, "never": None}
 
 
@@ -708,8 +684,6 @@ def remote_on() -> bool:
 
 
 def share_user_id() -> str:
-    """Random number for this box, made once; it's the user/<id> part of share links.
-    install.sh keeps it in printer-buddy.env (PB_USER_ID) so the tunnel can be named after it."""
     env_uid = os.getenv("PB_USER_ID", "").strip()
     if env_uid.isdigit():
         return env_uid
@@ -723,11 +697,11 @@ def share_user_id() -> str:
 def share_url(request: Request, pid: int, code: str) -> str:
     domain = os.getenv("PB_SHARE_DOMAIN", "").strip().strip("/")
     if not domain and setup()["remote"] == "on":
-        domain = "printerbuddy.stream"   # remote access on: links go through printerbuddy.stream by default
+        domain = "printerbuddy.stream"
     if domain:
         host = domain if domain.startswith("www.") else f"www.{domain}"
         return f"https://{host}/share/user/{share_user_id()}/printer/{pid}/{code}"
-    return f"{str(request.base_url).rstrip('/')}/share/printer/{pid}/{code}"   # no domain set: works on your network only
+    return f"{str(request.base_url).rstrip('/')}/share/printer/{pid}/{code}"
 
 
 def share_view(request: Request, row: dict) -> dict:
@@ -767,7 +741,6 @@ async def revoke_share(request: Request):
 
 
 def _valid_share(request: Request):
-    """The printer id for a share link, or None if the link is wrong, revoked, expired or sharing is off."""
     if not remote_on():
         return None
     row = store.get_share(request.path_params["code"])
@@ -831,8 +804,8 @@ async def printer_action(request: Request):
 
 
 GCODE_EXT = (".gcode", ".gco", ".g")
-CONFIG_EXT = (".conf", ".cfg", ".md", ".css", ".jpg", ".jpeg", ".png", ".gif")   # config uploads (same list as Fluidd)
-MAX_UPLOAD = 1024 * 1024 * 1024  # 1 GB
+CONFIG_EXT = (".conf", ".cfg", ".md", ".css", ".jpg", ".jpeg", ".png", ".gif")
+MAX_UPLOAD = 1024 * 1024 * 1024
 
 
 def _online_client(request: Request):
@@ -899,7 +872,7 @@ async def print_file(request: Request):
     if not name:
         return err("path is required")
     pid = request.path_params["pid"]
-    if b.get("timelapse") is False:     # start-print dialog: don't record this one
+    if b.get("timelapse") is False:
         manager.timelapse.skip.add(pid)
     else:
         manager.timelapse.skip.discard(pid)
@@ -911,7 +884,6 @@ async def print_file(request: Request):
 
 
 async def job_queue(request: Request):
-    """GET: the printer's job queue. POST {action: add|remove|start|pause|jump, filenames|job_ids|job_id}."""
     client, e = _online_client(request)
     if e:
         return e
@@ -924,7 +896,7 @@ async def job_queue(request: Request):
             if not names:
                 return err("filenames is required")
             params = {"filenames": names}
-            if b.get("reset"):   # replace the whole queue (the Queue panel's copies / reorder)
+            if b.get("reset"):
                 params["reset"] = True
         elif action == "remove":
             params = {"job_ids": [str(j) for j in b.get("job_ids") or []]}
@@ -964,7 +936,6 @@ RPC_ALLOW = {
 
 
 async def rpc(request: Request):
-    """POST {method, params}: one of the allowed Moonraker methods above, for the dashboard panels."""
     client, e = _online_client(request)
     if e:
         return e
@@ -977,7 +948,7 @@ async def rpc(request: Request):
     try:
         result = await client.rpc(method, params, timeout=RPC_ALLOW[method])
         if method in ("server.webcams.post_item", "server.webcams.delete_item"):
-            await client._load_webcams()   # the camera list changed: show it right away
+            await client._load_webcams()
         return JSONResponse({"result": result})
     except Exception as ex:
         text = str(ex) or type(ex).__name__
@@ -995,7 +966,6 @@ def _root_path(request: Request):
 
 
 async def printer_file(request: Request):
-    """GET: stream a file (G-code preview, config editor, log download). PUT: save a config file (the editor)."""
     client, e = _online_client(request)
     if e:
         return e
@@ -1033,7 +1003,7 @@ async def printer_file(request: Request):
     if request.query_params.get("download") == "1":
         headers["Content-Disposition"] = f'attachment; filename="{name}"'
     ctype = "text/plain; charset=utf-8" if root != "gcodes" or request.query_params.get("download") != "1" else "application/octet-stream"
-    if name.lower().endswith(THEME_IMG) and request.query_params.get("download") != "1":   # pictures (theme preview, file view)
+    if name.lower().endswith(THEME_IMG) and request.query_params.get("download") != "1":
         ctype = mimetypes.guess_type(name)[0] or ctype
     return StreamingResponse(relay(), media_type=ctype, headers=headers)
 
@@ -1122,7 +1092,6 @@ async def printer_gcode(request: Request):
     return JSONResponse({"ok": True})
 
 
-# ---- live updates (Server-Sent Events) -----------------------------------------
 async def events(request: Request):
     q = manager.subscribe()
 
@@ -1202,7 +1171,6 @@ async def test_notification(request: Request):
     return JSONResponse({"ok": True, "with_snapshot": bool(image)})
 
 
-# Setup chosen in install.sh (printer-buddy.env). First choice = default.
 SETUP = {
     "ui": ("PB_UI", ("basic", "advanced")),
     "ai": ("PB_AI", ("off", "basic", "heavy")),
@@ -1221,7 +1189,7 @@ def setup() -> dict:
     return out
 
 
-STARTED = str(time.time())  # changes on every restart; open pages reload when it does
+STARTED = str(time.time())
 
 
 async def get_config(request: Request):

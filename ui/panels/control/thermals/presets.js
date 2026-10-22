@@ -1,13 +1,9 @@
-// Thermals panel, part: temperature presets - your own (saved on the box per printer): a name, a target per heater,
-// optional G-code after. Used by thermals.js.
 PB.parts = PB.parts || {};
 PB.parts.thermalsPresets = (host, cmd) => {
-    // ---- presets: your own (saved on the box per printer) - name, a target per heater, optional G-code after ----
     const BASE = [{ name: "PLA", temps: { extruder: 210, heater_bed: 60 } }, { name: "PETG", temps: { extruder: 240, heater_bed: 80 } },
                   { name: "ABS", temps: { extruder: 250, heater_bed: 100 } }];
     let presets = BASE;
     const heaters = () => (PB.current()?.sensors || []).filter(s => s.target != null);
-    // a "Presets" button in the panel's title strip; its menu: heaters off, each preset (with its temperatures), edit
     const menu = PB.el("div", "bd-menu pb-presmenu"); menu.hidden = true; document.body.append(menu);
     let btn = null;
     function drawPresets() {

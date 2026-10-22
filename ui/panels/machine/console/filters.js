@@ -1,5 +1,3 @@
-// Console panel, part: filters - hide temperature reports and lines matching your text or /regex/ filters (saved on
-// the box per printer). Used by console.js.
 PB.parts = PB.parts || {};
 PB.parts.consoleFilters = (q, cfg, S) => {   // S: { get() -> filters, set(list) -> list (and redraw) }
     let filters;

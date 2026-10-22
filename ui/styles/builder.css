@@ -1,18 +1,14 @@
-/* Printer Buddy - dashboard builder look: flat panels, slim headers, dense text (Mainsail / Fluidd feel, our own CSS). */
 :is(#page, #home).bd { --bd-panel: #1d1d21; --bd-head: #232328; --bd-line: rgba(255, 255, 255, .07); --bd-hover: rgba(255, 255, 255, .06); --bd-deep: #16161a;
            --bd-mono: "Roboto Mono", ui-monospace, "SF Mono", Consolas, monospace; max-width: none; padding: 0; gap: 0; font-size: 14px;
            font-family: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif; }
-/* page background: flat, one step darker than the cards */
 html:not([data-theme="light"]) body { background: #121214; }
 :is(#page, #home).bd input, :is(#page, #home).bd select { min-height: 0; }
-/* the page's big touch-size inputs are too tall for dense panels */
 #page.bd button, #home.bd :where(.pb-card > header, .bd-tabbar, .bd-rowtools, .pb-body > :not(#grid):not(.grid)) button, #home.bd :where(.pb-body > button, .bd-addpanel, .bd-addrow) { min-height: 0; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid transparent;
                   background: var(--bd-hover); color: var(--text); font-size: 13px; font-weight: 500; }
 #page.bd button:hover:not(:disabled), #home.bd :where(.pb-card > header, .bd-tabbar, .bd-rowtools, .pb-body > :not(#grid):not(.grid)) button:hover:not(:disabled), #home.bd :where(.pb-body > button:hover:not(:disabled), .bd-addpanel, .bd-addrow):hover { background: rgba(255, 255, 255, .1); }
 #page.bd button:disabled, #home.bd :where(.pb-card > header, .bd-tabbar, .bd-rowtools, .pb-body > :not(#grid):not(.grid)) button:disabled, #home.bd :where(.pb-body > button:disabled, .bd-addpanel, .bd-addrow):disabled { opacity: .45; }
 :is(#page, #home).bd .pb-muted { color: var(--muted); }
 :is(#page, #home).bd .pb-ic { width: 16px; height: 16px; flex: none; }
-/* top bar */
 .bd-top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 12px 4px 16px;
           background: var(--bd-panel); border-bottom: 1px solid var(--bd-line); flex-wrap: wrap; }
 .bd-top .pg-back { min-height: 0; font-size: 13px; padding: 0; }
@@ -32,7 +28,6 @@ html:not([data-theme="light"]) body { background: #121214; }
 .bd-top .bd-divider { width: 1px; height: 22px; background: var(--bd-line); margin: 0 2px; }
 
 :is(#page, #home).bd #pgStop { color: var(--red-text, #ff6b61); }
-/* rail + main */
 .bd-wrap { display: flex; align-items: flex-start; }
 .bd-rail { position: sticky; top: 48px; width: 200px; flex: none; height: calc(100vh - 48px); overflow-y: auto; background: var(--bd-panel);
            border-right: 1px solid var(--bd-line); display: flex; flex-direction: column; gap: 2px; padding: 8px; }
@@ -42,7 +37,7 @@ html:not([data-theme="light"]) body { background: #121214; }
 :is(#page, #home).bd .bd-rail button .pb-ic { width: 18px; height: 18px; }
 :is(#page, #home).bd .bd-rail button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :is(#page, #home).bd .bd-rail button[aria-current="true"] { color: var(--orange); background: rgba(255, 138, 31, .14); }
-@media (max-width: 1100px) and (min-width: 761px) {   /* tablets: icons only */
+@media (max-width: 1100px) and (min-width: 761px) {
   .bd-rail { width: 60px; }
   :is(#page, #home).bd .bd-rail button { justify-content: center; padding: 0; }
   :is(#page, #home).bd .bd-rail button span { display: none; }
@@ -57,7 +52,6 @@ html:not([data-theme="light"]) body { background: #121214; }
 .bd-tab { display: flex; flex-direction: column; gap: 16px; }
 .bd-row { display: grid; gap: 16px; align-items: start; position: relative; }
 .bd-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 20px; }
-/* panels */
 :is(#page, #home).bd .pb-card { background: var(--bd-panel); border: 1px solid var(--bd-line); border-radius: 6px; overflow: hidden; }
 :is(#page, #home).bd .pb-card > header { display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 6px 0 14px; background: var(--bd-head);
                              border-bottom: 1px solid var(--bd-line); color: var(--muted); }
@@ -71,8 +65,6 @@ html:not([data-theme="light"]) body { background: #121214; }
 :is(#page, #home).bd .pb-body { padding: 14px; }
 :is(#page, #home).bd .pb-card.flush > .pb-body { padding: 0; }
 .pb-card.adv { }
-/* hidden in Basic mode by the page's own .adv rule */
-/* edit mode */
 :is(#page, #home).bd.bd-editing .pb-tools { display: flex; }
 :is(#page, #home).bd .pb-qset { height: 26px; padding: 0 7px; font-size: 12px; border: 0; background: none; }
 :is(#page, #home).bd.bd-editing .pb-qset { display: none; }
@@ -100,11 +92,9 @@ html:not([data-theme="light"]) body { background: #121214; }
 .bd-libgrid small { color: var(--muted); font-weight: 400; }
 .bd-libfoot { display: flex; justify-content: flex-end; margin-top: 12px; }
 .bd-libfoot button { height: 32px; padding: 0 12px; background: #2a2a2f; color: var(--text); border: 1px solid #2c2c31; border-radius: 4px; }
-/* reused page blocks inside panels */
 :is(#page, #home).bd .pb-card .pg-cambox { flex: none; border: 0; border-radius: 0; }
 :is(#page, #home).bd .pb-card .pg-ai { border: 0; background: none; padding: 0; margin: 0; }
 :is(#page, #home).bd .pb-card .files, :is(#page, #home).bd .pb-card .hist, :is(#page, #home).bd .pb-card .tl { margin: 0; }
-/* status */
 .pb-prog { height: 4px; background: var(--bd-hover); border-radius: 2px; margin: 10px 0 4px; overflow: hidden; }
 .pb-prog i { display: block; height: 100%; width: 0; }
 .pb-kv { display: grid; grid-template-columns: 1fr 1fr; margin: 8px 0 0; border-top: 1px solid var(--bd-line); font-variant-numeric: tabular-nums; }
@@ -113,9 +103,7 @@ html:not([data-theme="light"]) body { background: #121214; }
 .pb-kv div:nth-child(even) { padding-left: 12px; }
 .pb-kv dt { color: var(--muted); }
 .pb-kv dd { margin: 0; text-align: right; }
-/* thermals */
 .pb-chart { height: 180px; margin-top: 10px; border-top: 1px solid var(--bd-line); padding-top: 8px; }
-/* toolhead */
 .pb-row { display: flex; gap: 6px; margin-bottom: 6px; }
 :is(#page, #home).bd .pb-row button { flex: 1; min-width: 0; padding: 0 4px; }
 .pb-seg { display: flex; border: 1px solid var(--bd-line); border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
@@ -126,9 +114,6 @@ html:not([data-theme="light"]) body { background: #121214; }
 .pb-speed input { flex: 1; accent-color: var(--orange); }
 .pb-speed output { color: var(--text); font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
 .pb-note { font-size: 12px; color: var(--muted); min-height: 16px; }
-/* macros */
-/* console */
-/* phone: one column, rail along the top, buttons under the name */
 @media (max-width: 760px) {
   .bd-top { padding: 6px 10px; gap: 6px 8px; }
   .bd-top .pg-back { font-size: 0; }
@@ -145,18 +130,15 @@ html:not([data-theme="light"]) body { background: #121214; }
   .bd-row { grid-template-columns: minmax(0, 1fr) !important; gap: 8px; }
   .bd-tab, .bd-col { gap: 8px; }
 }
-/* panel settings box */
 .bd-setform { display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
 .bd-setform label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .bd-setform .bd-check { justify-content: flex-start; }
 .bd-setform select { height: 30px; background: #0f0f11; color: var(--text); border: 1px solid #2c2c31; border-radius: 4px; padding: 0 6px; }
 .bd-libfoot { gap: 8px; }
 .bd-set .bd-primary { background: var(--orange); border-color: var(--orange); color: #1a1005; }
-/* camera aspect setting */
 :is(#page, #home).bd .pb-body[data-aspect="4/3"] .pg-cam { aspect-ratio: 4 / 3; }
 :is(#page, #home).bd .pb-body[data-aspect="1/1"] .pg-cam { aspect-ratio: 1 / 1; }
 :is(#page, #home).bd .pb-body[data-fit="cover"] .pg-cam img { object-fit: cover; }
-/* lists: Files, History */
 .pb-tool { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
 .pb-tool input[type=search] { flex: 1 1 140px; min-width: 0; height: 32px; background: var(--bd-deep); border: 1px solid var(--bd-line);
                               border-radius: 4px; color: var(--text); padding: 0 10px; font: inherit; font-size: 13px; }
@@ -182,9 +164,7 @@ html:not([data-theme="light"]) body { background: #121214; }
 .bd-pp img { width: 96px; height: 96px; object-fit: contain; border-radius: 4px; background: #2a2a2f; }
 .bd-print .bd-primary { background: var(--orange); border-color: var(--orange); color: #1a1005; }
 @media (max-width: 760px) { .pb-chip { display: none; } }
-/* objects (exclude object) */
 .pb-msg code { font-family: var(--bd-mono); font-size: 12px; }
-/* print tuning panels */
 .pb-fields { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 6px 0; font-size: 13px; color: var(--muted); }
 .pb-fields label { display: inline-flex; align-items: center; gap: 6px; }
 .pb-fields input { width: 80px; height: 28px; background: var(--bd-deep); border: 1px solid var(--bd-line); border-radius: 3px;
@@ -197,10 +177,8 @@ html:not([data-theme="light"]) body { background: #121214; }
 .pb-dl { display: inline-grid; place-items: center; height: 28px; min-width: 28px; border-radius: 4px; border: 1px solid var(--bd-line);
          background: var(--bd-hover); color: var(--text); text-decoration: none; font-size: 13px; }
 @media (max-width: 760px) { .pb-li { flex-wrap: wrap; } .pb-lbtn { width: 100%; justify-content: flex-end; } }
-/* setup panels */
 .pb-code { width: 100%; box-sizing: border-box; background: var(--bd-deep); color: #d6d3dd; border: 1px solid var(--bd-line); border-radius: 4px;
            font-family: var(--bd-mono); font-size: 12.5px; line-height: 1.5; padding: 8px 10px; resize: vertical; tab-size: 2; white-space: pre; }
-/* light theme (top bar ☀ / ☾ button; "auto" follows the computer's setting) */
 html[data-theme="light"] { --bg: #f4f4f6; --card: #ffffff; --card2: #f0f0f3; --line: #dcdce2; --track: #e6e6ec;
                            --text: #1c1b20; --muted: #6b6878; --lilac: #6d28d9; --red-text: #c9372c; }
 html[data-theme="light"] :is(#page, #home).bd { --bd-panel: #ffffff; --bd-head: #f2f2f5; --bd-line: #dcdce2; --bd-hover: #ececf1; --bd-deep: #f7f7f9; }
@@ -209,8 +187,6 @@ html[data-theme="light"] .pb-log, html[data-theme="light"] .pb-code { color: #2a
 html[data-theme="light"] .bd-lib, html[data-theme="light"] .bd-libgrid button, html[data-theme="light"] .bd-libfoot button { background: #fff; color: #1c1b20; border-color: #dcdce2; }
 html[data-theme="light"] .pg-cam { background: #000; }
 :is(#page, #home).bd .bd-theme { width: 32px; padding: 0; background: transparent; border-color: transparent; color: var(--muted); }
-/* misc for the new panels */
-/* layout editor (Fluidd-style): handle, eye, menu, drag line, phone preview */
 .pb-handle { display: none; cursor: grab; color: var(--muted); font-size: 16px; padding: 0 2px; touch-action: none; user-select: none; }
 :is(#page, #home).bd.bd-editing .pb-handle { display: inline-block; }
 :is(#page, #home).bd.bd-editing .pb-card > header { cursor: default; }
@@ -234,12 +210,10 @@ html[data-theme="light"] .pg-cam { background: #000; }
 :is(#page, #home).bd.bd-preview .bd-tab > .bd-row > .bd-col { outline-style: solid; }
 .bd-libgrid small { font-size: 11.5px; line-height: 1.3; text-align: center; }
 html[data-theme="light"] .bd-menu { background: #fff; border-color: #dcdce2; }
-/* home page builder */
 #home.bd { margin: 8px 0 16px; }
 #home.bd .bd-main { padding: 0; }
 #home.bd .pb-card.flush > .pb-body, #home.bd .pb-printers { padding: 0; }
 #home.bd .pb-printers .grid { margin: 0; }
-/* home: fleet, active prints, camera wall, news, settings */
 .pb-fleet { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .pb-fstat { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 4px; background: var(--bd-hover, #2a2a2f); }
 .pb-fstat b { font-size: 26px; font-variant-numeric: tabular-nums; }
@@ -278,9 +252,6 @@ html[data-theme="light"] .bd-menu { background: #fff; border-color: #dcdce2; }
 .pb-settings .panel { border: 0; background: none; padding: 0; margin: 0; box-shadow: none; }
 .pb-settings .panel > h2 { display: none; }
 .pb-about { max-width: 480px; }
-/* history table */
-/* config files panel + full-screen editor */
-/* extras.js: Klipper error card, drop overlay, shortcuts, macro prompts, calibration helpers */
 .pb-xd button { height: 32px; padding: 0 12px; background: #2a2a2f; color: var(--text); border: 1px solid #3a3a40; border-radius: 4px; font-weight: 600; cursor: pointer; }
 .pb-xd button:hover { border-color: var(--orange); }
 .pb-xd .bd-primary { background: var(--orange); border-color: var(--orange); color: #1a1005; }
@@ -326,7 +297,6 @@ html[data-theme="light"] .pb-prow input, html[data-theme="light"] .pb-prow texta
 :is(#page, #home).bd .pb-tool [data-a=charts][aria-pressed="true"] { color: var(--orange); }
 .pb-xd .pb-cmdlist button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; height: auto; padding: 6px 8px; border: 0; border-bottom: 1px solid rgba(127, 127, 140, .15); border-radius: 0; background: none; text-align: left; font-weight: 400; }
 .pb-scard .pb-kv { margin-top: 4px; }
-/* line icons (PB.ic) inside buttons, links and labels */
 svg.pb-ic { width: 16px; height: 16px; flex: none; vertical-align: -3px; }
 :is(button, a, .pb-cdir, .pb-mname, .pb-hnote):has(> svg.pb-ic) { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .pb-cdir:has(> svg.pb-ic), .pb-mname:has(> svg.pb-ic), .pb-hnote:has(> svg.pb-ic) { justify-content: flex-start; }
@@ -335,7 +305,6 @@ svg.pb-ic { width: 16px; height: 16px; flex: none; vertical-align: -3px; }
 .pb-lthumb.pb-ico { display: grid; place-items: center; color: var(--muted); }
 .pb-lthumb.pb-ico svg.pb-ic { width: 20px; height: 20px; }
 .pb-bell svg.pb-ic, .bd-theme svg.pb-ic { width: 18px; height: 18px; }
-/* panel actions in the title strip (data-head) */
 :is(#page, #home).bd .pb-card > header .pb-hbtn { height: 30px; min-width: 30px; padding: 0 6px; border: 0; background: transparent; color: var(--muted); }
 :is(#page, #home).bd .pb-card > header .pb-hbtn:hover:not(:disabled) { background: var(--bd-hover); color: var(--text); }
 :is(#page, #home).bd .pb-card > header .pb-hbtn[aria-pressed="true"] { color: var(--orange); }

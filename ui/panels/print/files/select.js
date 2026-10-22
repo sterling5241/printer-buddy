@@ -1,7 +1,5 @@
-// Files panel, part: Select mode - tick files, then download / move / delete them all. Used by files.js.
 PB.parts = PB.parts || {};
 PB.parts.filesSelect = c => {
-    // ---- select mode: delete / move / download many ----
     function bulkBar() {
       const bar = c.q(".pb-bulk"); bar.hidden = !c.selecting;
       c.q(".pb-bn").textContent = `${c.picked.size} picked`;
@@ -11,7 +9,7 @@ PB.parts.filesSelect = c => {
     c.q("[data-a=sel]").onclick = e => { c.selecting = !c.selecting; c.picked.clear(); e.currentTarget.setAttribute("aria-pressed", c.selecting); c.draw(); };
     c.q("[data-b=all]").onclick = () => { for (const x of c.list.querySelectorAll("[data-pick]")) c.picked.add(x.dataset.pick); c.draw(); };
     c.q("[data-b=none]").onclick = () => { c.picked.clear(); c.draw(); };
-    c.q("[data-b=dl]").onclick = async () => {   // one download per file (browsers may ask once to allow several)
+    c.q("[data-b=dl]").onclick = async () => {
       for (const n of c.picked) { const a = PB.el("a"); a.href = PB.fileUrl(c.root, c.full(n), true); a.download = n; document.body.append(a); a.click(); a.remove(); await new Promise(r => setTimeout(r, 400)); }
     };
     c.q("[data-b=mv]").onclick = async () => {

@@ -1,4 +1,3 @@
-/* macros panel */
 .pb-macs { display: flex; flex-wrap: wrap; gap: 6px; }
 .pb-mac { display: inline-flex; }
 :is(#page, #home).bd .pb-mac button { height: 28px; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }

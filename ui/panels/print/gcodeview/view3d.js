@@ -1,14 +1,9 @@
-// G-code preview, part: the 3D view (Three.js, loaded on first use): solid lit toolpaths or lines, colours by
-// feature / tool, nozzle marker, bed grid. Used by gcodeview.js.
 PB.parts = PB.parts || {};
 PB.parts.gcode3d = S => {
-    // ---- 3D (Three.js scene, our own camera controls + toolpath meshes; renders only when something changes) ----
-    // Quality: "lines" = thin lines (fast), "solid" = every extrusion is a lit box (width x layer height), "auto" = solid
-    // unless the S.file is huge. Colours: by feature (from the slicer's ;TYPE: comments), by tool, or one colour.
     const FEATS = [["Outer wall", 0xff8a1f], ["Inner wall", 0xf6c344], ["Infill", 0xe5484d], ["Top / bottom", 0x8b5cf6],
                    ["Bridge", 0x4fd1c5], ["Support", 0x4ade80], ["Skirt / brim", 0x90cdf4], ["Other", 0x9ca3af]];
     const TOOLS = [0xff8a1f, 0x4fd1c5, 0x8b5cf6, 0x4ade80, 0x90cdf4, 0xe5484d, 0xf6c344, 0xf472b6];
-    const SOLID_MAX = 1500000;   // auto: above this many moves, fall back to lines
+    const SOLID_MAX = 1500000;
     let T = null, three = null, built = "";   // T = THREE; built = what the meshes were made for (file + settings)
     const loadThree = () => window.THREE ? Promise.resolve(window.THREE) : (PB._three ||= new Promise((ok, bad) => {
       const sc = document.createElement("script"); sc.src = "/static/vendor/three.min.js";
@@ -28,15 +23,15 @@ PB.parts.gcode3d = S => {
       renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); S.g3.prepend(renderer.domElement);
       const scene = new T.Scene(), camera = new T.PerspectiveCamera(40, 1, 0.5, 5000); camera.up.set(0, 0, 1);
       scene.add(new T.HemisphereLight(0xffffff, 0x444450, 0.75));
-      const sun = new T.DirectionalLight(0xffffff, 0.75); camera.add(sun); sun.position.set(0.4, 1, 0.6); scene.add(camera);   // light follows the camera
+      const sun = new T.DirectionalLight(0xffffff, 0.75); camera.add(sun); sun.position.set(0.4, 1, 0.6); scene.add(camera);
       const bedGrp = new T.Group(); scene.add(bedGrp);
       const nozzle = new T.Mesh(new T.ConeGeometry(2.2, 6, 20), new T.MeshPhongMaterial({ color: 0xe5e5ea, emissive: 0x333338, shininess: 80 }));
       nozzle.rotation.x = -Math.PI / 2; nozzle.geometry.translate(0, 3, 0); nozzle.visible = false; scene.add(nozzle);
       three = { renderer, scene, camera, bedGrp, nozzle, bedKey: "", objs: [], starts: null, solid: false,
                 orbit: { th: 0, ph: 1, r: 400, tx: 0, ty: 0, tz: 0 } };
-      PB.parts.gcodeOrbit(renderer.domElement, { get three() { return three; }, draw3d, home3d });   // orbit.js
+      PB.parts.gcodeOrbit(renderer.domElement, { get three() { return three; }, draw3d, home3d });
     }
-    function home3d() {   // look at the middle of the bed from the front-left, high up
+    function home3d() {
       const [x0, y0, x1, y1] = S.bed || [0, 0, 250, 250], o = three.orbit, zTop = S.layers.at(-1)?.z || 0;
       Object.assign(o, { th: -Math.PI / 2 - 0.5, ph: 0.95, r: Math.max(x1 - x0, y1 - y0) * 1.7, tx: (x0 + x1) / 2, ty: (y0 + y1) / 2, tz: zTop / 3 });
     }
@@ -72,7 +67,7 @@ PB.parts.gcode3d = S => {
         starts[i] = s;
         for (let k = 0; k < L.segs.length; k += 4, s++) {
           const v = s * 6; vtx[v] = L.segs[k]; vtx[v + 1] = L.segs[k + 1]; vtx[v + 2] = L.z; vtx[v + 3] = L.segs[k + 2]; vtx[v + 4] = L.segs[k + 3]; vtx[v + 5] = L.z;
-          colorOf(L, k / 4, c); if (!three.solid) c.multiplyScalar(0.45 + 0.55 * (L.z / zTop));   // lines: darker low down, for depth
+          colorOf(L, k / 4, c); if (!three.solid) c.multiplyScalar(0.45 + 0.55 * (L.z / zTop));
           col[v] = col[v + 3] = c.r; col[v + 1] = col[v + 4] = c.g; col[v + 2] = col[v + 5] = c.b;
         }
       });
@@ -108,7 +103,7 @@ PB.parts.gcode3d = S => {
       for (const o of three.objs) three.scene.add(o);
       legend(); home3d();
     }
-    function legend() {   // which colours mean what (feature / tool mode), only the ones in this file
+    function legend() {
       const box = S.q(".pb-g3legend"); box.innerHTML = "";
       if (!S.layers.length || S.cfg.color === "single") return;
       const used = new Set(); for (const L of S.layers) for (const v of (S.cfg.color === "tool" ? L.tl : L.ft)) used.add(v);
@@ -132,10 +127,10 @@ PB.parts.gcode3d = S => {
         const live = S.q("[data-a=follow]").checked && S.pos != null && S.pos >= L.start;
         let done = L.segs.length;
         if (live) { done = 0; while (done / 4 < L.offs.length && L.offs[done / 4] < S.pos) done += 4; }
-        const upto = three.starts[li] + done / 4;   // moves shown solid / bright
+        const upto = three.starts[li] + done / 4;
         if (three.lines) three.lines.geometry.setDrawRange(0, upto * 2);
         if (three.mesh) { three.mesh.count = upto; }
-        three.ghost.geometry.setDrawRange(upto * 2, (three.starts[li + 1] - upto) * 2);   // the rest of this layer, faint
+        three.ghost.geometry.setDrawRange(upto * 2, (three.starts[li + 1] - upto) * 2);
         if (S.cfg.toolhead && live && done > 0) {
           three.nozzle.position.set(L.segs[done - 2], L.segs[done - 1], L.z); three.nozzle.visible = true;
         }

@@ -659,7 +659,6 @@ function toast(msg) {
   const t = $("#toast"); t.textContent = msg; t.style.display = "block";
   clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = "none", 4000);
 }
-// A thank-you burst for every photo given to the AI (skipped with reduced motion).
 function confetti() {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const c = document.createElement("canvas"), g = c.getContext("2d"), dpr = devicePixelRatio || 1;
@@ -676,7 +675,7 @@ function confetti() {
   const start = performance.now();
   let last = start;
   (function frame(now) {
-    const t = now - start, k = Math.min(4, (now - last) / 16.7);   // same speed at any frame rate
+    const t = now - start, k = Math.min(4, (now - last) / 16.7);
     last = now;
     g.clearRect(0, 0, w, h);
     g.globalAlpha = Math.max(0, Math.min(1, (3200 - t) / 800));
@@ -725,7 +724,6 @@ const look = st => LOOK[st] || [st, "grey", "var(--muted)", `Klipper ${st}`, "va
 const NOCAM_SVG = `<svg width="44" height="44" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.8a15 15 0 0 1 4.2-2.6M10.7 5.1A15 15 0 0 1 22 8.8M5 12.5a10 10 0 0 1 3.3-2M15.5 10.7A10 10 0 0 1 19 12.5M8.5 16a5 5 0 0 1 7 0M12 20h.01M3 3l18 18"/></svg>`;
 const MENU_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>`;
 
-// ---- dashboard ---------------------------------------------------------------
 function render() {
   const grid = $("#grid");
   $("#empty").hidden = printers.size > 0;
@@ -809,7 +807,6 @@ function render() {
   renderPage();
 }
 
-// ---- view, sort, search ----------------------------------------------------------
 const prefs = (() => { try { return JSON.parse(localStorage.getItem("pb-view") || "{}"); } catch { return {}; } })();
 function savePrefs() { try { localStorage.setItem("pb-view", JSON.stringify(prefs)); } catch {} }
 const RANK = { error: 0, shutdown: 0, auth_error: 0, paused: 1, printing: 2, complete: 3, cancelled: 4, standby: 5, connecting: 6, offline: 7 };
@@ -821,7 +818,6 @@ function arrange() {
     if (by === "custom") { const d = (a.position ?? 1e9) - (b.position ?? 1e9); if (d) return d; }
     return a.name.localeCompare(b.name);
   });
-  // group headings: only when at least one printer has a group; named groups A–Z, ungrouped last
   const grouped = list.some(p => p.group);
   const groups = grouped ? [...new Set(list.map(p => p.group || ""))].sort((a, b) => !a ? 1 : !b ? -1 : a.localeCompare(b)) : [""];
   const want = [];
@@ -846,7 +842,7 @@ function arrange() {
     grid.querySelector(`[data-id="${p.id}"]`).hidden = !hit; if (hit) shown++;
   }
   $("#noMatch").hidden = !(printers.size && !shown);
-  for (const h of grid.querySelectorAll(".grp-head")) {   // hide a heading whose printers are all filtered out
+  for (const h of grid.querySelectorAll(".grp-head")) {
     let n = h.nextElementSibling, any = false;
     while (n && !n.classList.contains("grp-head")) { if (!n.hidden) any = true; n = n.nextElementSibling; }
     h.hidden = !any;
@@ -882,7 +878,6 @@ $("#sortBy").onchange = () => { prefs.sort = $("#sortBy").value; savePrefs(); ar
 $("#search").oninput = arrange;
 if (prefs.sort) $("#sortBy").value = prefs.sort;
 setView(prefs.view === "list" ? "list" : "cards");
-// ---- camera refresh, flip/rotate and FPS (one loop for every camera box) ------------
 const camState = new WeakMap();
 const mainCam = p => Math.min(p?.cam_settings?.main ?? 0, Math.max(0, (p?.cams?.length || 1) - 1));
 function camCfg(p, idx = 0) {
@@ -907,8 +902,7 @@ function showFps(img, st, cfg) {
   const fps = span > 0 ? (n - 1) / span : null;
   badge.textContent = (fps ? `${fps < 1 ? fps.toFixed(1) : Math.round(fps)} fps` : "— fps") + (cfg.target ? ` · cam ${cfg.target}` : "");
 }
-// ---- live MJPEG (installer: Video live/timelapse) — big views only; cards stay on snapshots
-const liveStreams = new Map();   // img -> { pid, idx, ctrl }
+const liveStreams = new Map();
 const liveOn = () => SETUP.video === "live" || SETUP.video === "timelapse";
 function stopLive(img) {
   const s = liveStreams.get(img); if (!s) return;
@@ -941,24 +935,23 @@ async function startLive(img, pid, idx, st) {
         const url = URL.createObjectURL(new Blob([frame], { type: "image/jpeg" }));
         img.src = url; if (prevUrl) URL.revokeObjectURL(prevUrl); prevUrl = url;
       }
-      if (buf.length > 8_000_000) buf = new Uint8Array(0);   // runaway guard
+      if (buf.length > 8_000_000) buf = new Uint8Array(0);
     }
   } catch (e) { if (ctrl.signal.aborted) return; }
   finally { if (prevUrl) setTimeout(() => URL.revokeObjectURL(prevUrl), 2000); }
-  // stream ended or failed: fall back to snapshots for a while, then try again
   if (liveStreams.get(img)?.ctrl === ctrl) liveStreams.delete(img);
   st.liveRetry = performance.now() + 10000;
 }
 
 function camTick() {
   if (document.hidden) { for (const img of [...liveStreams.keys()]) stopLive(img); return; }
-  for (const [img, s] of [...liveStreams]) {   // stop streams that went off screen or changed camera
+  for (const [img, s] of [...liveStreams]) {
     if (!img.isConnected || !img.offsetParent || +img.dataset.camPid !== s.pid || +(img.dataset.camIdx || 0) !== s.idx) stopLive(img);
   }
   const now = performance.now();
   for (const img of document.querySelectorAll("img[data-cam-pid]")) {
     const pid = +img.dataset.camPid, p = printers.get(pid);
-    if (!img.dataset.camPid || !p || !img.offsetParent) continue;   // hidden, closed or off-screen tab
+    if (!img.dataset.camPid || !p || !img.offsetParent) continue;
     const idx = +(img.dataset.camIdx || 0);
     const cfg = camCfg(p, idx), every = (cfg.refresh ?? (img.dataset.camKind === "card" ? 5 : 2)) * 1000;
     let st = camState.get(img);
@@ -980,7 +973,6 @@ function camTick() {
 }
 setInterval(camTick, 250);
 
-// big camera boxes (Quick View, printer page, Control): one camera or all of them in a grid
 function setupCamBox(box, img, p, sel) {
   const cams = p?.cams || [], live = !!p && p.has_webcam && p.connection === "online";
   const grid = sel === "grid" && cams.length > 1;
@@ -1011,7 +1003,6 @@ let qvSel = 0, pageSel = 0;
 $(".qv-cam").addEventListener("campick", e => { qvSel = e.detail; renderQV(); });
 for (const box of [$("#pgCam"), $(".ctl-cam")]) box.addEventListener("campick", e => { pageSel = e.detail; renderPage(); });
 
-// ---- camera settings dialog
 let camDlgId = null, camDraft = null, camEditing = 0;
 function camFormLoad(idx) {
   const p = printers.get(camDlgId), f = $("#camForm"), d = camDraft.cams[idx], m = p.cams?.[idx] || {};
@@ -1059,11 +1050,10 @@ async function removePrinter(id) {
   catch (e) { toast(e.message); }
 }
 
-// ---- live updates --------------------------------------------------------------
 let serverStarted = null;
 function connectEvents() {
   const es = new EventSource("/api/events");
-  es.onopen = async () => {   // after a restart/update, reload so the page runs the new version
+  es.onopen = async () => {
     try {
       const { started } = await api("/api/config");
       if (serverStarted && started !== serverStarted) location.reload();
@@ -1076,7 +1066,7 @@ function connectEvents() {
   es.addEventListener("removed", e => { printers.delete(JSON.parse(e.data).id); render(); });
   es.addEventListener("event", e => {
     const d = JSON.parse(e.data);
-    if (d.event === "progress") return;   // progress updates go to phone/chat only
+    if (d.event === "progress") return;
     if (d.event === "ai_failure") {
       toast(`${d.name}: possible ${d.label.replace("_", " ")} (${Math.round(d.score * 100)}%)${d.paused ? " — print paused" : ""}`);
       return;
@@ -1085,7 +1075,6 @@ function connectEvents() {
   });
 }
 
-// ---- scan → pick ---------------------------------------------------------------
 $("#scanBtn").onclick = async () => {
   const btn = $("#scanBtn"); btn.disabled = true; btn.textContent = "Scanning…";
   try { showResults((await api("/api/scan", { method: "POST" })).printers); }
@@ -1125,7 +1114,6 @@ $("#addSelected").onclick = async () => {
   if (added) toast(`Added ${added} printer${added > 1 ? "s" : ""}`);
 };
 
-// ---- manual add -------------------------------------------------------------------
 $("#manualBtn").onclick = () => $("#manual").hidden = !$("#manual").hidden;
 $("#manualForm").onsubmit = async e => {
   e.preventDefault();
@@ -1136,7 +1124,6 @@ $("#manualForm").onsubmit = async e => {
   } catch (err) { toast(err.message); }
 };
 
-// ---- Quick View ----------------------------------------------------------------
 let qvId = null;
 function openQV(id) {
   qvId = id; qvSel = mainCam(printers.get(id)); $("#qvImg").removeAttribute("src"); renderQV();
@@ -1185,9 +1172,7 @@ $("#qvCancel").onclick = () => qvAction("cancel");
 $("#qvStop").onclick = () => qvAction("estop");
 
 
-// ---- printer page --------------------------------------------------------------
 let pageId = null;
-// 12 / 24 hour clock: Settings > Look ("auto" follows the device)
 const hour12 = () => { try { const v = JSON.parse(localStorage.getItem("pb-clock")); return v === "12" ? true : v === "24" ? false : undefined; } catch { return undefined; } };
 const fmtClock = d => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: hour12() });
 function route() {
@@ -1247,7 +1232,6 @@ $("#pgStop").onclick = () => doAction(pageId, "estop");
 $("#pgFull").onclick = () => $("#pgCam").requestFullscreen?.();
 window.addEventListener("hashchange", route);
 
-// ---- printer page: Control tab -------------------------------------------------
 const TABS = { status: ["#tabStatus", "#pgStatus"], control: ["#tabControl", "#pgControl"], console: ["#tabConsole", "#pgConsole"], timelapse: ["#tabTimelapse", "#pgTimelapse"] };
 function showTab(name) {
   if (name === "timelapse" && SETUP.video !== "timelapse") name = "status";
@@ -1263,14 +1247,12 @@ $("#tabStatus").onclick = () => showTab("status");
 $("#tabControl").onclick = () => showTab("control");
 $("#tabConsole").onclick = () => showTab("console");
 
-// ---- printer page: History tab -------------------------------------------------
 const RESULT = { completed: ["Done", "done"], cancelled: ["Cancelled", ""], error: ["Failed", "failed"],
                  klippy_shutdown: ["Failed", "failed"], klippy_disconnect: ["Failed", "failed"],
                  interrupted: ["Interrupted", "failed"], in_progress: ["Printing", "running"], server_exit: ["Interrupted", "failed"] };
 const fmtFil = mm => mm == null ? "—" : mm >= 1000 ? `${(mm / 1000).toFixed(1)} m` : `${Math.round(mm)} mm`;
 $("#tabTimelapse").onclick = () => showTab("timelapse");
 
-// ---- printer page: Timelapses tab ------------------------------------------------
 async function loadTimelapseSettings() {
   try {
     const c = await api("/api/timelapse/settings"), f = $("#tlForm");
@@ -1317,12 +1299,10 @@ async function loadTimelapses() {
   } catch (e) { if (id === pageId) $("#tlStatus").textContent = e.message; }
 }
 
-// ---- printer page: Files tab ---------------------------------------------------
 const fmtSize = b => b == null ? "—" : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
 const fmtDate = t => t ? new Date(t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: hour12() }) : "—";
 
-// ---- printer page: Console tab -------------------------------------------------
-const conLogs = new Map();          // printer id -> [{kind, text}], kept since this page was opened
+const conLogs = new Map();
 const conHistory = [];
 let conHistPos = -1;
 function conAdd(id, kind, text) {
@@ -1410,7 +1390,6 @@ function renderControl(p) {
 }
 
 
-// ---- notification settings -------------------------------------------------------------
 const EVENT_LABELS = { started: "a print starts", paused: "a print pauses", resumed: "a print resumes", finished: "a print finishes",
   failed: "a print fails", cancelled: "a print is cancelled", offline: "a printer goes offline mid-print", shutdown: "Klipper shuts down or errors" };
 async function loadNotify() {
@@ -1467,7 +1446,6 @@ $("#notifyTest").onclick = async () => {
   } catch (e) { toast(e.message); } finally { btn.disabled = false; }
 };
 
-// ---- share links (Remote access on) ---------------------------------------------------
 let shareId = null;
 async function openShare(id) {
   const p = printers.get(id); if (!p) return;
@@ -1503,8 +1481,7 @@ $("#shareCreate").onclick = async () => {
 };
 $("#shareClose").onclick = () => $("#shareDlg").close();
 
-// ---- AI failure detection (AI detection = basic) --------------------------------------
-let aiCfg = null;   // /api/ai/settings: thresholds + model info
+let aiCfg = null;
 const AI_MODE_TEXT = { off: "Off", alert: "Alert only", pause: "Alert + auto-pause" };
 const aiThr = () => aiCfg?.ai_threshold ?? 0.6;
 const aiName = l => (l || "").replace("_", " ");
@@ -1556,10 +1533,10 @@ function renderPageAI(p) {
   const bm = a.box_mode || "failure";
   $("#pgAiBoxAlways").setAttribute("aria-pressed", String(bm === "always"));
   $("#pgAiBoxFail").setAttribute("aria-pressed", String(bm !== "off"));
-  $("#pgAiBoxFail").disabled = bm === "always";   // always already includes failures
+  $("#pgAiBoxFail").disabled = bm === "always";
   const m = aiCfg?.model || {}, kinds = m.kinds || {};
   const test = aiTest.get(p.id), fresh = !!test && Date.now() / 1000 - test.at < 120;
-  const shown = a.watching ? a.scores : fresh ? test.scores : null;   // never show old scores as if live
+  const shown = a.watching ? a.scores : fresh ? test.scores : null;
   const labels = m.labels?.length ? m.labels : Object.keys(shown || a.scores || {});
   $("#pgAiRows").classList.toggle("idle", !a.watching && !fresh);
   $("#pgAiRows").innerHTML = labels.map(l => {
@@ -1600,7 +1577,7 @@ function cycleAI(id) {
   setAIMode(id, order[(order.indexOf(cur) + 1) % order.length]);
 }
 $("#pgAiMode").onchange = e => setAIMode(pageId, e.target.value);
-const aiTest = new Map();   // printer id -> last "Check now" result
+const aiTest = new Map();
 async function answerAlert(yes) {
   const p = printers.get(pageId), iid = p?.ai?.alert_item;
   if (!iid) return;
@@ -1628,7 +1605,6 @@ $("#pgAiSave").onchange = async e => {
   } catch (err) { toast(err.message); }
 };
 
-// ---- Photos for AI (AI panel)
 let aiPhotos = null;
 const SRC_TEXT = {
   alert: i => `AI alert: possible ${aiName(i.suggested)}`, alert_yes: () => "AI alert, you said: real failure",
@@ -1720,7 +1696,6 @@ $("#aiForm").onsubmit = async e => {
   catch (err) { toast(err.message); }
 };
 
-// ---- setup from install.sh ----------------------------------------------------------
 let SETUP = { ui: "basic" };
 const isBasic = () => SETUP.ui !== "advanced";
 const PART_NAMES = { ui: "Interface", ai: "AI detection", video: "Video", notify: "Notifications", remote: "Remote access", users: "Users" };

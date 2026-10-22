@@ -1,7 +1,6 @@
-// Macro prompts: macros that send  RESPOND TYPE=command MSG="action:prompt_begin …"  get a pop-up with buttons.
 (() => {
   const { el } = PB, { onPage, cur, send, live, dialog, pageHook } = PB.x;
-  const prompts = new Map();   // printer id -> { title, items, footer, group, shown }
+  const prompts = new Map();
   const pd = dialog("pb-prompt");
   pd.addEventListener("cancel", e => { e.preventDefault(); closePrompt(); });
   const COLORS = ["primary", "secondary", "info", "warning", "error", "success"];

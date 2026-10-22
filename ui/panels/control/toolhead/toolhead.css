@@ -1,4 +1,3 @@
-/* toolhead panel */
 .pb-th { display: flex; justify-content: center; align-items: center; gap: 14px; margin: 4px 0 10px; }
 .pb-th[hidden] { display: none; }
 .pb-thx { display: grid; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 46px); gap: 6px; }
@@ -16,7 +15,6 @@
                   padding: 0 6px; font-family: var(--bd-mono); font-size: 12.5px; }
 .pb-thpos input:focus { border-color: var(--orange); outline: none; }
 :is(#page, #home).bd .pb-thpos button { height: 28px; padding: 0 10px; font-size: 12px; }
-/* bars layout */
 .pb-thbars { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
 .pb-thbars[hidden] { display: none; }
 .pb-thbar { display: flex; gap: 4px; }
@@ -24,7 +22,6 @@
 :is(#page, #home).bd .pb-thbar .pb-thh { flex: 0 0 52px; flex-direction: row; display: flex; align-items: center; justify-content: center; gap: 3px; }
 .pb-thbar .pb-thh .pb-ic { width: 14px; height: 14px; }
 .pb-thbar button[data-jog$="-"] + button[data-jog$="+"] { margin-left: 6px; }
-/* circle layout */
 .pb-thc { flex: 0 1 250px; min-width: 150px; }
 .pb-thc svg { display: block; width: 100%; height: auto; }
 .pb-thtag { fill: var(--muted); font-size: 12px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }

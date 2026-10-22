@@ -1,13 +1,11 @@
-// Calibration helpers: manual probe (PROBE_CALIBRATE, Z_ENDSTOP_CALIBRATE …), BED_SCREWS_ADJUST, SCREWS_TILT_CALCULATE.
 (() => {
   const { el } = PB, { onPage, cur, send, live, dialog, pageHook } = PB.x;
   const mp = dialog("pb-mprobe"), bs = dialog("pb-bscrew"), st = dialog("pb-tilt");
-  for (const d of [mp, bs]) d.addEventListener("cancel", e => e.preventDefault());   // close with Abort / Accept only
+  for (const d of [mp, bs]) d.addEventListener("cancel", e => e.preventDefault());
   const STEPS = [-1, -0.1, -0.05, -0.01, 0.01, 0.05, 0.1, 1];
   const fmt = v => v == null ? "—" : Number(v).toFixed(3);
   let mpKey = "", bsKey = "", tiltSeen = new Map();
   pageHook(p => {
-    // manual probe (TESTZ / ACCEPT / ABORT)
     const m = p.manual_probe;
     if (m?.active) {
       const key = `${p.id}|${m.z}|${m.lo}|${m.hi}`;
@@ -25,7 +23,6 @@
       }
       if (!mp.open) mp.showModal();
     } else if (mp.open) { mp.close(); mpKey = ""; }
-    // bed screws (ADJUSTED / ACCEPT / ABORT)
     const b = p.bed_screws;
     if (b?.active) {
       const key = `${p.id}|${b.state}|${b.screw}|${b.accepted}`;
@@ -42,7 +39,6 @@
       }
       if (!bs.open) bs.showModal();
     } else if (bs.open) { bs.close(); bsKey = ""; }
-    // screws tilt results: pop up when new results arrive (not for old results already there when the page opened)
     const t = p.screws_tilt;
     if (t) {
       const key = JSON.stringify(t);

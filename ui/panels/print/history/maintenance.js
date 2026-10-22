@@ -1,7 +1,5 @@
-// History panel, part: maintenance reminders (every N print hours / metres of filament / days). Used by history.js.
 PB.parts = PB.parts || {};
 PB.parts.historyMaint = c => {
-    // ---- maintenance reminders: due after N print hours, metres of filament or days since last done ----
     const nowTotals = () => ({ at: Date.now() / 1000, hours: (c.totals.total_print_time || 0) / 3600, fil: (c.totals.total_filament_used || 0) / 1000 });
     function status(m) {
       const n = nowTotals(), l = m.last || n, parts = [];

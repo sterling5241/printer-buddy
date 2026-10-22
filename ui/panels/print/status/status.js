@@ -1,5 +1,3 @@
-// Status panel: thumbnail, file, state, progress bar, then a two-column list of the numbers. In the title strip (like Fluidd):
-// pause / resume and cancel while printing, and reset (SDCARD_RESET_FILE, clears the finished print) when it's done.
 PB.panel("status", {
   title: "Status", desc: "Print progress, file, times, layer, speed and flow",
   icon: PB.icon('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
@@ -30,7 +28,7 @@ PB.panel("status", {
     q("[data-a=pal]").onclick = () => PB.pauseAtLayer?.();
     let paused = false;
     q("[data-a=pr]").onclick = () => doAction(pageId, paused ? "resume" : "pause");
-    q("[data-a=cancel]").onclick = () => doAction(pageId, "cancel");   // asks first
+    q("[data-a=cancel]").onclick = () => doAction(pageId, "cancel");
     q("[data-a=reset]").onclick = () => gcode("SDCARD_RESET_FILE");
     return {
       open() { thumbFile = undefined; },
@@ -42,14 +40,14 @@ PB.panel("status", {
         paused = p.state === "paused";
         const pr = q("[data-a=pr]"), lbl = paused ? "Resume" : "Pause";
         pr.hidden = q("[data-a=cancel]").hidden = !active; pr.innerHTML = paused ? ICON.resume : ICON.pause; pr.title = lbl; pr.setAttribute("aria-label", lbl);
-        q("[data-a=reset]").hidden = active || !p.filename;   // a finished / cancelled / failed print is still loaded
+        q("[data-a=reset]").hidden = active || !p.filename;
         for (const b of [pr, q("[data-a=cancel]"), q("[data-a=reset]")]) b.disabled = !live;
         if (file !== thumbFile && cfg.thumb) {
           thumbFile = file; thumb.hidden = true;
           if (file) thumb.src = `/api/printers/${p.id}/thumbnail?file=${encodeURIComponent(file)}`; else thumb.removeAttribute("src");
         }
         q(".pb-file").textContent = file || "No print running";
-        const pl = p.pause_layer, pal = q(".pb-pal");   // pause at layer (needs the SET_PAUSE_AT_LAYER macros)
+        const pl = p.pause_layer, pal = q(".pb-pal");
         pal.hidden = !pl || !active;
         if (pl) q(".pb-palstate").textContent = pl.next?.enable ? "Pausing at the next layer" : pl.at?.enable && pl.at.layer ? `Pausing at layer ${pl.at.layer}` : "";
         const state = q(".pb-state");

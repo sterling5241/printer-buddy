@@ -1,5 +1,3 @@
-// Sensors panel: Moonraker's [sensor] sections (power meters, MQTT values …) and the Nevermore air filter, if the
-// printer has them. Refreshes every 5 seconds while visible.
 PB.panel("sensors", {
   title: "Sensors", desc: "Moonraker sensors (power, MQTT …) and Nevermore air filter", cls: "adv",
   icon: PB.icon('<path d="M12 3v12"/><circle cx="12" cy="18" r="3"/><path d="M8 7h8M8 11h8"/>'),

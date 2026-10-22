@@ -1,5 +1,3 @@
-// G-code preview panel: 2D (top-down layer) or 3D (rotate / zoom) view of a print file, following the live print position.
-// 3D uses Three.js (MIT, static/vendor/three.min.js), loaded only the first time someone picks 3D; the camera controls are ours.
 PB.panel("gcodeview", {
   title: "G-code preview", desc: "2D layer view or 3D view of a print file; follows the print", cls: "adv",
   icon: PB.icon('<path d="M4 7l8-4 8 4-8 4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/>'),
@@ -25,7 +23,6 @@ PB.panel("gcodeview", {
     const g3 = q(".pb-g3"); cv.style.height = g3.style.height = `${cfg.height}px`;
     let mode = cfg.view === "3d" ? "3d" : "2d";
     let layers = [], file = null, bed = null, pos = null, loading = false;
-    // shared with the parts in parse.js / view2d.js / view3d.js (+ orbit.js)
     const S = {
       cv, q, cfg, g3, gmsg, range, draw: () => draw(),
       get layers() { return layers; }, get file() { return file; }, get bed() { return bed; }, get pos() { return pos; },
@@ -55,7 +52,7 @@ PB.panel("gcodeview", {
       if (i !== +range.value) setLayer(i); else draw();
     }
     let cur = null, manual = false, listed = false;
-    async function listFiles() {   // any G-code file on the printer, newest first
+    async function listFiles() {
       try {
         const files = (await PB.rpc("server.files.list", { root: "gcodes" })) || [];
         const sel = q("[data-a=pick]");
@@ -67,7 +64,7 @@ PB.panel("gcodeview", {
     const pick = name => { manual = true; q("[data-a=follow]").checked = false; load(name); };
     q("[data-a=pick]").onchange = e => { if (e.target.value) pick(e.target.value); };
     q("[data-a=load]").onclick = () => { manual = false; q("[data-a=follow]").checked = true; load(cur); };
-    PB.previewFile = name => { PB.reveal(host); pick(name); };   // Files panel: "Preview"
+    PB.previewFile = name => { PB.reveal(host); pick(name); };
     range.oninput = () => { q("[data-a=follow]").checked = false; setLayer(+range.value); };
     for (const b of q(".pb-gmode").querySelectorAll("button")) b.onclick = () => setMode(b.dataset.m);
     new ResizeObserver(() => draw()).observe(host);

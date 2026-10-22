@@ -1,5 +1,3 @@
-// Exclude object panel: the objects in the current print on a top-down bed map + a list; skip one that failed.
-// Needs [exclude_object] in printer.cfg and "label objects" turned on in the slicer.
 PB.panel("exclude", {
   title: "Objects", desc: "Skip one failed object mid-print", cls: "adv",
   icon: PB.icon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14l7 7M21 14l-7 7"/>'),

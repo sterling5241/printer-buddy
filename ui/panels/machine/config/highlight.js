@@ -1,16 +1,14 @@
-// Config panel, part: Klipper config syntax colours ([sections], key: value, # comments, G-code / Jinja in macros).
-// line(text) -> HTML for one line. Used by editor.js.
 PB.parts = PB.parts || {};
 PB.parts.cfgHighlight = (() => {
     const h = (cls, t) => `<span class="${cls}">${esc(t)}</span>`;
-    function gcodeLine(t) {   // indented macro lines
+    function gcodeLine(t) {
       return esc(t)
         .replace(/(\{%.*?%\}|\{\{.*?\}\})/g, '<span class="c-jin">$1</span>')
         .replace(/^(\s*)([A-Z][A-Z0-9_]*)\b/, '$1<span class="c-cmd">$2</span>')
         .replace(/(\s)([XYZEFST])(-?\d+(?:\.\d+)?)\b/g, '$1<span class="c-key">$2</span><span class="c-num">$3</span>');
     }
     function line(t) {
-      if (/^#\*#/.test(t)) return h("c-auto", t);                             // SAVE_CONFIG block
+      if (/^#\*#/.test(t)) return h("c-auto", t);
       if (/^\s*[#;]/.test(t)) return h("c-com", t);
       let m = t.match(/^(\[)([^\]]+)(\])(.*)$/);
       if (m) return `<span class="c-sec">[${esc(m[2])}]</span>${h("c-com", m[4])}`;

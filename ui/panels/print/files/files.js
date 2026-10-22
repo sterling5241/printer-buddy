@@ -1,6 +1,3 @@
-// Files panel: G-code / config / log files with folders, details (print time, filament, layer height), thumbnails,
-// search (this folder or everywhere), sort, filter (printed / not yet), multi-upload, print, queue, rename, duplicate,
-// download, delete, preview (pictures + text), and Select mode for deleting / moving / downloading many at once.
 PB.panel("files", {
   title: "Files", desc: "G-code, config and log files with folders", cls: "adv",
   icon: PB.icon('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>'),
@@ -117,7 +114,6 @@ PB.panel("files", {
     q("input[type=search]").oninput = draw;
     q("[data-a=everywhere]").onchange = draw;
     q("[data-a=filter]").onchange = draw;
-    // shared with the parts in search.js / select.js / preview.js
     const c = {
       q, list, msg, more, load: () => load(), draw: () => draw(), crumbs: () => crumbs(), full: n => full(n), picked,
       get root() { return root; }, get dir() { return dir; }, set dir(v) { dir = v; }, get busy() { return busy; },
@@ -137,7 +133,6 @@ PB.panel("files", {
       const picked = [...e.target.files], start = q(".pb-chk input").checked && picked.length === 1; e.target.value = "";
       uploadAll(picked, start, dir);
     };
-    // drag & drop anywhere on the printer page (extras.js) lands here: into the G-code folder that's open in this panel
     PB.uploadFiles = picked => uploadAll(picked, false, root === "gcodes" ? dir : "");
     async function uploadAll(picked, start, dir) {
       const id = pageId;

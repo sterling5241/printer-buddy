@@ -1,4 +1,3 @@
-// Printer Buddy - dashboard builder core: the panel registry and one shared live feed for every panel.
 // Loaded after the main page script; builds on its globals (printers, pageId, renderPage, route, conAdd, gcode...).
 // A panel file calls  PB.panel("name", { title, icon, cls, single, settings, gear, create(host, cfg) -> { open, update, shown, log, destroy } })
 //   gear: true    its ⚙ settings button shows all the time, not only in Edit layout (for options people change often)
@@ -11,24 +10,21 @@
 //   log(kind, t)  a console line arrived for the open printer
 //   destroy()     the panel was removed from the layout
 window.PB = (() => {
-  const defs = {}, homeDefs = {}, live = new Set(), routeHooks = [];   // printer-page panels, home-page panels
+  const defs = {}, homeDefs = {}, live = new Set(), routeHooks = [];
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   const icon = path => `<svg class="pb-ic" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
   const store = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
                   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
   const each = (fn, only) => { for (const i of only || live) { try { fn(i); } catch (e) { console.error(`panel ${i.type}:`, e); } } };
   const current = () => (pageId !== null && printers.get(pageId)) || null;
-  // panels that reuse one of the page's own blocks (camera, files, ...) put it back here when removed
   const parking = el("div"); parking.hidden = true; document.body.append(parking);
   const take = sel => { const n = document.querySelector(sel); if (n) n.hidden = false; return n; };
 
   function panel(type, def) { defs[type] = { type, title: type, icon: "", cls: "", single: false, ...def }; }
-  // home panels get update(listOfAllPrinters) whenever any printer changes
   function homePanel(type, def) { homeDefs[type] = { type, title: type, icon: "", cls: "", single: false, home: true, ...def }; }
   const page = i => !i.def.home, home = i => i.def.home;
   const all = () => [...printers.values()];
 
-  // edit panels keep their whole setup; the rest get their settings list with defaults filled in
   const config = (def, cfg) => def.edit ? structuredClone(cfg || {}) : Object.fromEntries((def.settings || []).map(s => [s.k, cfg?.[s.k] ?? s.def]));
 
   function mount(type, host, cfg, reg = defs) {
@@ -45,7 +41,7 @@ window.PB = (() => {
 
   // one feed: the page's own render / route / console hooks fan out to every mounted panel
   const baseRender = renderPage;
-  const pageHooks = [];   // extras/ features that run on every printer page refresh
+  const pageHooks = [];
   renderPage = () => {
     baseRender(); const p = current();
     if (p) { each(i => i.update?.(p), [...live].filter(page)); for (const f of pageHooks) { try { f(p); } catch (e) { console.error(e); } } }
@@ -64,9 +60,8 @@ window.PB = (() => {
   window.addEventListener("hashchange", route);
   const baseConAdd = conAdd;
   conAdd = (id, kind, text) => { baseConAdd(id, kind, text); if (id === pageId) each(i => i.log?.(kind, text)); };
-  showTab = () => {};   // the old tab strip is gone; panels that need loading do it in shown()
+  showTab = () => {};
 
-  // the gear's settings box: one form for any panel's settings list
   const dlg = el("dialog", "bd-lib bd-set");
   document.body.append(dlg);
   function settings(def, cfg, save) {
@@ -87,11 +82,9 @@ window.PB = (() => {
     dlg.showModal();
   }
 
-  // "Start this print?" box with the file's picture, used by Files and History
   const pdlg = el("dialog", "bd-lib bd-print");
   document.body.append(pdlg);
   const thumbUrl = (pid, file) => `/api/printers/${pid}/thumbnail?file=${encodeURIComponent(file)}`;
-  // start-print dialog: thumbnail, time + filament, the spool to use (Spoolman) and timelapse on / off (if this box records)
   let tlOn = null;
   const dur = s => { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m`; };
   async function printFile(path) {
@@ -114,7 +107,6 @@ window.PB = (() => {
       } catch (e) { toast(`${p.name}: ${e.message}`); }
     };
     pdlg.showModal();
-    // the extras load after the dialog is open, so it never waits on a slow printer
     rpc("server.files.metadata", { filename: path }).then(m => {
       const bits = [m?.estimated_time && `about ${dur(m.estimated_time)}`, m?.filament_total && `${(m.filament_total / 1000).toFixed(1)} m filament`,
                     m?.filament_type, m?.layer_height && `${m.layer_height} mm layers`].filter(Boolean);
@@ -134,21 +126,18 @@ window.PB = (() => {
         ${spools.map(s => `<option value="${s.id}"${s.id === spool ? " selected" : ""}>#${s.id} ${esc(nm(s))}${left(s)}</option>`).join("")}</select></label>`);
     } catch {}
   }
-  // call an allowed Moonraker method for the open printer (see RPC_ALLOW in main.py)
   const rpc = async (method, params) => {
     if (pageId === null) throw new Error("no printer open");
     return (await api(`/api/printers/${pageId}/rpc`, { method: "POST", body: JSON.stringify({ method, params }) })).result;
   };
   const fileUrl = (root, path, download) => `/api/printers/${pageId}/file?root=${root}&path=${encodeURIComponent(path)}${download ? "&download=1" : ""}`;
-  const reveal = host => host.dispatchEvent(new CustomEvent("pb-reveal", { bubbles: true }));   // builder switches to its tab
+  const reveal = host => host.dispatchEvent(new CustomEvent("pb-reveal", { bubbles: true }));
   const confirmGcode = (text, script, done) => { if (confirm(text)) { gcode(script); if (done) toast(done); } };
-  // small per-printer lists saved on the box (presets, notes, maintenance, console filters) - see printer_kv in main.py
   const kv = {
     get: async (key, pid = pageId) => (await api(`/api/printers/${pid}/kv?key=${key}`)).value,
     set: (key, value, pid = pageId) => api(`/api/printers/${pid}/kv?key=${key}`, { method: "PUT", body: JSON.stringify({ value }) }),
   };
 
-  // one line-icon set for the whole UI (no emoji): PB.ic.name -> <svg class="pb-ic">
   const ic = {
     x: icon('<path d="M18 6L6 18M6 6l12 12"/>'),
     cog: icon('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
@@ -180,7 +169,6 @@ window.PB = (() => {
     camera: icon('<rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-4v12l-6-4z"/>'),
   };
 
-  // shared helpers for the page-wide features in core/extras/
   const x = {
     onPage: () => pageId !== null && !$("#page").hidden && $("#page").offsetParent !== null,
     cur: () => current(),

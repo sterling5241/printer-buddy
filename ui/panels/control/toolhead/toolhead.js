@@ -1,10 +1,3 @@
-// Toolhead panel, three layouts (⚙ Layout, like Fluidd):
-//   cross   home X / Y column, X/Y arrows round a Home all button, a Z column, and a step size to pick
-//   bars    one row per axis with fixed steps (−50 … +50) and its home button; no step size to pick
-//   circle  a jog wheel: one ring per step size (inner = smallest), axis names round the outside, Home all in the middle,
-//           home X / Y column on the left, Z column on the right
-// Under it: X / Y / Z boxes that show the position (type a number + Enter to move there), motors off, print speed (M220).
-// Home buttons turn orange when that axis isn't homed. ⚙: layout, jog distances, jog speeds, invert X / Y / Z.
 PB.panel("toolhead", {
   title: "Toolhead", desc: "Position, home, jog, move to and print speed", cls: "adv", gear: true,
   icon: PB.icon('<path d="M12 2v20M2 12h20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"/>'),
@@ -29,7 +22,6 @@ PB.panel("toolhead", {
     const jog = (j, icon) => `<button type="button" data-jog="${j}" aria-label="${j}">${icon}<span>${j.replace("-", "−")}</span></button>`;
     const home = (a, label) => `<button type="button" class="pb-thh" data-home="${a}" title="Home ${label}">${house}<span>${label}</span></button>`;
     const zcol = `<div class="pb-thz">${jog("Z+", ar.up)}${home("Z", "Z")}${jog("Z-", ar.down)}</div>`;
-    // ---- the three layouts ----
     const cross = () => `<div class="pb-th">
         <div class="pb-thhxy">${home("X", "X")}${home("Y", "Y")}</div>
         <div class="pb-thx"><span></span>${jog("Y+", ar.up)}<span></span>${jog("X-", ar.left)}${home("", "All")}${jog("X+", ar.right)}<span></span>${jog("Y-", ar.down)}<span></span></div>
@@ -49,7 +41,7 @@ PB.panel("toolhead", {
           <text x="${pt((r1 + r2) / 2, mid).split(" ")[0]}" y="${pt((r1 + r2) / 2, mid).split(" ")[1]}">${s}</text></g>`;
       })).join("");
       const tags = quarters.map(([j, mid]) => { const [x, y] = pt(C - 11, mid).split(" ");
-        return `<text class="pb-thtag" x="${x}" y="${y}">${j.replace("-", "−")}</text>`; }).join("");   // axis names round the outside
+        return `<text class="pb-thtag" x="${x}" y="${y}">${j.replace("-", "−")}</text>`; }).join("");
       return `<div class="pb-th"><div class="pb-thhxy">${home("X", "X")}${home("Y", "Y")}</div><div class="pb-thc"><svg viewBox="0 0 ${2 * C} ${2 * C}" aria-label="Jog wheel">${rings}${tags}
           <g class="pb-thseg pb-thh" data-home="" role="button" aria-label="Home all"><circle cx="${C}" cy="${C}" r="${R0 - 3}"/><text x="${C}" y="${C}">All</text></g></svg></div>${zcol}</div>`;
     }

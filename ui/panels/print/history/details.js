@@ -1,7 +1,5 @@
-// History panel, part: details box + note for one print. Used by history.js.
 PB.parts = PB.parts || {};
 PB.parts.historyDetails = c => {
-    // ---- details + note ----
     async function details(jid) {
       const j = c.jobs.find(x => String(x.id) === String(jid)); if (!j) return;
       c.dlg.innerHTML = `<h3>${esc(j.filename)}</h3><dl class="pb-kv pb-hkv"><dt>Result</dt><dd>${esc((RESULT[j.status] || [j.status])[0] || "—")}</dd>
@@ -19,7 +17,7 @@ PB.parts.historyDetails = c => {
         try { await PB.kv.set("notes", c.notes); } catch (e) { toast(`Couldn't save the note: ${e.message}`); }
       };
       c.dlg.showModal();
-      try {   // the slicer's details for this job (Moonraker keeps the file's metadata with the job)
+      try {
         const r = await PB.rpc("server.history.get_job", { uid: String(j.id) }), m = r?.job?.metadata || {};
         const rows = [["Slicer", [m.slicer, m.slicer_version].filter(Boolean).join(" ")], ["Estimated", m.estimated_time && fmtDur(m.estimated_time)],
           ["Total time", r?.job?.total_duration && fmtDur(r.job.total_duration)], ["Layer height", m.layer_height && `${m.layer_height} mm`],

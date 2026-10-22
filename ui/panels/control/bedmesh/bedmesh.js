@@ -1,6 +1,3 @@
-// Bed mesh panel (like Fluidd / Mainsail): the mesh as a 3D surface (ECharts GL) you can drag to turn and scroll to zoom,
-// coloured by height with a scale. Toggles: Mesh / Probed points, Flat (seen from above), Wireframe. Range (min, max,
-// spread), profiles (load / save / remove), calibrate, clear.
 PB.panel("bedmesh", {
   title: "Bed mesh", desc: "3D bed mesh, profiles and calibrate", cls: "adv",
   icon: PB.icon('<path d="M3 17l9 4 9-4M3 12l9 4 9-4M3 7l9 4 9-4-9-4z"/>'),
@@ -55,7 +52,7 @@ PB.panel("bedmesh", {
                                         : { projection: "perspective", alpha: 30, beta: 30, distance: 190, rotateSensitivity: 1 } },
         series: [{ type: "surface", shading: "color", dataShape: [rows, cols], wireframe: { show: opt.wire, lineStyle: { color: "rgba(0,0,0,.35)" } },
                    data: z.flatMap((row, j) => row.map((v, i) => [at(x0, x1, i, cols), at(y0, y1, j, rows), v])) }],
-      }, true); } catch (e) { chart.clear(); q(".pb-range").textContent = `3D view unavailable: ${e.message}`; }   // echarts-gl missing
+      }, true); } catch (e) { chart.clear(); q(".pb-range").textContent = `3D view unavailable: ${e.message}`; }
     }
     for (const b of host.querySelectorAll("[data-v]")) b.onclick = () => { opt.view = b.dataset.v; PB.store.set("pb-mesh-view", opt); draw(); };
     for (const b of host.querySelectorAll("[data-o]")) b.onclick = () => { opt[b.dataset.o] = !opt[b.dataset.o]; PB.store.set("pb-mesh-view", opt); draw(); };

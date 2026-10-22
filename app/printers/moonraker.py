@@ -1,4 +1,3 @@
-"""One persistent Moonraker WebSocket connection per *selected* printer."""
 from __future__ import annotations
 
 import asyncio
@@ -15,7 +14,7 @@ from ..core.net import HandshakeError, WebSocket, get_json, http_get, http_post,
 
 log = logging.getLogger(__name__)
 VERSION = "0.1.0"
-ETA_MODE = "file"   # how "time left" is worked out: file (progress through the file), slicer (its estimate), filament (used / total)
+ETA_MODE = "file"
 
 SUBSCRIBE = {
     "print_stats": None,
@@ -29,7 +28,6 @@ SUBSCRIBE = {
                  "max_velocity", "max_accel", "square_corner_velocity", "minimum_cruise_ratio", "max_accel_to_decel"],
 }
 
-# Extra Klipper objects shown on the printer dashboard (found per printer on connect).
 SENSOR_PREFIXES = ("temperature_sensor ", "temperature_fan ", "heater_generic ")
 FAN_PREFIXES = ("heater_fan ", "controller_fan ", "fan_generic ")
 EXTRA_HEATERS = ("extruder1", "extruder2", "extruder3")
@@ -43,7 +41,6 @@ _PARAM_RE = re.compile(r"""params\s*(?:\.\s*([A-Za-z_]\w*)|\[\s*['"]([A-Za-z_]\w
 
 
 def _macro_params(gcode: str) -> list[dict]:
-    """Parameters a macro reads (params.TEMP|default(200) -> TEMP, default 200), for the Macros panel's form."""
     out: dict[str, str | None] = {}
     for m in _PARAM_RE.finditer(gcode):
         name = (m.group(1) or m.group(2)).upper()
@@ -56,7 +53,6 @@ def _macro_params(gcode: str) -> list[dict]:
 
 
 def _pretty(obj: str) -> str:
-    """'temperature_sensor chamber_temp' -> 'Chamber Temp', 'heater_bed' -> 'Bed'."""
     named = {"extruder": "Nozzle", "heater_bed": "Bed", "fan": "Part fan"}
     if obj in named:
         return named[obj]
@@ -88,22 +84,21 @@ class MoonrakerClient:
         self.id, self.host, self.port, self.api_key = printer_id, host, port, api_key
         self._on_change = on_change
         self.on_gcode: Callable[["MoonrakerClient", str], None] | None = None
-        self.connection = "connecting"  # connecting | online | offline | auth_error
+        self.connection = "connecting"
         self.error: str | None = None
         self.klippy_state: str | None = None
         self.klippy_message: str | None = None
         self.status: dict = {}
         self.webcams: list[dict] = []
-        self.extras: list[str] = []          # extra sensors/fans/heaters this printer has
-        self.macros: list[dict] = []         # [{"name", "description"}], hidden ones (_NAME) left out
-        self.pwm_pins: set[str] = set()      # output_pin sections with pwm: True (sliders; the rest are on/off)
-        self._thumbs: dict[str, tuple[str, bytes] | None] = {}   # filename -> (content type, image)
+        self.extras: list[str] = []
+        self.macros: list[dict] = []
+        self.pwm_pins: set[str] = set()
+        self._thumbs: dict[str, tuple[str, bytes] | None] = {}
         self._ids = itertools.count(1)
         self._pending: dict[int, asyncio.Future] = {}
         self._ws: WebSocket | None = None
         self._task: asyncio.Task | None = None
 
-    # lifecycle -----------------------------------------------------------
     def start(self):
         self._task = asyncio.create_task(self._run(), name=f"moonraker-{self.id}")
 
@@ -159,7 +154,7 @@ class MoonrakerClient:
                     "url": "https://github.com/",
                 })
             except RPCError:
-                pass  # very old Moonraker
+                pass
             info = await self._call("server.info")
             self._set(connection="online", error=None, klippy_state=info.get("klippy_state"))
             await self._load_webcams()
@@ -191,7 +186,6 @@ class MoonrakerClient:
                 ws.abort()
                 return
 
-    # JSON-RPC -------------------------------------------------------------
     async def _call(self, method: str, params: dict | None = None, timeout: float = 10.0):
         if not self._ws:
             raise ConnectionError("not connected")
@@ -257,7 +251,6 @@ class MoonrakerClient:
             log.warning("printer %s: %s", self.id, e)
 
     async def _load_klippy_message(self):
-        """printer.info carries Klipper's state_message (e.g. 'MCU shutdown: Timer too close')."""
         try:
             res = await self._call("printer.info")
             self._set(klippy_state=res.get("state", self.klippy_state), klippy_message=res.get("state_message"))
@@ -274,7 +267,7 @@ class MoonrakerClient:
                        if n.startswith(SENSOR_PREFIXES + FAN_PREFIXES) or n == "fan" or n in EXTRA_HEATERS]
         for n in self.extras:
             objects[n] = None
-        if "exclude_object" in names:            # slicer-labelled objects in the print (skip one mid-print)
+        if "exclude_object" in names:
             objects["exclude_object"] = None
         self.outputs = [n for n in names if n.startswith(OUTPUT_PREFIXES)]
         self.fsensors = [n for n in names if n.startswith(FSENSOR_PREFIXES)]
@@ -282,14 +275,14 @@ class MoonrakerClient:
         self.extruders = sorted(n for n in names if n == "extruder" or (n.startswith("extruder") and n[8:].isdigit()))
         for n in self.outputs + self.fsensors:
             objects[n] = None
-        for n in ("manual_probe", "bed_screws", "screws_tilt_adjust"):   # calibration helper dialogs
+        for n in ("manual_probe", "bed_screws", "screws_tilt_adjust"):
             if n in names:
                 objects[n] = None
-        self.led_effects = [n for n in names if n.startswith("led_effect ")]   # the led_effect plugin
+        self.led_effects = [n for n in names if n.startswith("led_effect ")]
         for n in self.led_effects:
             objects[n] = ["enabled"]
         self.pause_layer = "gcode_macro SET_PAUSE_AT_LAYER" in names or "gcode_macro SET_PAUSE_NEXT_LAYER" in names
-        if "gcode_macro SET_PRINT_STATS_INFO" in names:   # pause-at-layer state lives in this macro's variables
+        if "gcode_macro SET_PRINT_STATS_INFO" in names:
             objects["gcode_macro SET_PRINT_STATS_INFO"] = ["pause_next_layer", "pause_at_layer"]
         for n in ("bed_mesh", "firmware_retraction", "quad_gantry_level", "z_tilt"):
             if n in names:
@@ -300,7 +293,6 @@ class MoonrakerClient:
         self._changed()
 
     async def _load_macros(self, names: list[str]):
-        """Macro names + descriptions (from the printer's config). _NAME macros are Klipper's 'hidden' ones."""
         desc = {}
         try:
             res = await self._call("printer.objects.query", {"objects": {"configfile": ["settings"]}})
@@ -334,7 +326,6 @@ class MoonrakerClient:
         self._changed()
 
     async def command(self, action: str):
-        """pause / resume / cancel / estop"""
         methods = {"pause": "printer.print.pause", "resume": "printer.print.resume",
                    "cancel": "printer.print.cancel", "estop": "printer.emergency_stop"}
         return await self._call(methods[action], timeout=15)
@@ -352,7 +343,6 @@ class MoonrakerClient:
              "start": "server.job_queue.start", "pause": "server.job_queue.pause", "jump": "server.job_queue.jump"}
 
     async def job_queue(self, action: str, params: dict | None = None) -> dict:
-        """Moonraker's job queue ([job_queue] in moonraker.conf). Every action answers with the queue as it is now."""
         res = await self._call(self.QUEUE[action], params or None, timeout=15) or {}
         if action != "status" and "queued_jobs" not in res:
             res = await self._call(self.QUEUE["status"]) or {}
@@ -364,7 +354,6 @@ class MoonrakerClient:
         return await self._call("server.files.delete_file", {"path": f"gcodes/{path}"})
 
     async def upload(self, filename: str, data: bytes, start: bool = False, root: str = "gcodes", folder: str = ""):
-        """Upload a file to one of the printer's folders (Moonraker HTTP upload): G-code, or a config file from the editor."""
         boundary = uuid.uuid4().hex
         parts = [("root", root)] + ([("path", folder)] if folder else []) + ([("print", "true")] if start else [])
         body = b"".join(
@@ -392,14 +381,12 @@ class MoonrakerClient:
         return (res or {}).get("job_totals", {})
 
     async def temperature_history(self) -> dict:
-        """Moonraker keeps ~20 minutes of 1-per-second readings: {object: {"temperatures": [...], "targets": [...]}}."""
         res = await self._call("server.temperature_store", {"include_monitors": False}, timeout=15) or {}
         keep = {"extruder", "heater_bed", *self.extras}
         return {k: {f: v[f] for f in ("temperatures", "targets", "powers", "speeds") if f in v}
                 for k, v in res.items() if k in keep and isinstance(v, dict)}
 
     async def thumbnail(self, filename: str) -> tuple[str, bytes] | None:
-        """The slicer's preview picture for a G-code file (the largest up to 400 px wide), cached."""
         if filename in self._thumbs:
             return self._thumbs[filename]
         try:
@@ -426,10 +413,8 @@ class MoonrakerClient:
         return self._thumbs[filename]
 
     async def gcode(self, script: str):
-        """Run G-code; waits until Klipper finishes it (homing can take a while)."""
         return await self._call("printer.gcode.script", {"script": script}, timeout=120)
 
-    # state ------------------------------------------------------------------
     def _set(self, **kw):
         for k, v in kw.items():
             setattr(self, k, v)
@@ -468,7 +453,6 @@ class MoonrakerClient:
         return service.startswith(("mjpegstreamer", "uv4l-mjpeg", "ipstream")) or "action=stream" in url or service == ""
 
     def stream_url(self, index: int = 0) -> str | None:
-        """MJPEG stream URL of a camera, or None if it has none (e.g. WebRTC-only)."""
         cams = self._snap_cams()
         if not cams:
             return None
@@ -476,7 +460,6 @@ class MoonrakerClient:
         return self._abs(cam["stream_url"]) if self._is_mjpeg(cam) else None
 
     def cams_info(self) -> list[dict]:
-        """Name / flip / rotation / fps of each camera, as configured in Moonraker."""
         out = []
         for i, cam in enumerate(self._snap_cams()):
             try:
@@ -499,7 +482,7 @@ class MoonrakerClient:
         duration = ps.get("print_duration") or 0.0
         eta = None
         fname = ps.get("filename") or None
-        if fname and getattr(self, "_meta_for", None) != fname:   # slicer estimate + filament total, once per file
+        if fname and getattr(self, "_meta_for", None) != fname:
             self._meta_for, self._meta = fname, {}
             asyncio.ensure_future(self._load_meta(fname))
         meta = getattr(self, "_meta", {}) or {}
@@ -568,7 +551,6 @@ class MoonrakerClient:
         }
 
     def output_view(self) -> list[dict]:
-        """output_pin values (0-1) and LED colours, for the Fans & outputs panel."""
         out = []
         for n in getattr(self, "outputs", []):
             st = self.status.get(n, {})
@@ -584,13 +566,11 @@ class MoonrakerClient:
         return await self._call(method, params, timeout=timeout)
 
     async def read_file(self, root: str, path: str):
-        """Stream a file from Moonraker's file roots (gcodes / config / logs)."""
         from urllib.parse import quote
         url = f"http://{self.host}:{self.port}/server/files/{root}/{quote(path)}"
         return await http_stream(url, {"X-Api-Key": self.api_key} if self.api_key else {}, timeout=15)
 
     def print_objects(self) -> dict | None:
-        """Objects in the current print (Klipper exclude_object): outlines, which are skipped, which is printing now."""
         eo = self.status.get("exclude_object")
         if not isinstance(eo, dict) or not eo.get("objects"):
             return None
@@ -599,13 +579,11 @@ class MoonrakerClient:
                 "excluded": eo.get("excluded_objects") or [], "current": eo.get("current_object")}
 
     def bed_area(self) -> list | None:
-        """[min x, min y, max x, max y] the toolhead can reach, for drawing the objects map."""
         th = self.status.get("toolhead", {})
         lo, hi = th.get("axis_minimum"), th.get("axis_maximum")
         return [lo[0], lo[1], hi[0], hi[1]] if lo and hi and len(lo) > 1 and len(hi) > 1 else None
 
     def sensors(self) -> list[dict]:
-        """Every heater / temperature sensor / fan, for the dashboard's Thermals card and chart."""
         out = []
         for obj in ["extruder", "heater_bed", *self.extras]:
             st = self.status.get(obj)

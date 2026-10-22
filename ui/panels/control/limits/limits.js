@@ -1,4 +1,3 @@
-// Limits panel: change max velocity / acceleration / square corner velocity live (SET_VELOCITY_LIMIT). Resets on restart.
 PB.panel("limits", {
   title: "Limits", desc: "Velocity and acceleration, live", cls: "adv",
   icon: PB.icon('<path d="M3 17a9 9 0 0 1 18 0"/><path d="M12 17l4-6"/>'),

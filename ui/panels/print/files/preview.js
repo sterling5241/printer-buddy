@@ -1,7 +1,5 @@
-// Files panel, part: preview pictures and text files (logs show their last lines). Used by files.js.
 PB.parts = PB.parts || {};
 PB.parts.filesPreview = c => {
-    // ---- preview: pictures, and text files (logs show their last lines) ----
     const PREVIEW = /\.(png|jpe?g|gif|webp|bmp|txt|log|cfg|conf|ini|json|md|csv|sh|py)$/i;
     const pv = PB.el("dialog", "bd-lib pb-xd pb-pvdlg"); document.body.append(pv);
     async function look(path) {

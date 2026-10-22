@@ -1,8 +1,7 @@
-// Settings > Look options: ask before e-stop / cancel, progress in the tab title, slider lock on touch screens.
 (() => {
   const { el } = PB, { onPage, cur, send, live, dialog, pageHook } = PB.x;
   const opt = (k, d) => PB.store.get(k, d);
-  doAction = async (id, action) => {   // the page's pause / resume / cancel / e-stop, with the confirmations you chose
+  doAction = async (id, action) => {
     const p = printers.get(id); if (!p) return;
     if (action === "cancel" && opt("pb-confirm-cancel", true) && !confirm(`Cancel the print on ${p.name}?`)) return;
     if (action === "estop" && opt("pb-confirm-estop", true) && !confirm(`Emergency stop ${p.name}? This halts the printer immediately and Klipper will need a restart.`)) return;

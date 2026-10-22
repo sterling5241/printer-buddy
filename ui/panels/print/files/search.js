@@ -1,7 +1,5 @@
-// Files panel, part: search every folder (not just the open one). Used by files.js.
 PB.parts = PB.parts || {};
 PB.parts.filesSearch = c => {
-    // ---- search every folder ----
     async function drawEverywhere(term, by) {
       const id = pageId, r0 = c.root;
       if (!c.everything || c.everything.root !== c.root) {

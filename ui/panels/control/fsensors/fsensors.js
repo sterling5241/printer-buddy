@@ -1,4 +1,3 @@
-// Filament sensors panel: runout / motion sensors - filament present?, and switch each one on or off.
 PB.panel("fsensors", {
   title: "Filament sensors", desc: "Filament runout sensors on / off", cls: "adv",
   icon: PB.icon('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 4v6"/>'),

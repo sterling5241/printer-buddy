@@ -1,6 +1,3 @@
-// Console panel: Klipper's replies and your commands, with a G-code input under it.
-// Extras (Fluidd-style ideas, our code): filters (hide temperature reports + your own text / /regex/ filters, saved on the
-// box per printer), clear, auto-scroll toggle, up/down command history, click a sent command to reuse it, autocomplete.
 PB.panel("console", {
   title: "Console", desc: "Klipper replies and a G-code input", cls: "adv", flush: true, gear: true,
   icon: PB.icon('<path d="M4 17l6-5-6-5M12 19h8"/>'),
@@ -20,7 +17,7 @@ PB.panel("console", {
     input.setAttribute("list", dl.id);
     logEl.style.height = `${cfg.height}px`;
     let filters = [], auto = true, hist = -1, help = {};
-    async function commands(id) {   // autocomplete: every G-code command Klipper knows (incl. macros), with its help text
+    async function commands(id) {
       try {
         const h = await PB.rpc("printer.gcode.help");
         if (id === pageId) help = h || {};
@@ -39,13 +36,12 @@ PB.panel("console", {
       if (auto) logEl.scrollTop = logEl.scrollHeight;
       q(".pb-fn").textContent = filters.length ? ` (${filters.length})` : "";
     }
-    // stop following when you scroll up to read; follow again at the bottom
     logEl.onscroll = () => { const bottom = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 4; if (auto !== bottom) { auto = bottom; q("[data-a=scroll]").setAttribute("aria-pressed", auto); } };
     q("[data-a=scroll]").onclick = () => { auto = !auto; q("[data-a=scroll]").setAttribute("aria-pressed", auto); if (auto) logEl.scrollTop = logEl.scrollHeight; };
     q("[data-a=clear]").onclick = () => { conLogs.set(pageId, []); draw(); };
-    const flt = PB.parts.consoleFilters(q, cfg, { get: () => filters, set: f => { filters = f; draw(); return f; } });   // filters.js
-    const hlp = PB.parts.consoleHelp(q, input, () => help);   // help.js
-    input.onkeydown = e => {   // the same command history as the rest of the app
+    const flt = PB.parts.consoleFilters(q, cfg, { get: () => filters, set: f => { filters = f; draw(); return f; } });
+    const hlp = PB.parts.consoleHelp(q, input, () => help);
+    input.onkeydown = e => {
       if ((e.key !== "ArrowUp" && e.key !== "ArrowDown") || !conHistory.length) return;
       e.preventDefault();
       if (e.key === "ArrowUp") hist = hist === -1 ? conHistory.length - 1 : Math.max(0, hist - 1);

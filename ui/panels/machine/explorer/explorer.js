@@ -1,4 +1,3 @@
-// State explorer panel (for tinkering): every Klipper object on the printer; pick one to see all its live values.
 PB.panel("explorer", {
   title: "State explorer", desc: "Browse every Klipper object and its live values (for tinkering)", cls: "adv",
   icon: PB.icon('<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>'),

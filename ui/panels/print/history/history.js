@@ -1,6 +1,3 @@
-// History panel: totals, maintenance reminders, then past prints with thumbnails, result, time, filament and Reprint.
-// Extras (Mainsail-style ideas, our code): a note per print, a details box, CSV export, and maintenance reminders
-// (every N print hours / metres of filament / days), all saved on the box per printer.
 PB.panel("history", {
   title: "History", desc: "Past prints, totals and reprint", cls: "adv",
   icon: PB.icon('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 3"/>'),
@@ -39,7 +36,6 @@ PB.panel("history", {
         jobs = jobs.concat(r.jobs); count = r.count; draw();
       } catch (e) { if (id === pageId) msg.textContent = e.message.includes("history") ? "This printer's Moonraker has no print history turned on." : e.message; }
     }
-    // sortable table: click a header to sort by it, again to flip the direction (sorts the prints loaded so far)
     const COLS = [["filename", "File"], ["start_time", "Started"], ["print_duration", "Duration"], ["filament_used", "Filament"], ["status", "Result"]];
     let sortKey = "start_time", sortDir = -1;
     function draw() {
@@ -70,15 +66,14 @@ PB.panel("history", {
       more.hidden = jobs.length >= count;
     }
     more.onclick = () => load(false);
-    const dlg = PB.el("dialog", "bd-lib pb-xd pb-hdlg"); document.body.append(dlg);   // the details + maintenance box
-    let allJobs = null;   // every job (for CSV + charts), fetched once per printer
+    const dlg = PB.el("dialog", "bd-lib pb-xd pb-hdlg"); document.body.append(dlg);
+    let allJobs = null;
     async function fetchAll(id) {
       if (allJobs?.id === id) return allJobs.jobs;
       let all = [], total = 1;
       while (all.length < total && all.length < 20000) { const r = await api(`/api/printers/${id}/history?start=${all.length}&limit=100`); total = r.count; if (!r.jobs.length) break; all = all.concat(r.jobs); }
       allJobs = { id, jobs: all }; return all;
     }
-    // shared with the parts in details.js / charts.js / csv.js / maintenance.js
     const c = {
       q, msg, cfg, dlg, draw: () => draw(), fetchAll: id => fetchAll(id),
       get jobs() { return jobs; }, get notes() { return notes; }, set notes(v) { notes = v; },

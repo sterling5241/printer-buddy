@@ -1,8 +1,3 @@
-"""Timelapse recorder: snapshots during a print (per layer or every N seconds), rendered to MP4 with ffmpeg.
-
-Recordings live in <data>/timelapses/<printer id>/<timelapse id>.mp4 (+ .json with details).
-Only active when the installer's Video choice is "timelapse".
-"""
 from __future__ import annotations
 
 import asyncio
@@ -32,19 +27,16 @@ class Timelapse:
                  transform: Callable[[int], tuple[bool, bool, int]]):
         self.store = store
         self.root = Path(data_dir) / "timelapses"
-        self.snapshot = snapshot          # pid -> JPEG bytes from the printer's main camera
-        self.transform = transform        # pid -> (flip_h, flip_v, rotation) as shown in the app
+        self.snapshot = snapshot
+        self.transform = transform
         self.active: dict[int, dict] = {}
-        self.skip: set[int] = set()       # printers whose next print shouldn't be recorded (start-print dialog)
+        self.skip: set[int] = set()
 
-    # settings -------------------------------------------------------------
     def settings(self) -> dict:
         s = self.store.settings()
         return {k: s.get(k, v) for k, v in DEFAULTS.items()}
 
-    # recording ------------------------------------------------------------
     def recording(self, pid: int) -> int | None:
-        """Frames captured so far, or None when not recording."""
         job = self.active.get(pid)
         return job["frames"] if job else None
 
@@ -77,7 +69,7 @@ class Timelapse:
         self.active[pid] = job
         if job["mode"] == "interval":
             job["task"] = asyncio.get_running_loop().create_task(self._interval_loop(pid, cfg["tl_interval"]))
-        asyncio.get_running_loop().create_task(self._capture(pid))   # first frame right away
+        asyncio.get_running_loop().create_task(self._capture(pid))
         log.info("timelapse started for printer %s (%s)", pid, job["mode"])
 
     async def _interval_loop(self, pid: int, every: int):
@@ -155,7 +147,6 @@ class Timelapse:
         for item in self.list(pid)[keep:]:
             self.delete(pid, item["id"])
 
-    # browsing ------------------------------------------------------------
     def list(self, pid: int) -> list[dict]:
         d = self.root / str(pid)
         out = []

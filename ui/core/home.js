@@ -1,15 +1,12 @@
-// Home page header: 🔔 Printer Buddy news (from printerbuddy.stream, via this box) and ⚙ Settings
-// (Alerts = the old Notifications panel, AI, Look, About). Loaded after builder.js.
 (() => {
   const { el } = PB;
   const row = $(".top .row");
-  $("#aiBtn").hidden = true; $("#notifyBtn").hidden = true;   // their panels now live in Settings
+  $("#aiBtn").hidden = true; $("#notifyBtn").hidden = true;
   const bell = el("button", "pb-bell", `${PB.ic.bell}<i hidden></i>`); bell.type = "button"; bell.title = "News and printer notices"; bell.setAttribute("aria-label", "News");
   const gear = el("button", "pb-iconbtn", `${PB.ic.cog}Settings`); gear.type = "button";
   row.insertBefore(gear, $("#homeEdit") || $("#manualBtn"));
   row.insertBefore(bell, gear);
 
-  // ---- news ------------------------------------------------------------------------------------------
   const read = () => new Set(PB.store.get("pb-news-read", []));
   const LEVEL = { update: "Update", important: "Important" };
   PB.news = {
@@ -23,7 +20,6 @@
         : `<p class="pb-muted">No news yet.</p>`;
     },
     async load() {
-      // Printer Buddy news + each printer's Moonraker notices (warnings, failed parts, Klipper / Moonraker announcements)
       const [news, notes] = await Promise.all([api("/api/news").then(r => r.items || [], () => null), api("/api/notices").then(r => r.items || [], () => [])]);
       if (news === null && !notes.length) return;
       this.items = [...notes, ...(news || [])];
@@ -46,7 +42,7 @@
       if (!drop.contains(e.target) && e.target !== bell) { drop.hidden = true; document.removeEventListener("pointerdown", close); }
     }), 0);
   };
-  function banner() {   // "important" news: a slim banner once per browser
+  function banner() {
     const seen = new Set(PB.store.get("pb-news-banner", []));
     const n = PB.news.items.find(x => x.level === "important" && !seen.has(x.id));
     $(".pb-banner")?.remove();
@@ -56,9 +52,8 @@
     document.body.prepend(b);
   }
   PB.news.load();
-  setInterval(() => PB.news.load(), 15 * 60 * 1000);   // the box caches: news 6 h, printer notices 10 min
+  setInterval(() => PB.news.load(), 15 * 60 * 1000);
 
-  // ---- settings ----------------------------------------------------------------------------------------
   const panel = el("section", "panel pb-settings"); panel.hidden = true;
   panel.innerHTML = `<div class="pb-settop"><h2>Settings</h2><span class="bd-sp"></span><button type="button" data-a="close">Close</button></div>
     <div class="pb-settabs" role="tablist"><button type="button" data-tab="alerts">Alerts</button><button type="button" data-tab="ai" class="ai">AI</button>

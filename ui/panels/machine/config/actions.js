@@ -1,17 +1,13 @@
-// Config panel, part: the actions - Add menu (new file, new folder, upload files, upload folder), right-click menu (edit, view,
-// rename, duplicate, download, zip, delete), ticked-files bar (zip, delete), drag & drop (upload from the computer, move into a folder).
-// Used by config.js.
 PB.parts = PB.parts || {};
 PB.parts.cfgActions = c => {
-    const ACCEPT = [".conf", ".cfg", ".md", ".css", ".jpg", ".jpeg", ".png", ".gif"];   // same list as CONFIG_EXT in main.py
+    const ACCEPT = [".conf", ".cfg", ".md", ".css", ".jpg", ".jpeg", ".png", ".gif"];
     const IMG = /\.(png|jpe?g|gif|webp|bmp)$/i, MOVE = "text/x-pb-cfg";
-    const pv = PB.parts.filesPreview(c);   // the Files panel's view dialog (pictures, text)
+    const pv = PB.parts.filesPreview(c);
     const isDir = n => c.dirs.some(d => d.dirname === n);
     const call = async (method, params) => { try { await PB.rpc(method, params); return true; } catch (e) { const p = params.source || params.path; toast(p ? `${p}: ${e.message}` : e.message); return false; } };
     function openFile(n) {
       if (c.root === "config" && !IMG.test(n)) c.ed.open(c.full(n)); else pv.look(c.full(n));
     }
-    // ---- one file / folder ----
     async function rename(n) {
       const name = prompt("New name:", n); if (!name || name === n || name.includes("/")) return;
       if (await call("server.files.move", { source: c.path(n), dest: c.path(name) })) c.load();
@@ -46,7 +42,6 @@ PB.parts.cfgActions = c => {
       if (ok) toast(`Moved ${ok} to ${to || "the top folder"}`);
       c.picked.clear(); c.load();
     }
-    // ---- right-click menu: ticked rows act together ----
     function rowMenu(e, n) {
       e.preventDefault();
       const ro = c.ro(), d = isDir(n), many = c.picked.has(n) && c.picked.size > 1, names = many ? [...c.picked] : [n];
@@ -69,7 +64,6 @@ PB.parts.cfgActions = c => {
     }
     c.q("[data-b=zip]").onclick = () => zip([...c.picked]);
     c.q("[data-b=del]").onclick = () => remove([...c.picked]);
-    // ---- Add menu ----
     async function newFile() {
       const name = prompt("New file name:", "new.cfg"); if (!name || name.includes("/")) return;
       if (c.files.some(f => f.filename === name)) return toast(`${name} already exists`);
@@ -89,7 +83,6 @@ PB.parts.cfgActions = c => {
       { label: "Upload files", run: () => c.q("[data-u=files]").click() },
       { label: "Upload folder", run: () => c.q("[data-u=dir]").click() },
     ]);
-    // ---- uploads: [[File, folder inside the root], ...] ----
     async function upload(items) {
       const id = pageId, ok = items.filter(([f]) => ACCEPT.some(x => f.name.toLowerCase().endsWith(x)));
       if (items.length > ok.length) toast(`Skipped ${items.length - ok.length} file(s) that aren't ${ACCEPT.join(" ")}`);
@@ -119,7 +112,6 @@ PB.parts.cfgActions = c => {
       const fs = [...din.files]; din.value = "";
       upload(fs.map(f => [f, [c.dir, f.webkitRelativePath.split("/").slice(0, -1).join("/")].filter(Boolean).join("/")]));
     };
-    // ---- drag & drop: rows move into folders (and ..), files from the computer upload into the folder they land on ----
     const has = (e, t) => [...(e.dataTransfer?.types || [])].includes(t);
     const wrap = c.q("[data-drop]");
     function wire(list) {

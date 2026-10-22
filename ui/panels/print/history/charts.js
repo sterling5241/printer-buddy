@@ -1,7 +1,5 @@
-// History panel, part: charts: results donut, filament + print hours per week. Used by history.js.
 PB.parts = PB.parts || {};
 PB.parts.historyCharts = c => {
-    // ---- charts: results (donut), and filament + print hours per week for the last 12 weeks ----
     let c1 = null, c2 = null;
     c.q("[data-a=charts]").onclick = async e => {
       const box = c.q(".pb-hcharts"), on = box.hidden; box.hidden = !on; e.currentTarget.setAttribute("aria-pressed", on);

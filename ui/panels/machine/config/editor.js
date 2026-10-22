@@ -1,5 +1,3 @@
-// Config panel, part: the full-screen editor - top bar (close, file name, unsaved dot | outline, find, docs,
-// Save & restart, Save), line numbers, search + replace, section outline, docs link. Used by config.js.
 PB.parts = PB.parts || {};
 PB.parts.cfgEditor = (cfg, onClose) => {
     const fx = PB.el("div", "pb-cfx"); fx.hidden = true;
@@ -21,7 +19,7 @@ PB.parts.cfgEditor = (cfg, onClose) => {
               <textarea spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-label="Config file contents"></textarea></div></div>
           <aside class="pb-coutline"></aside></div>
         <div class="pb-cfoot pb-muted"><span class="pb-cpos"></span></div>`;
-    ($("#page") || document.body).appendChild(fx);   // inside #page so it gets the page's colours + button styles
+    ($("#page") || document.body).appendChild(fx);
     const q = s => fx.querySelector(s), ta = q("textarea"), hl = q(".pb-hl"), gut = q(".pb-gutter"), state = q(".pb-cstate");
     let showOutline = cfg.outline;
     const setOutline = () => { q(".pb-coutline").hidden = !showOutline; q("[data-a=outline]").setAttribute("aria-pressed", showOutline); };
@@ -30,8 +28,7 @@ PB.parts.cfgEditor = (cfg, onClose) => {
     const dirty = () => path && ta.value !== saved;
     const mark = () => { state.textContent = !path ? "" : dirty() ? "● unsaved" : ""; };
 
-    // ---- highlighting (Klipper config: [sections], key: value, # comments, indented G-code / Jinja in macros) ----
-    const { line } = PB.parts.cfgHighlight;   // highlight.js
+    const { line } = PB.parts.cfgHighlight;
     function paint() {
       const lines = ta.value.split("\n");
       hl.innerHTML = lines.map(line).join("\n") + "\n";
@@ -45,7 +42,6 @@ PB.parts.cfgEditor = (cfg, onClose) => {
       const lines = ta.value.split("\n"); let pos = 0; for (let i = 0; i < n; i++) pos += lines[i].length + 1;
       ta.focus(); ta.setSelectionRange(pos, pos); ta.scrollTop = Math.max(0, n * lineH() - ta.clientHeight / 3); sync(); where();
     }
-    // ---- outline + docs link for the section the cursor is in ----
     let sections = [];
     function outline(lines) {
       sections = []; lines.forEach((t, i) => { const m = t.match(/^\[([^\]]+)\]/); if (m) sections.push([i, m[1]]); });
@@ -60,7 +56,6 @@ PB.parts.cfgEditor = (cfg, onClose) => {
       doc.hidden = !sec || !path.endsWith(".cfg");
       if (sec) { doc.href = `https://www.klipper3d.org/Config_Reference.html#${ANCHOR(sec[1])}`; doc.innerHTML = `Docs: [${esc(sec[1].split(/\s+/)[0])}] ${PB.ic.external}`; }
     }
-    // ---- full-screen editor ----
     function show(on) {
       fx.hidden = !on; document.documentElement.classList.toggle("pb-noscroll", on);
       if (on) { addEventListener("keydown", onKey); setTimeout(() => ta.focus(), 0); } else removeEventListener("keydown", onKey);
@@ -90,7 +85,6 @@ PB.parts.cfgEditor = (cfg, onClose) => {
         saved = ta.value; mark(); toast(`Saved ${path}`); return true;
       } catch (e) { toast(`Save failed: ${e.message}`); return false; }
     }
-    // ---- search + replace ----
     const F = n => q(`[data-f=${n}]`);
     function hits() {
       const s = F("q").value; if (!s) return [];
@@ -122,7 +116,6 @@ PB.parts.cfgEditor = (cfg, onClose) => {
     F("q").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); findNext(e.shiftKey ? -1 : 1); } if (e.key === "Escape") q(".pb-cfind").hidden = true; };
     F("next").onclick = () => findNext(1); F("prev").onclick = () => findNext(-1);
     F("one").onclick = replaceOne; F("all").onclick = replaceAll; F("x").onclick = () => { q(".pb-cfind").hidden = true; ta.focus(); };
-    // ---- editor events ----
     ta.oninput = () => { repaint(); mark(); };
     ta.onscroll = sync;
     ta.onclick = ta.onkeyup = where;

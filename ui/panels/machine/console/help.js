@@ -1,7 +1,5 @@
-// Console panel, part: command help - search every command Klipper knows, click one to put it in the box. Used by console.js.
 PB.parts = PB.parts || {};
 PB.parts.consoleHelp = (q, input, getHelp) => {
-    // command help: search every command, click one to put it in the box
     const hd = PB.el("dialog", "bd-lib pb-xd pb-cmdhelp"); document.body.append(hd);
     q("[data-a=help]").onclick = () => {
       hd.innerHTML = `<div class="pb-ptop"><h3>Commands</h3><button type="button" class="pb-px" aria-label="Close">${PB.ic.x}</button></div>

@@ -1,4 +1,3 @@
-// Klipper error card: when Klipper isn't ready, its message + klippy.log + Restart / Firmware restart / Restart service.
 (() => {
   const { el } = PB, { onPage, cur, send, live, dialog, pageHook } = PB.x;
   const page = $("#page");

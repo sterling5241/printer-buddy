@@ -1,11 +1,3 @@
-"""AI failure detection: while a printer prints, score its camera every few seconds with our model.
-
-Only active when the installer's AI choice is "basic". The model lives in <data>/ai/<tag>/:
-  printer-buddy-basic.onnx + model.json   (published as "ai-basic-*" releases; the installer downloads them)
-
-Alert rule: the highest "alert" label score must reach the threshold for `hold` checks in a row,
-then nothing more for `cooldown` minutes. "warn" labels never trigger anything, they're only shown.
-"""
 from __future__ import annotations
 
 import asyncio
@@ -23,7 +15,7 @@ log = logging.getLogger(__name__)
 DEFAULTS = {"ai_threshold": 0.6, "ai_interval": 10, "ai_hold": 3, "ai_cooldown": 10}
 CHOICES = {"ai_threshold": (0.4, 0.5, 0.6, 0.7, 0.8), "ai_interval": (5, 10, 20, 30),
            "ai_hold": (1, 2, 3, 5), "ai_cooldown": (5, 10, 20, 30)}
-MODES = ("off", "alert", "pause")      # per printer; default "alert"
+MODES = ("off", "alert", "pause")
 SUSPECT_SPEEDUP = 5.   # s taken off the interval while a failure holds, until it alerts
 MIN_INTERVAL = 2.
 DEFAULT_MODE = "alert"
@@ -34,7 +26,6 @@ def enabled() -> bool:
 
 
 class Model:
-    """The ONNX model + its model.json. score() is blocking: call it in a thread."""
 
     def __init__(self, folder: Path):
         self.meta = json.load(open(folder / "model.json"))
@@ -46,7 +37,7 @@ class Model:
         import onnxruntime as ort
         self.np = np
         opts = ort.SessionOptions()
-        opts.intra_op_num_threads = 2          # leave CPU for the rest of the box
+        opts.intra_op_num_threads = 2
         self.sess = ort.InferenceSession(str(path), opts, providers=["CPUExecutionProvider"])
         inp = self.meta["input"]
         self.size = int(inp["shape"][2])
@@ -59,7 +50,6 @@ class Model:
     def _input(self, jpeg: bytes, flip_h=False, flip_v=False, rotation=0):
         from PIL import Image, ImageOps
         im = Image.open(io.BytesIO(jpeg)).convert("RGB")
-        # show the model the print the way the app shows it (upright)
         if rotation:
             im = im.rotate(-int(rotation), expand=True)
         if flip_h:
@@ -97,7 +87,7 @@ class Model:
         for r in range(grid - k + 1):
             for c in range(grid - k + 1):
                 y = x.copy()
-                y[..., round(r * cell):round((r + k) * cell), round(c * cell):round((c + k) * cell)] = 0.   # = mean colour
+                y[..., round(r * cell):round((r + k) * cell), round(c * cell):round((c + k) * cell)] = 0.
                 diff = base - logit(self._run(y)[li])
                 heat[r:r + k, c:c + k] += max(0., diff)
                 change[r:r + k, c:c + k] += abs(diff)
@@ -119,7 +109,7 @@ class Model:
             todo += [(r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)]
         rows, cols = [r for r, _ in keep], [c for _, c in keep]
         box = [min(cols) / grid, min(rows) / grid, (max(cols) + 1) / grid, (max(rows) + 1) / grid]
-        if (box[2] - box[0]) * (box[3] - box[1]) > LOCATE_MAX_AREA and not force:   # all over the picture
+        if (box[2] - box[0]) * (box[3] - box[1]) > LOCATE_MAX_AREA and not force:
             return None
         return _to_camera(box, flip_h, flip_v, rotation)
 
@@ -127,13 +117,12 @@ class Model:
 LOCATE_GRID = 6          # cells per side; patches are LOCATE_PATCH x LOCATE_PATCH cells
 LOCATE_PATCH = 2
 LOCATE_MIN_DROP = 0.5    # log-odds the best patch must take off the score (90% -> 85%, 99.9% -> 99.8%)
-LOCATE_MAX_AREA = 0.6    # a box over more of the picture than this isn't shown
-BOX_MODES = ("always", "failure", "off")   # off skips locating (its extra model runs) altogether
+LOCATE_MAX_AREA = 0.6
+BOX_MODES = ("always", "failure", "off")
 DEFAULT_BOX = "failure"
 
 
 def _to_camera(box, flip_h, flip_v, rotation):
-    """A box on the upright picture the model saw -> the same box on the camera's own picture."""
     def back(u, v):
         if flip_v:
             v = 1 - v
@@ -152,7 +141,6 @@ def _to_camera(box, flip_h, flip_v, rotation):
 
 
 def draw_box(jpeg: bytes, box: list[float], text: str) -> bytes:
-    """The camera picture with a red box (and TEXT) drawn on it, for notifications."""
     from PIL import Image, ImageDraw
     im = Image.open(io.BytesIO(jpeg)).convert("RGB")
     w, h = im.size
@@ -183,11 +171,9 @@ class AI:
         self.error: str | None = None
         self.tasks: dict[int, asyncio.Task] = {}
         self.state: dict[int, dict] = {}
-        self.box: dict[int, str] = {}      # failure box per printer: always / failure / off (BOX_MODES)
+        self.box: dict[int, str] = {}
 
-    # model ----------------------------------------------------------------
     def load(self):
-        """Load the newest model in <data>/ai/. Safe to call again (e.g. after the installer downloads one)."""
         self.model, self.error = None, None
         if not enabled():
             return
@@ -213,12 +199,10 @@ class AI:
                 "tag": m.tag if m else None, "labels": m.labels if m else [],
                 "kinds": m.kinds if m else {}, "default_threshold": m.meta.get("default_threshold") if m else None}
 
-    # settings -------------------------------------------------------------
     def settings(self) -> dict:
         s = self.store.settings()
         return {k: s.get(k, v) for k, v in DEFAULTS.items()}
 
-    # per printer ----------------------------------------------------------
     def status(self, pid: int) -> dict | None:
         if not enabled():
             return None
@@ -227,21 +211,20 @@ class AI:
                 "score": st.get("score"), "top": st.get("top"), "scores": st.get("scores"), "box": st.get("box"),
                 "at": st.get("at"), "streak": st.get("streak", 0), "alerted_at": st.get("alerted_at"),
                 "fast": st.get("streak", 0) > 0 and not st.get("prompted"), "box_mode": self.box_mode(pid),
-                "alert_item": st.get("alert_item")}   # photo the "was it really a failure?" question is about
+                "alert_item": st.get("alert_item")}
 
     def on_change(self, pid: int, prev: dict, v: dict):
         if not enabled() or not self.model:
             return
         if v["state"] == "printing" and v["connection"] == "online" and self.mode_of(pid) != "off":
             if pid not in self.tasks:
-                if prev["state"] not in ("printing", "paused"):   # a new print: start fresh
+                if prev["state"] not in ("printing", "paused"):
                     self.state[pid] = {}
                 self.tasks[pid] = asyncio.get_running_loop().create_task(self._watch(pid))
         else:
             self.cancel(pid, keep_scores=True)
 
     def refresh(self, pid: int, v: dict):
-        """Mode changed: start or stop watching right away."""
         self.on_change(pid, {"state": v["state"]}, v)
 
     def cancel(self, pid: int, keep_scores: bool = False):
@@ -257,7 +240,6 @@ class AI:
             self.cancel(pid)
 
     async def check_now(self, pid: int) -> dict:
-        """One test score of the camera right now, in any printer state. Never alerts, pauses or counts."""
         if not enabled():
             raise RuntimeError("AI detection is off (installer: AI detection = basic)")
         m = self.model
@@ -274,9 +256,6 @@ class AI:
         return {"scores": scores, "top": top, "score": score, "box": box, "at": time.time()}
 
     async def _locate(self, pid: int, img: bytes, top: str | None, score: float) -> list[float] | None:
-        """Box around the problem: in "failure" mode only for an alert score at or over the threshold,
-        in "always" mode on every check (the likeliest place, even for a good print), never in "off"
-        mode, which skips the extra model runs."""
         mode = self.box_mode(pid)
         force = mode == "always"
         if not top or mode == "off" or (score < float(self.settings()["ai_threshold"]) and not force):

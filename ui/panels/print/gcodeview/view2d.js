@@ -1,4 +1,3 @@
-// G-code preview, part: the 2D top-down layer view (canvas). Used by gcodeview.js.
 PB.parts = PB.parts || {};
 PB.parts.gcode2d = S => {
     function draw2d() {

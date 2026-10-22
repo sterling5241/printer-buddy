@@ -1,5 +1,3 @@
-// Config panel, part: the file list - load a folder, breadcrumbs, folder picker, Name / Modified / Size sort, search,
-// filters (hidden files, backups, temp uploads), go to file, low disk warning. Used by config.js.
 PB.parts = PB.parts || {};
 PB.parts.cfgBrowse = c => {
     const ROOTS = { config: "Config", config_examples: "Config examples", docs: "Docs" };
@@ -33,7 +31,7 @@ PB.parts.cfgBrowse = c => {
         .concat(parts.map((p, i) => `<button type="button" data-d="${esc(parts.slice(0, i + 1).join("/"))}">${esc(p)}</button>`)).join(" / ");
       for (const b of c.q(".pb-crumbs").querySelectorAll("[data-d]")) b.onclick = () => go(b.dataset.d);
     }
-    function low() {   // same rule as Fluidd: under 1 GB free, or under 20% free on a small disk
+    function low() {
       const d = c.disk, w = c.q(".pb-clow"), on = !!d && d.free < Math.min(1073741824, d.total * 0.2);
       w.hidden = !on;
       if (on) w.title = `Low on disk space: ${kb(d.free)} free of ${kb(d.total)}`;
@@ -72,14 +70,13 @@ PB.parts.cfgBrowse = c => {
         const row = x.closest(".pb-crow"); if (x.checked) c.picked.add(row.dataset.n); else c.picked.delete(row.dataset.n);
         row.classList.toggle("picked", x.checked); c.q("[data-all]").checked = c.rows.every(r => c.picked.has(r.n)); c.bulk();
       };
-      c.wire(list);   // actions.js: right-click menu + drag & drop on the rows
+      c.wire(list);
       c.bulk();
     }
     c.q("input[type=search]").oninput = draw;
     c.q("[data-a=root]").onchange = e => { c.root = e.target.value; go(""); };
     c.q("[data-a=filter]").onclick = e => c.menu(e.currentTarget, FILTERS.map(([k, label]) => ({
       label, check: hide.has(k), run: on => { if (on) hide.add(k); else hide.delete(k); PB.store.set("pb-cfg-hide", [...hide]); draw(); } })));
-    // ---- go to file: every file in this folder tree, type to narrow it down ----
     const gd = PB.el("dialog", "bd-lib pb-xd pb-cmdhelp"); document.body.append(gd);
     gd.innerHTML = `<div class="pb-ptop"><h3>Go to file</h3><button type="button" class="pb-px" aria-label="Close">${PB.ic.x}</button></div>
       <input type="search" placeholder="File name…" aria-label="File name"><div class="pb-cmdlist"></div>`;

@@ -1,7 +1,5 @@
-// History panel, part: CSV export of the whole history. Used by history.js.
 PB.parts = PB.parts || {};
 PB.parts.historyCsv = c => {
-    // ---- CSV export: every job, not just the ones loaded ----
     c.q("[data-a=csv]").onclick = async () => {
       const id = pageId; if (id === null) return;
       c.msg.textContent = "Collecting the history…";

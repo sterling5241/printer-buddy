@@ -1,4 +1,3 @@
-"""Find Moonraker instances on the LAN. Discovery only lists printers; it never connects to them."""
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +12,7 @@ log = logging.getLogger(__name__)
 
 MDNS_TYPE = "_moonraker._tcp.local."
 PROBE_PORTS = [int(p) for p in os.getenv("PROBE_PORTS", "7125,80").split(",") if p.strip()]
-MAX_HOSTS = 4096  # refuse to sweep anything bigger than a /20
+MAX_HOSTS = 4096
 
 
 def local_subnets() -> list[ipaddress.IPv4Network]:
@@ -22,7 +21,7 @@ def local_subnets() -> list[ipaddress.IPv4Network]:
         return [ipaddress.ip_network(s.strip(), strict=False) for s in env.split(",") if s.strip()]
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        s.connect(("10.255.255.255", 1))  # no packet is sent; just picks the LAN interface
+        s.connect(("10.255.255.255", 1))
         ip = s.getsockname()[0]
     except OSError:
         return []
@@ -41,7 +40,6 @@ async def _port_open(host: str, port: int, timeout: float = 0.5) -> bool:
 
 
 async def _mdns(duration: float) -> dict[str, int]:
-    """host -> port from Moonraker's [zeroconf] announcements. Silently empty if zeroconf isn't installed."""
     try:
         from zeroconf import IPVersion, ServiceStateChange
         from zeroconf.asyncio import AsyncServiceBrowser, AsyncServiceInfo, AsyncZeroconf
@@ -72,7 +70,6 @@ async def _mdns(duration: float) -> dict[str, int]:
 
 
 async def probe(host: str, port: int, api_key: str | None = None) -> dict | None:
-    """Return a description of the Moonraker at host:port, or None if it isn't one."""
     base = f"http://{host}:{port}"
     hdrs = {"X-Api-Key": api_key} if api_key else {}
     try:

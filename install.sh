@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Printer Buddy installer and manager (Pi / Debian / Ubuntu), KIAUH-style.
-#
 #   ./install.sh                         open the menu
 #   ./install.sh -y                      install/update with no questions (keeps current setup)
 #   ./install.sh --ui advanced --ai off  set parts and install with no menu
@@ -12,8 +10,8 @@ UNIT_FILE="/etc/systemd/system/$SERVICE.service"
 RUN_USER="${SUDO_USER:-$USER}"
 ENV_FILE="$DIR/printer-buddy.env"
 BACKUP_DIR="$DIR/backups"
-PORT_GIVEN=""     # from --port
-INTERACTIVE=0     # 1 when run from the menu
+PORT_GIVEN=""
+INTERACTIVE=0
 
 # key|env var|name|choices (first one is the default)
 PARTS=(
@@ -37,11 +35,9 @@ declare -A DESC=(
   [remote.off]="only on your home network"
   [remote.on]="reach it from anywhere, with a login"
 )
-# Choices that are built today. The others are saved now and switch on once they're built.
 BUILT=" ui.basic ui.advanced ai.off ai.basic video.snapshots notify.basic notify.advanced video.live video.timelapse remote.off remote.on "
 
-# ---------------------------------------------------------------- helpers
-W=55   # inner width of the menu box
+W=55
 hr()    { printf '|%s|\n' "$(printf '%*s' $((W + 2)) '' | tr ' ' '-')"; }
 top()   { printf '/%s\\\n' "$(printf '%*s' $((W + 2)) '' | tr ' ' '=')"; }
 bottom(){ printf '\\%s/\n' "$(printf '%*s' $((W + 2)) '' | tr ' ' '=')"; }
@@ -58,7 +54,7 @@ set_env() {
   if grep -qE "^$1=" "$ENV_FILE"; then sed -i "s|^$1=.*|$1=$2|" "$ENV_FILE"; else echo "$1=$2" >> "$ENV_FILE"; fi
 }
 built() { case "$BUILT" in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
-part_value() {   # current choice for a part line, falling back to its default
+part_value() {
   local key var name choices; IFS='|' read -r key var name choices <<<"$1"
   local v; v="$(get_env "$var")"
   case " $choices " in *" $v "*) echo "$v" ;; *) echo "${choices%% *}" ;; esac
@@ -72,10 +68,9 @@ service_state() {
 }
 url() { local ip port; ip=$(hostname -I 2>/dev/null | awk '{print $1}'); port="$(get_env PORT)"; echo "http://${ip:-<this-box>}:${port:-8080}"; }
 
-# ---------------------------------------------------------------- port
 current_port() { local p; p="$(get_env PORT)"; echo "${p:-8080}"; }
 valid_port() { [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1024 ] && [ "$1" -le 65535 ]; }
-port_owner() {   # prints what is listening on TCP port $1 (Printer Buddy itself doesn't count); fails if free
+port_owner() {
   local p="$1" line pid name ours
   ours="$(systemctl show -p MainPID --value "$SERVICE" 2>/dev/null)"
   if command -v ss >/dev/null; then
@@ -163,7 +158,7 @@ change_port() {
 
 UPDATE_INFO=""
 NEED_LOGIN=0
-check_updates() {   # one quiet fetch when the menu opens; never prompts
+check_updates() {
   NEED_LOGIN=0
   git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1 || { UPDATE_INFO=""; return; }
   local out
@@ -177,7 +172,7 @@ check_updates() {   # one quiet fetch when the menu opens; never prompts
   else UPDATE_INFO="couldn't check for updates"; fi
 }
 
-github_login() {   # ask for a username + token once and save it for this repo (git's credential store)
+github_login() {
   local remote host; remote="$(git -C "$DIR" remote get-url origin 2>/dev/null)"
   case "$remote" in https://*) ;; *) echo "This copy doesn't use an https:// GitHub address, so there's nothing to save."; return 1 ;; esac
   host="${remote#https://}"; host="${host%%/*}"; host="${host#*@}"
@@ -200,7 +195,7 @@ github_login() {   # ask for a username + token once and save it for this repo (
 version() { git -C "$DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown"; }
 branch() { git -C "$DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"; }
 
-hard_restart() {   # full stop, then start, then wait until it answers
+hard_restart() {
   local port; port="$(get_env PORT)"; port="${port:-8080}"
   sudo systemctl stop "$SERVICE"
   local i; for i in $(seq 1 20); do systemctl is-active --quiet "$SERVICE" || break; sleep 0.5; done
@@ -214,7 +209,7 @@ hard_restart() {   # full stop, then start, then wait until it answers
   echo; echo "It started but isn't answering on port $port yet. $(port_hint "$port")"; return 1
 }
 
-write_unit() {   # (re)write the systemd service file
+write_unit() {
   sudo tee "$UNIT_FILE" >/dev/null <<UNIT
 [Unit]
 Description=Printer Buddy - self-hosted printer monitor
@@ -237,19 +232,19 @@ UNIT
   sudo systemctl daemon-reload
 }
 
-ensure_ffmpeg() {   # timelapses need ffmpeg to make the video
+ensure_ffmpeg() {
   [ "$(part_value "${PARTS[2]}")" = "timelapse" ] || return 0
   command -v ffmpeg >/dev/null && return 0
   echo "Installing ffmpeg (needed for timelapses)..."
   sudo apt-get update -q && sudo apt-get install -y -q ffmpeg || echo "Couldn't install ffmpeg; timelapses will save pictures but no video."
 }
 
-ai_model() {   # installed AI model version (newest), or nothing
+ai_model() {
   local f; f="$(ls -1t "$DIR"/data/ai/*/model.json 2>/dev/null | head -n1)"
   [ -n "$f" ] && basename "$(dirname "$f")"
 }
 
-ensure_ai() {   # AI detection = basic: libraries + newest model from this repo's releases
+ensure_ai() {
   [ "$(part_value "${PARTS[1]}")" = "basic" ] || return 0
   case "$(uname -m)" in
     aarch64|arm64|x86_64|amd64) ;;
@@ -265,7 +260,6 @@ ensure_ai() {   # AI detection = basic: libraries + newest model from this repo'
   return 0
 }
 
-# ---------------------------------------------------------------- actions
 do_install() {
   echo; echo "Installing..."
   ensure_env
@@ -287,20 +281,21 @@ do_install() {
 
 do_update() {
   echo; echo "Updating..."
-  git -C "$DIR" pull --ff-only || { echo "git pull failed (local changes?). Nothing else was changed."; return 1; }
+  git -C "$DIR" fetch || { echo "Couldn't get the latest from GitHub. Nothing was changed."; return 1; }
+  git -C "$DIR" reset --hard && git -C "$DIR" reset --hard "origin/$(branch)" || { echo "Update failed."; return 1; }
   after_code_change || return 1
   echo "Updated to $(git -C "$DIR" log -1 --format='%h %s')"
   check_updates
 }
 
-after_code_change() {   # new code is in place (update or branch switch): requirements, AI model, restart
+after_code_change() {
   if [ -x "$DIR/.venv/bin/pip" ]; then "$DIR/.venv/bin/pip" install -r "$DIR/requirements.txt" -q || return 1; fi
   [ -x "$DIR/.venv/bin/pip" ] && ensure_ai
   if installed; then write_unit; hard_restart || return 1; fi
   return 0
 }
 
-switch_branch() {   # list every branch on GitHub, pick one, switch to it; Update then follows that branch
+switch_branch() {
   git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1 || { echo "This copy isn't a git checkout, so it can't switch branch."; return 1; }
   echo; echo "Getting the branch list from GitHub..."
   # a one-branch clone only knows its own branch; make it see (and track) all of them
@@ -322,10 +317,8 @@ switch_branch() {   # list every branch on GitHub, pick one, switch to it; Updat
   if ! [[ "$c" =~ ^[0-9]+$ ]] || [ "$c" -lt 1 ] || [ "$c" -gt ${#list[@]} ]; then echo "That's not a number from the list. Nothing changed."; return 1; fi
   b="${list[$((c - 1))]}"
   [ "$b" != "$cur" ] || { echo "Already on $b. Use 3) Update to get its latest."; return 0; }
-  if [ -n "$(git -C "$DIR" status --porcelain --untracked-files=no)" ]; then
-    echo "The code folder has local edits, so it can't switch safely. Nothing changed."; return 1
-  fi
   echo "Switching to $b..."
+  git -C "$DIR" reset -q --hard
   git -C "$DIR" checkout -q -B "$b" "origin/$b" && git -C "$DIR" branch -q --set-upstream-to "origin/$b" "$b" \
     || { echo "Switching failed. Nothing else was changed."; return 1; }
   after_code_change || return 1
@@ -376,14 +369,13 @@ restore_backup() {
   echo "Restored ${list[$((n - 1))]}."
 }
 
-# ---------------------------------------------------------------- remote access (Cloudflare tunnel)
 share_domain() { local d; d="$(get_env PB_SHARE_DOMAIN)"; echo "${d:-printerbuddy.stream}"; }
 tunnel_state() {
   if ! systemctl list-unit-files cloudflared.service >/dev/null 2>&1 || ! systemctl cat cloudflared >/dev/null 2>&1; then echo "not set up"
   elif systemctl is-active --quiet cloudflared; then echo "running"
   else echo "stopped"; fi
 }
-user_id() {   # this box's Printer Buddy ID: the user/<id> part of share links and the tunnel's name
+user_id() {
   local uid; uid="$(get_env PB_USER_ID)"
   if [ -z "$uid" ]; then
     local port; port="$(get_env PORT)"
@@ -403,7 +395,7 @@ install_cloudflared() {
     && sudo dpkg -i "$tmp" >/dev/null || { rm -f "$tmp"; echo "Couldn't install cloudflared."; return 1; }
   rm -f "$tmp"
 }
-start_tunnel() {   # (re)install the cloudflared service with token $1
+start_tunnel() {
   if [ "$(tunnel_state)" != "not set up" ]; then sudo cloudflared service uninstall >/dev/null 2>&1; fi
   if sudo cloudflared service install "$1" >/dev/null 2>&1; then
     sleep 3
@@ -417,12 +409,11 @@ start_tunnel() {   # (re)install the cloudflared service with token $1
   fi
   return 0
 }
-# automatic setup: the printerbuddy.stream server makes this box's tunnel (relay/worker.js /api/tunnel)
 tunnel_api() { local a; a="$(get_env PB_TUNNEL_API)"; echo "${a:-https://www.$(share_domain)/api/tunnel}"; }
 json_get() { python3 -c 'import sys, json
 try: print(json.load(sys.stdin).get(sys.argv[1]) or "")
 except Exception: print("")' "$1"; }
-tunnel_call() {   # POST (create / update port) or DELETE; prints the server's JSON reply, fails with its error
+tunnel_call() {
   local method="$1" uid port key body resp code err
   uid="$(user_id)"; port="$(current_port)"; key="$(get_env PB_TUNNEL_KEY)"
   body="{\"id\": \"$uid\", \"port\": $port${key:+, \"key\": \"$key\"}}"
@@ -442,7 +433,7 @@ auto_tunnel() {
   resp="$(tunnel_call POST)" || return 1
   token="$(json_get token <<<"$resp")"; key="$(json_get key <<<"$resp")"
   [ -n "$token" ] || { echo "The setup server didn't send a tunnel token."; return 1; }
-  [ -n "$key" ] && set_env PB_TUNNEL_KEY "$key"   # only sent the first time; keeps this box in charge of its tunnel
+  [ -n "$key" ] && set_env PB_TUNNEL_KEY "$key"
   start_tunnel "$token" || return 1
   echo "Share links now work from anywhere: https://www.$(share_domain)/share/user/$(user_id)/..."
 }
@@ -483,7 +474,6 @@ remote_menu() {
   done
 }
 
-# ---------------------------------------------------------------- menus
 setup_lines() {
   local part key var name choices v note
   for part in "${PARTS[@]}"; do
@@ -588,10 +578,8 @@ backup_menu() {
   done
 }
 
-# ---------------------------------------------------------------- entry point
 if [ $# -eq 0 ] && { [ -t 0 ] || [ -r /dev/tty ]; }; then main_menu; fi
 
-# no menu: -y and/or --part value, then install
 declare -A GIVEN=()
 while [ $# -gt 0 ]; do
   case "$1" in

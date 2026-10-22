@@ -1,4 +1,3 @@
-"""SQLite storage for the printers the user chose to monitor."""
 from __future__ import annotations
 
 import json
@@ -89,7 +88,6 @@ class Store:
             self.db.executemany("INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
                                 [(k, json.dumps(v)) for k, v in values.items()])
 
-    # share links ---------------------------------------------------------
     def add_share(self, code: str, pid: int, expires_at: float | None) -> dict:
         with self.db:
             self.db.execute("INSERT INTO shares(code, printer_id, created_at, expires_at) VALUES (?,?,?,?)",

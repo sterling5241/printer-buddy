@@ -1,14 +1,10 @@
-// Theme from Fluidd / Mainsail (Settings > Look): copy a printer's colour, dark / light, background picture, and (Mainsail)
-// logo + side bar picture, and from custom.css the page background, panel look and header tint (backgrounds + blur only),
-// onto this box, then use them on every device. The rest of custom.css isn't used: it only fits their own pages.
 (() => {
   const { el } = PB;
   const NAMES = { color: "Colour", mode: "Dark / light (this device)", background: "Background picture", logo: "Logo", sidebar: "Side bar picture",
                   page: "Background (from custom.css)", panel: "See-through panels", head: "Header tint", over: "Background logo" };
   let theme = {};
-  const style = el("style"); document.head.append(style);   // the custom.css parts
+  const style = el("style"); document.head.append(style);
   const imp = decls => decls.split(";").filter(d => d.trim()).map(d => `${d.trim()} !important`).join("; ");
-  // ---- use the saved theme on this page ----
   function use() {
     const root = document.documentElement, url = n => `/api/ui/theme/${encodeURIComponent(n)}?v=${Date.now()}`;
     if (theme.color) root.style.setProperty("--orange", theme.color); else root.style.removeProperty("--orange");
@@ -33,7 +29,6 @@
   }
   api("/api/ui/theme").then(r => { theme = r.theme || {}; use(); }).catch(() => {});
 
-  // ---- the Look tab: pick a printer + Fluidd / Mainsail, see what it has, tick what to copy ----
   const look = document.querySelector('.pb-settings [data-body="look"]'); if (!look) return;
   const box = el("div", "pb-thm", `<h4>Theme from Fluidd or Mainsail</h4>
     <p class="pb-muted">Copy a printer's Fluidd or Mainsail look: its colour, dark / light, background, logo, and from its custom.css the

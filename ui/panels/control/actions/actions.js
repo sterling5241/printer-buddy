@@ -1,4 +1,3 @@
-// Actions panel: one-tap printer jobs - home, QGL / Z-tilt / screws, motors off, endstop + probe checks, SAVE_CONFIG.
 PB.panel("actions", {
   title: "Actions", desc: "Home, QGL / Z-tilt, motors off, checks", cls: "adv",
   icon: PB.icon('<path d="M4 12h4l3-8 4 16 3-8h2"/>'),

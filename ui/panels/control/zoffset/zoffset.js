@@ -1,4 +1,3 @@
-// Z offset panel: babystep Z up / down (also mid-print), reset, and save it to the config.
 PB.panel("zoffset", {
   title: "Z offset", desc: "Babystep Z up / down and save it", cls: "adv", gear: true,
   settings: [{ k: "steps", label: "Step sizes (mm)", type: "select", def: "0.005,0.01,0.025,0.05", options: [["0.005,0.01,0.025,0.05", "0.005 · 0.01 · 0.025 · 0.05"],

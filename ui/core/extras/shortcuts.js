@@ -1,5 +1,3 @@
-// Keyboard shortcuts (off by default; Settings > Look): Ctrl+Shift+E e-stop, Shift+P pause/resume, Shift+C cancel,
-// Shift+H home, ? list.
 (() => {
   const { el } = PB, { onPage, cur, send, live, dialog, pageHook } = PB.x;
   const KEYS = [["Ctrl + Shift + E", "Emergency stop (no confirm)"], ["Shift + P", "Pause / resume the print"], ["Shift + C", "Cancel the print"],

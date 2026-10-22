@@ -1,6 +1,3 @@
-// Klipper sensors panel: a live line chart of any values Klipper reports (e.g. Cartographer temperature and frequency).
-// Setup (the panel's ⚙): pick an object, tick its values, then name / colour / axis / optional formula for each line.
-// A formula uses x (this value), {object.field} (another value), numbers, + - * / and ( ). No code is run.
 (() => {
   const COLORS = ["#ff8a1f", "#4fd1c5", "#c4a7ff", "#f6ad55", "#90cdf4", "#f87171", "#a3e635"];
   const txt = { color: "#8f8b99", fontSize: 10 };
@@ -38,7 +35,6 @@
     return f;
   }
 
-  // ---- the panel ----
   function create(host, cfg) {
     const key = JSON.stringify(cfg);
     host.innerHTML = `<div class="pb-cc" style="height:${cfg.height}px"></div><p class="pb-muted pb-ccmsg"></p>`;
@@ -63,7 +59,7 @@
       busy = false;
     }
     function draw() {
-      if (!window.echarts || box.offsetParent === null) return;   // hidden tab: keep collecting, draw when shown
+      if (!window.echarts || box.offsetParent === null) return;
       chart ||= echarts.init(box, null, { renderer: "canvas" });
       const right = cfg.lines.some(l => l.axis === 1);
       const lim = v => v === "" || v == null ? undefined : +v;
@@ -88,7 +84,6 @@
     };
   }
 
-  // ---- the setup box ----
   const dlg = PB.x.dialog("pb-ccedit");
   function edit(cfg, done) {
     dlg.innerHTML = `<div class="pb-ptop"><h3>Klipper sensors setup</h3><button type="button" class="pb-px" aria-label="Close">${PB.ic.x}</button></div>
@@ -135,7 +130,6 @@
         row.querySelector("[data-x]").onclick = () => { cfg.lines.splice(row.dataset.i, 1); drawLines(); };
       }
     }
-    // picker: step 1 find the object, step 2 tick its values (shown with what they read right now)
     async function objects() {
       pick.hidden = false; pick.innerHTML = `<p class="pb-muted">Loading…</p>`;
       let all;
@@ -153,7 +147,7 @@
       pick.innerHTML = `<p class="pb-muted">Loading ${esc(o)}…</p>`;
       let st;
       try { st = (await PB.rpc("printer.objects.query", { objects: { [o]: null } }))?.status?.[o] || {}; } catch (e) { pick.innerHTML = `<p class="pb-muted">${esc(e.message)}</p>`; return; }
-      const flat = (v, pre, out = []) => {   // numbers only, one level of nesting (e.g. power.voltage)
+      const flat = (v, pre, out = []) => {
         for (const [k, x] of Object.entries(v || {})) {
           if (typeof x === "number") out.push([pre + k, x]);
           else if (x && typeof x === "object" && !Array.isArray(x) && !pre) flat(x, k + ".", out);

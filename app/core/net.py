@@ -1,8 +1,3 @@
-"""Tiny dependency-free async HTTP GET + WebSocket client for talking to Moonraker on the LAN.
-
-Kept stdlib-only on purpose so the monitor stays light enough for a Pi Zero 2 / NAS.
-Only plain http:// and ws:// are supported (Moonraker on a LAN is almost always plain HTTP).
-"""
 from __future__ import annotations
 
 import asyncio
@@ -100,7 +95,6 @@ async def http_post(url: str, body: bytes, headers: dict[str, str] | None = None
 
 
 class HTTPStream:
-    """An open streaming GET (e.g. an MJPEG camera). Iterate .chunks(); always close()."""
 
     def __init__(self, status: int, headers: dict[str, str], reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         self.status, self.headers, self._r, self._w = status, headers, reader, writer
@@ -139,7 +133,6 @@ async def http_stream(url: str, headers: dict[str, str] | None = None, timeout: 
 
 
 async def get_json(url: str, headers: dict[str, str] | None = None, timeout: float = 5.0):
-    """Returns (status, parsed_json_or_None)."""
     status, _, body = await http_get(url, headers, timeout, max_bytes=2_000_000)
     try:
         return status, json.loads(body)
@@ -234,7 +227,6 @@ class WebSocket:
         await self._send(0x9, b"")
 
     async def recv(self) -> str | None:
-        """Next text message, or None once the connection is closed."""
         buf = bytearray()
         try:
             while True:

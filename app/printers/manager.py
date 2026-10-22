@@ -1,4 +1,3 @@
-"""Owns the Moonraker connections for the selected printers, detects print events, fans out updates."""
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +12,7 @@ from ..core.notify import Notifier
 from ..core.store import Store
 
 log = logging.getLogger(__name__)
-OFFLINE_GRACE = float(os.getenv("OFFLINE_GRACE", "60"))  # seconds a printer must stay gone mid-print before alerting
+OFFLINE_GRACE = float(os.getenv("OFFLINE_GRACE", "60"))
 
 
 def _event_for(prev: str | None, new: str | None) -> str | None:
@@ -30,12 +29,12 @@ class Manager:
         self.notifier = notifier
         self.clients: dict[int, MoonrakerClient] = {}
         self.rows: dict[int, dict] = {}
-        self._last: dict[int, dict] = {}             # last view per printer, for transition detection
+        self._last: dict[int, dict] = {}
         self._offline_timers: dict[int, asyncio.Task] = {}
-        self._milestone: dict[int, int] = {}         # last progress % announced per printer
-        self.timelapse = None                         # set by main.py (app/timelapse.py)
-        self.ai = None                                # set by main.py (app/ai/detector.py)
-        self.collect = None                           # set by main.py (app/collect.py)
+        self._milestone: dict[int, int] = {}
+        self.timelapse = None
+        self.ai = None
+        self.collect = None
         self._subs: set[asyncio.Queue] = set()
 
     async def start(self):
@@ -54,7 +53,6 @@ class Manager:
         self.clients[row["id"]] = c
         c.start()
 
-    # CRUD ---------------------------------------------------------------
     def add(self, name: str, host: str, port: int, api_key: str | None) -> dict:
         row = self.store.add(name, host, port, api_key)
         self._spawn(row)
@@ -75,7 +73,7 @@ class Manager:
         if not row.get("cam"):
             return None
         cfg = json.loads(row["cam"])
-        if "cams" not in cfg:  # settings saved before multi-camera: they were for camera 0
+        if "cams" not in cfg:
             cfg = {"main": 0, "cams": {"0": cfg}}
         return cfg
 
@@ -114,7 +112,7 @@ class Manager:
         self.rows.pop(pid, None)
         self._last.pop(pid, None)
         if self.timelapse:
-            self.timelapse.cancel(pid)   # recordings already saved are kept
+            self.timelapse.cancel(pid)
         if self.ai:
             self.ai.cancel(pid)
         if self.collect:
@@ -127,7 +125,6 @@ class Manager:
             await c.stop()
         self._broadcast("removed", {"id": pid})
 
-    # views --------------------------------------------------------------
     def view(self, pid: int) -> dict:
         row = self.rows[pid]
         return {
@@ -142,7 +139,6 @@ class Manager:
     def views(self) -> list[dict]:
         return [self.view(pid) for pid in self.clients]
 
-    # updates ------------------------------------------------------------
     def _on_change(self, client: MoonrakerClient):
         pid = client.id
         if pid not in self.rows:
@@ -165,7 +161,6 @@ class Manager:
             self.ai.on_change(pid, prev, v)
         if self.collect:
             self._collect_on_change(pid, prev, v)
-        # progress updates (advanced notifications): every N % while printing
         step = self.notifier.progress_step()
         if step and v["state"] == "printing" and prev["state"] in ("printing", "paused"):
             reached = int(v["progress"] * 100) // step * step
@@ -195,12 +190,11 @@ class Manager:
 
     def _emit(self, pid: int, event: str, v: dict):
         self._broadcast("event", {"id": pid, "event": event, "name": v["name"]})
-        if self.rows.get(pid, {}).get("notify") == 0:   # notifications switched off for this printer
+        if self.rows.get(pid, {}).get("notify") == 0:
             return
         if self.notifier.enabled and self.notifier.wants(event):
             asyncio.get_running_loop().create_task(self._notify(pid, event, v))
 
-    # AI training photos (app/collect.py) ------------------------------------
     def _ai_meta(self, pid: int) -> dict:
         st = (self.ai.state.get(pid) if self.ai else None) or {}
         return {"model": self.ai.model.tag if self.ai and self.ai.model else None,
@@ -230,21 +224,18 @@ class Manager:
             self.collect.add(pid, row["name"], img, source, status, meta=self._ai_meta(pid))
 
     async def save_for_ai(self, pid: int, label: str) -> dict | None:
-        """'Save for AI' button: snapshot now, labelled by the user."""
         img = await self.snapshot(pid)
         row = self.rows.get(pid)
         if not img or not row or not self.collect:
             return None
         return self.collect.add(pid, row["name"], img, "user", "ready", label=label, meta=self._ai_meta(pid))
 
-    # AI ---------------------------------------------------------------------
     def ai_update(self, pid: int):
         if pid in self.rows:
             self._broadcast("printer", self.view(pid))
 
     async def ai_alert(self, pid: int, label: str, score: float, image: bytes | None, mode: str,
                        box: list | None = None):
-        """The AI saw a failure that held long enough: pause (if set) and tell the user."""
         c, row = self.clients.get(pid), self.rows.get(pid)
         if not c or not row:
             return
@@ -256,7 +247,7 @@ class Manager:
             except Exception as e:
                 log.warning("AI: couldn't pause printer %s: %s", pid, e)
         nice = label.replace("_", " ")
-        if self.collect and image:   # keep the photo so the user can say if it really was a failure
+        if self.collect and image:
             item = self.collect.add(pid, row["name"], image, "alert", "pending", suggested=label,
                                     meta=self._ai_meta(pid))
             if item and self.ai:
@@ -269,7 +260,7 @@ class Manager:
         title = f"{row['name']}: possible {nice} ({score * 100:.0f}%)"
         parts = [v.get("filename") or "unknown file", f"{v['progress'] * 100:.0f}% done",
                  "print paused - check it and resume or cancel" if paused else "check the print"]
-        if image and box:   # only the notification gets the box; the saved AI photo stays clean
+        if image and box:
             try:
                 image = draw_box(image, box, f"{nice} {score * 100:.0f}%")
             except Exception as e:
@@ -304,7 +295,6 @@ class Manager:
         await self.notifier.send(title, " · ".join(parts), image)
 
     def cam_transform(self, pid: int) -> tuple[bool, bool, int]:
-        """Flip/rotation of the main camera, as the app shows it (own settings, else Moonraker's)."""
         row, c = self.rows.get(pid), self.clients.get(pid)
         if not row or not c:
             return False, False, 0
@@ -317,7 +307,6 @@ class Manager:
         return bool(pick("flip_h")), bool(pick("flip_v")), int(pick("rotation") or 0)
 
     async def snapshot(self, pid: int) -> bytes | None:
-        """Picture from the printer's main camera (the one shown on its dashboard card)."""
         c, row = self.clients.get(pid), self.rows.get(pid)
         if not c or not row:
             return None
@@ -345,4 +334,4 @@ class Manager:
             try:
                 q.put_nowait((kind, data))
             except asyncio.QueueFull:
-                pass  # slow browser tab; it gets a fresh snapshot on reconnect
+                pass

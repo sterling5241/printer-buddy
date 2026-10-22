@@ -1,4 +1,3 @@
-"""Push notifications (ntfy and/or Discord). Set up in the web page; env vars are only defaults."""
 from __future__ import annotations
 
 import asyncio
@@ -15,7 +14,7 @@ from email.message import EmailMessage
 log = logging.getLogger(__name__)
 
 ALL_EVENTS = ["started", "paused", "resumed", "finished", "failed", "cancelled", "offline", "shutdown"]
-PROGRESS_STEPS = [0, 10, 20, 25, 33, 50]          # 0 = off
+PROGRESS_STEPS = [0, 10, 20, 25, 33, 50]
 SERVICES = ["ntfy", "discord", "telegram", "pushover", "email"]
 ADVANCED_SERVICES = {"telegram", "pushover", "email"}
 
@@ -47,7 +46,6 @@ class Notifier:
             "discord_webhook": s.get("discord_webhook", os.getenv("DISCORD_WEBHOOK", "")),
             "events": s.get("events", default_events),
             "attach_snapshot": s.get("attach_snapshot", True),
-            # advanced
             "telegram_token": s.get("telegram_token", ""), "telegram_chat": s.get("telegram_chat", ""),
             "pushover_user": s.get("pushover_user", ""), "pushover_token": s.get("pushover_token", ""),
             "smtp_host": s.get("smtp_host", ""), "smtp_port": s.get("smtp_port", 587), "smtp_tls": s.get("smtp_tls", "starttls"),

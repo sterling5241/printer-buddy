@@ -1,12 +1,7 @@
-// Printer Buddy - layout builder: tabs -> rows (pick a column split) -> columns -> panels.
-// Used twice: the printer page (tabs in a rail) and the home page (all printers, one tab). Each saves its own layout on
-// the box (/api/ui/layout, ?scope=home). Edit layout: drag panels by ⠿ (mouse or touch), 👁 hide, ⚙ settings, ⋯ menu,
-// rows + tabs, and a separate phone order. New boxes and "Reset to base layout" get the base layout below.
 (() => {
   const { el, icon } = PB;
   const SPLITS = { "1": [1], "1-1": [1, 1], "1-2": [1, 2], "2-1": [2, 1], "1-1-1": [1, 1, 1], "1-1-1-1": [1, 1, 1, 1] };
   const SPLIT_NAMES = { "1": "1 column", "1-1": "½ + ½", "1-2": "⅓ + ⅔", "2-1": "⅔ + ⅓", "1-1-1": "⅓ ×3", "1-1-1-1": "¼ ×4" };
-  // sidebar icons for the base tabs (any other tab uses its first panel's icon)
   const TAB_ICONS = {
     dash: icon('<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>'),
     jobs: icon('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>'),
@@ -18,12 +13,9 @@
   };
   const GRID = icon('<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>');
   const rid = () => Math.random().toString(36).slice(2, 9);
-  const phone = matchMedia("(max-width: 760px)");   // phones: one column per tab, in the tab's own phone order
+  const phone = matchMedia("(max-width: 760px)");
   const P = (tab, t, o) => ({ id: `${tab}-${t}`, t, o: o || {} });
 
-  // base layout of the printer page: Dashboard follows Fluidd's default card order (left: status, spoolman, camera,
-  // toolhead, macros, outputs, runout sensors (off), limits; right: temperatures, console, jobs, queue (off), preview,
-  // bed mesh (off)). Hidden (h) = off by default, like Fluidd. Exclude + AI are ours, at the end of the right column.
   const H = (tab, t, o) => ({ ...P(tab, t, o), h: true });
   const PAGE_DEFAULT = { v: 4, tabs: [
     { id: "dash", name: "Dashboard", rows: [{ s: "1-1", cols: [
@@ -43,12 +35,10 @@
                                             { s: "1", cols: [[P("machine", "system")]] },
                                             { s: "1", cols: [[P("machine", "config", { height: 640 })]] }] },
   ] };
-  // base layout of the home page: the fleet at a glance, then the printers
   const HOME_DEFAULT = { v: 1, tabs: [
     { id: "home", name: "Home", rows: [{ s: "1", cols: [[P("home", "fleet")]] }, { s: "1", cols: [[P("home", "printers")]] }] },
   ] };
 
-  // ---- printer page shell: top bar + theme -----------------------------------------------------------
   const page = $("#page");
   const head = page.querySelector(".pg-head");
   const top = el("div", "bd-top"), actions = el("div", "bd-actions");
@@ -74,7 +64,6 @@
   const pageWrap = el("div", "bd-wrap");
   page.append(pageWrap);
 
-  // ---- home page shell: an Edit layout button next to the header buttons --------------------------
   const homeRoot = el("div", "bd bd-homewrap"); homeRoot.id = "home";
   $("#grid").before(homeRoot);
   const homeEdit = el("button", "adv", "Edit layout"); homeEdit.type = "button"; homeEdit.id = "homeEdit";
@@ -92,7 +81,7 @@
     o.wrap.append(main);
 
     let layout = null, active = PB.store.get(o.tabKey, o.base.tabs[0].id), saveTimer = null, preview = false;
-    const insts = new Map();   // tab id -> [panel instances]
+    const insts = new Map();
     const clean = l => {
       if (!l || !Array.isArray(l.tabs) || !l.tabs.length) return null;
       l.tabs = l.tabs.filter(t => t && t.id && Array.isArray(t.rows)).map(t => ({
@@ -137,7 +126,7 @@
           const b = el("button", "", `${TAB_ICONS[t.id] || reg[first?.t]?.icon || GRID}<span>${esc(t.name)}</span>`);
           b.type = "button"; b.setAttribute("aria-current", String(t.id === active)); b.title = t.name;
           b.onclick = () => showTab(t.id);
-          if (editing()) {   // Edit layout: drag a tab up / down the side bar to reorder
+          if (editing()) {
             b.draggable = true;
             b.ondragstart = e => { e.dataTransfer.setData("text/x-pb-tab", t.id); e.dataTransfer.effectAllowed = "move"; };
             b.ondragover = e => { if ([...e.dataTransfer.types].includes("text/x-pb-tab")) { e.preventDefault(); b.classList.add("bd-tabover"); } };
@@ -151,7 +140,6 @@
           }
           return b;
         }));
-        // compact rail (icons only), remembered per browser; phones and tablets lay the rail out themselves
         const fold = el("button", "bd-fold"); fold.type = "button";
         const setFold = compact => {
           rail.classList.toggle("bd-compact", compact);
@@ -220,7 +208,7 @@
           <button type="button" data-a="del">Remove row</button>`);
         tools.querySelector("select").onchange = e => {
           const n = SPLITS[e.target.value].length, cols = row.cols;
-          while (cols.length > n) cols[n - 1].push(...cols.pop());   // fewer columns: panels move left, nothing is lost
+          while (cols.length > n) cols[n - 1].push(...cols.pop());
           while (cols.length < n) cols.push([]);
           row.s = e.target.value; changed();
         };
@@ -260,7 +248,7 @@
       return c;
     }
 
-    function buildPhone(tab, list) {   // phones: one column in the tab's phone order; edits only change that order
+    function buildPhone(tab, list) {
       const r = el("div", "bd-row"), c = el("div", "bd-col"), order = phoneItems(tab);
       const setOrder = ord => { tab.phone = ord.map(i => i.id); };
       c._list = order; c._commit = () => setOrder(order);
@@ -311,9 +299,9 @@
       head.querySelector("[data-a=eye]").onclick = () => { item.h = !item.h; changed(); };
       const gear = head.querySelector("[data-a=set]");
       if (def.settings?.length) gear.onclick = () => PB.settings(def, item.o, v => { item.o = v; changed(); });
-      else if (def.edit) gear.onclick = () => def.edit(item.o, v => { item.o = v; changed(); });   // panels with their own setup box
+      else if (def.edit) gear.onclick = () => def.edit(item.o, v => { item.o = v; changed(); });
       else gear.remove();
-      const qset = head.querySelector(".pb-qset");   // panels with gear: true keep their ⚙ outside Edit layout too
+      const qset = head.querySelector(".pb-qset");
       if (qset) qset.onclick = () => def.edit ? def.edit(item.o, v => { item.o = v; changed(); }) : PB.settings(def, item.o, v => { item.o = v; changed(); });
       head.querySelector("[data-a=menu]").onclick = e => menu(e.currentTarget, [
         ["Move up", ops.up], ["Move down", ops.down], ["Move to the left column", ops.left], ["Move to the right column", ops.right],
@@ -343,7 +331,7 @@
     function setEditing(on) { root.classList.toggle("bd-editing", on); preview = false; build(); }
     o.editBtn.onclick = () => setEditing(!editing());
     phone.addEventListener("change", build);
-    main.addEventListener("pb-reveal", e => {   // a panel asked to be shown (e.g. Files -> Edit opens the config editor's tab)
+    main.addEventListener("pb-reveal", e => {
       const sec = e.target.closest(".bd-tab"), i = [...main.children].indexOf(sec);
       if (i >= 0 && layout.tabs[i] && layout.tabs[i].id !== active) showTab(layout.tabs[i].id);
       e.target.closest(".pb-card")?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -354,7 +342,6 @@
     return { build, showTab, setEditing };
   }
 
-  // ---- shared by both builders: the panel library box, the ⋯ menu, drag + drop -----------------------
   const lib = el("dialog", "bd-lib");
   document.body.append(lib);
   const pop = el("div", "bd-menu"); pop.hidden = true; document.body.append(pop);
@@ -385,9 +372,8 @@
   function moveDrag(e) {
     if (!drag) return;
     drag.ghost.style.left = `${e.clientX + 12}px`; drag.ghost.style.top = `${e.clientY + 12}px`;
-    if (e.clientY < 70) scrollBy(0, -14); else if (e.clientY > innerHeight - 50) scrollBy(0, 14);   // scroll while dragging
+    if (e.clientY < 70) scrollBy(0, -14); else if (e.clientY > innerHeight - 50) scrollBy(0, 14);
     const under = document.elementFromPoint(e.clientX, e.clientY)?.closest(".bd-col");
-    // only drop within the same page (printer page or home)
     if (!under || !under._list || under.closest(".bd") !== drag.from.closest(".bd")) { marker.remove(); drag.target = null; return; }
     const cards = [...under.querySelectorAll(":scope > .pb-card")].filter(c => c !== drag.card);
     const before = cards.find(c => { const r = c.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; }) || null;

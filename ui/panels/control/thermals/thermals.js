@@ -1,4 +1,3 @@
-// Thermals panel: a dense table (name, power, actual, target), presets, then the temperature chart (ECharts).
 PB.panel("thermals", {
   title: "Thermals", desc: "Temperatures table, presets and history chart",
   icon: PB.icon('<path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/>'),
@@ -22,9 +21,9 @@ PB.panel("thermals", {
     const COLORS = { extruder: "#FF8A1F", heater_bed: "#8B5CF6" }, EXTRA = ["#4FD1C5", "#F6E05E", "#FC8181", "#90CDF4", "#68D391", "#C4A7FF"];
     const SPAN = cfg.span * 60 * 1000;
     let chart = null, series = {}, lastPush = 0, key = "", order = [];
-    const hidden = new Set(PB.store.get("pb-thermals-hidden", []));   // sensors left off the graph (click a name)
+    const hidden = new Set(PB.store.get("pb-thermals-hidden", []));
     const colorOf = id => COLORS[id] || EXTRA[Math.max(0, order.indexOf(id) - (order.includes("extruder") ? 1 : 0) - (order.includes("heater_bed") ? 1 : 0)) % EXTRA.length];
-    if (!cfg.chart) { /* no chart */ }
+    if (!cfg.chart) { }
     else if (window.echarts) {
       chart = echarts.init(chartEl, null, { renderer: "canvas" });
       new ResizeObserver(() => chart.resize()).observe(chartEl);
@@ -56,7 +55,7 @@ PB.panel("thermals", {
     const cmd = (s, v) => s.id.startsWith("temperature_fan ")
       ? `SET_TEMPERATURE_FAN_TARGET TEMPERATURE_FAN=${s.id.slice(16)} TARGET=${v}`
       : `SET_HEATER_TEMPERATURE HEATER=${s.id.startsWith("heater_generic ") ? s.id.slice(15) : s.id} TARGET=${v}`;
-    const presets = PB.parts.thermalsPresets(host, cmd);   // presets.js
+    const presets = PB.parts.thermalsPresets(host, cmd);
     return {
       async open(id) {
         series = {}; lastPush = 0; key = "";
@@ -66,7 +65,7 @@ PB.panel("thermals", {
           if (id !== pageId) return;
           const now = Date.now();
           for (const s of sensors.filter(s => s.kind !== "fan")) {
-            const h = history[s.id] || {}, keep = SPAN / 1000;   // Moonraker keeps ~20 min at 1 per second
+            const h = history[s.id] || {}, keep = SPAN / 1000;
             const temps = (h.temperatures || []).slice(-keep), targets = (h.targets || []).slice(-keep), t0 = now - (temps.length - 1) * 1000;
             series[s.id] = { name: s.name, hasTarget: s.target != null, temp: temps.map((v, i) => [t0 + i * 1000, v]),
                              target: targets.map((v, i) => [t0 + i * 1000, v]) };
@@ -76,7 +75,6 @@ PB.panel("thermals", {
       },
       shown() { chart?.resize(); },
       update(p) {
-        // temperatures only: fans have their own panel
         const list = (p.sensors || []).filter(s => s.kind !== "fan"), live = p.connection === "online" && p.klippy_state === "ready";
         const k = list.map(s => s.id).join("|");
         if (k !== key) {

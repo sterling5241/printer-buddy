@@ -1,4 +1,3 @@
-// Pause at layer: SET_PAUSE_NEXT_LAYER / SET_PAUSE_AT_LAYER (the standard pause-at-layer macros).
 (() => {
   const { el } = PB, { onPage, cur, send, live, dialog, pageHook } = PB.x;
   const pl = dialog("pb-paldlg");

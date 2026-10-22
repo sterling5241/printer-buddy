@@ -1,5 +1,3 @@
-// G-code preview, part: the G-code reader - layers, extrusion moves, travel, feature type (slicer ;TYPE: comments)
-// and tool per move. parse(text) -> layers. Used by gcodeview.js.
 PB.parts = PB.parts || {};
 PB.parts.gcodeParse = (() => {
     // slicer feature names (PrusaSlicer / Orca / Bambu / Cura / Simplify3D) -> FEATS index
@@ -23,7 +21,7 @@ PB.parts.gcodeParse = (() => {
       };
       for (const raw of text.split("\n")) {
         const at = off; off += raw.length + 1;
-        if (raw.charCodeAt(0) === 59) { const m = TYPE_RE.exec(raw); if (m) ft = featOf(m[1]); continue; }   // ;TYPE:Outer wall …
+        if (raw.charCodeAt(0) === 59) { const m = TYPE_RE.exec(raw); if (m) ft = featOf(m[1]); continue; }
         const line = raw.split(";")[0].trim().toUpperCase();
         if (!line) continue;
         const w = line.split(/\s+/), c = w[0];

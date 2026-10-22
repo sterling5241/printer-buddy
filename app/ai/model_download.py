@@ -1,17 +1,8 @@
 #!/usr/bin/env python3
-"""Download the newest Printer Buddy AI model from this repo's GitHub releases.
-
-  python app/ai/model_download.py              # newest "ai-basic-*" release -> data/ai/basic-vN/
-  python app/ai/model_download.py --kind heavy # (later) "ai-heavy-*"
-
-Uses the GitHub login git already saved for this copy (installer menu: 8) GitHub login),
-so a private repo works without typing a token. Standard library only.
-Exit code 0 = model ready (downloaded or already up to date), 1 = something went wrong.
-"""
 import argparse, hashlib, json, os, re, subprocess, sys, tempfile, urllib.error, urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent.parent   # the repo root
+ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 def say(msg):

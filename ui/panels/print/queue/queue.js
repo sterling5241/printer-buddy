@@ -1,4 +1,3 @@
-// Queue panel: Moonraker's job queue - prints lined up to run one after another. Add files from the Files panel (+ Queue).
 PB.panel("queue", {
   title: "Queue", desc: "Line up prints to run one after another", cls: "adv",
   icon: PB.icon('<path d="M4 6h16M4 12h16M4 18h10"/><path d="M18 16l3 2-3 2z"/>'),
@@ -55,7 +54,7 @@ PB.panel("queue", {
     q("[data-a=start]").onclick = () => call("start");
     q("[data-a=pause]").onclick = () => call("pause");
     q("[data-a=ref]").onclick = () => call();
-    PB.queueAdd = async path => {   // the Files panel's "+ Queue"
+    PB.queueAdd = async path => {
       const id = pageId; if (id === null) return;
       try {
         const r = await api(`/api/printers/${id}/queue`, { method: "POST", body: JSON.stringify({ action: "add", filenames: [path] }) });
@@ -67,7 +66,7 @@ PB.panel("queue", {
       open(id) { pid = id; jobs = []; state = null; list.innerHTML = ""; msg.textContent = ""; },
       shown() {
         call();
-        clearInterval(timer);   // the queue changes when prints finish: refresh while it's on screen
+        clearInterval(timer);
         timer = setInterval(() => { if (host.offsetParent && pageId !== null) call(); }, 10000);
       },
       destroy() { clearInterval(timer); },

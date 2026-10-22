@@ -1,10 +1,3 @@
-"""Training photos for the AI: collect labelled camera snapshots, and (only if the owner opted in) send them
-to printerbuddy.stream/api/contribute, which adds them to the Printer Buddy data repo for the next model.
-
-Only active when AI detection is on. Photos live in <data>/ai/collect/<item>.jpg + <item>.json.
-Status: "pending" (needs the user's label) -> "ready" (labelled) -> "sent". "waiting" = print snapshot that
-becomes "ok" when the print finishes, or "pending" if it fails or is cancelled.
-"""
 from __future__ import annotations
 
 import asyncio
@@ -23,9 +16,9 @@ from typing import Callable
 log = logging.getLogger(__name__)
 
 LABELS = ("ok", "spaghetti", "warping", "first_layer", "failure", "stringing", "blob", "crack")
-PRINT_MARKS = (0.10, 0.50, 0.90)       # snapshots per print, by progress
-KEEP = 500                             # most photos kept on the box
-SEND_EVERY = 60                        # seconds between upload rounds
+PRINT_MARKS = (0.10, 0.50, 0.90)
+KEEP = 500
+SEND_EVERY = 60
 
 
 def api_url() -> str:
@@ -37,12 +30,11 @@ def api_url() -> str:
 
 
 def verdict(item: dict) -> str | None:
-    """Was the AI right about this photo? right / false_alarm / missed, or None if it didn't score it."""
     label, meta = item.get("label"), item.get("meta") or {}
     if not label:
         return None
     if item.get("source") in ("alert", "alert_yes", "alert_no"):
-        said_problem = True                       # it alerted
+        said_problem = True
     elif meta.get("score") is None or meta.get("threshold") is None:
         return None
     else:
@@ -57,28 +49,24 @@ class Collector:
         self.store = store
         self.root = Path(data_dir) / "ai" / "collect"
         self.box_id = box_id
-        self.enabled = enabled              # AI detection on?
-        self.marks: dict[int, set] = {}     # pid -> print marks already taken
-        self.job: dict[int, list] = {}      # pid -> item ids waiting for the print's result
+        self.enabled = enabled
+        self.marks: dict[int, set] = {}
+        self.job: dict[int, list] = {}
         self._task: asyncio.Task | None = None
         self._pause_until = 0.0
-        self._lock: asyncio.Lock | None = None   # one upload round at a time (timer and "send now" share it)
+        self._lock: asyncio.Lock | None = None
         self.last_error: str | None = None
 
-    # settings ---------------------------------------------------------------
     def sharing(self) -> bool:
         return bool(self.store.settings().get("ai_contribute", False))
 
     def set_sharing(self, on: bool):
         self.store.save_settings({"ai_contribute": bool(on)})
 
-    # was the AI right? ------------------------------------------------------
     def stats(self) -> dict:
-        """{model: {"right": n, "false_alarm": n, "missed": n}} for photos labelled on this box."""
         return self.store.settings().get("ai_stats", {})
 
     def _judge(self, item: dict):
-        """Set the item's verdict and keep the per-model counts right (also when a label changes)."""
         old, new = item.get("verdict"), verdict(item)
         item["verdict"] = new
         if old == new:
@@ -92,7 +80,6 @@ class Collector:
             m[new] += 1
         self.store.save_settings({"ai_stats": stats})
 
-    # storage ----------------------------------------------------------------
     def _meta_path(self, iid: str) -> Path:
         return self.root / f"{iid}.json"
 
@@ -128,7 +115,6 @@ class Collector:
 
     @staticmethod
     def _clean_jpeg(jpeg: bytes) -> bytes:
-        """640px max, re-encoded: no camera metadata leaves the box."""
         from PIL import Image
         im = Image.open(io.BytesIO(jpeg)).convert("RGB")
         im.thumbnail((640, 640))
@@ -173,9 +159,8 @@ class Collector:
         return ok
 
     def set_label(self, iid: str, label: str) -> dict | None:
-        """User's answer. For an alert photo, 'ok' means 'no, not a failure'."""
         item = self._read(iid)
-        if item and label == "yes":   # "yes, it was a failure": take the label the AI suggested
+        if item and label == "yes":
             label = item.get("suggested") or "failure"
         if not item or item.get("status") == "sent" or label not in LABELS:
             return None
@@ -188,7 +173,6 @@ class Collector:
         return item
 
     def set_severity(self, iid: str, severity) -> dict | None:
-        """How bad was the failure, 1 (barely) to 10 (total mess). Only for failure labels."""
         item = self._read(iid)
         try:
             n = int(severity)
@@ -200,7 +184,6 @@ class Collector:
         self._write(item)
         return item
 
-    # print snapshots ---------------------------------------------------------
     def print_started(self, pid: int):
         self.marks[pid] = set()
         self.job[pid] = []
@@ -221,7 +204,6 @@ class Collector:
             self.job.setdefault(pid, []).append(item["id"])
 
     def print_finished(self, pid: int, ok: bool):
-        """complete -> the print's snapshots are 'ok'; failed/cancelled -> the user labels them."""
         for iid in self.job.pop(pid, []):
             item = self._read(iid)
             if not item or item.get("status") != "waiting":
@@ -236,7 +218,6 @@ class Collector:
         if ok:
             self.kick()
 
-    # uploading ---------------------------------------------------------------
     def start(self):
         if self._task is None:
             self._task = asyncio.get_running_loop().create_task(self._loop())
@@ -258,11 +239,10 @@ class Collector:
                 log.exception("collect: upload round failed")
 
     def kick(self):
-        """A photo just got its label: send it now instead of waiting for the next round (if sharing is on)."""
         try:
             asyncio.get_running_loop().create_task(self.send_now())
         except RuntimeError:
-            pass   # no event loop (tests / scripts): the timer sends it later
+            pass
 
     async def send_now(self):
         if not (self.enabled() and self.sharing()) or time.time() < self._pause_until:
@@ -279,7 +259,7 @@ class Collector:
             await self._send_ready(limit)
 
     async def _send_ready(self, limit: int):
-        ready = [i for i in self.items() if i.get("status") == "ready"][::-1][:limit]   # oldest first
+        ready = [i for i in self.items() if i.get("status") == "ready"][::-1][:limit]
         for item in ready:
             img = self.image_path(item["id"])
             if not img:
@@ -295,10 +275,10 @@ class Collector:
             if status == 201:
                 item["status"], item["sent_at"] = "sent", time.time()
                 self._write(item)
-                img.unlink(missing_ok=True)          # sent: the photo now lives in the data repo
+                img.unlink(missing_ok=True)
                 self.last_error = None
             elif status == 429:
-                self._pause_until = time.time() + 3600   # daily limit: try again in an hour
+                self._pause_until = time.time() + 3600
                 self.last_error = "daily limit reached, sending the rest later"
                 return
             else:

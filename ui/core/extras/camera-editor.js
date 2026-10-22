@@ -1,4 +1,3 @@
-// Camera editor: add / edit / delete the printer's cameras in Moonraker (server.webcams.*), same list as Mainsail / Fluidd.
 (() => {
   const { el } = PB, { onPage, cur, send, live, dialog, pageHook } = PB.x;
   const cd = dialog("pb-camdlg");

@@ -1,5 +1,3 @@
-// Machine panel: host load / temperature / memory / disk, restart Klipper / Moonraker, reboot or shut down,
-// services (each one Moonraker may manage: state + restart / stop / start, like Fluidd's list), logs.
 PB.panel("machine", {
   title: "Machine", desc: "Host load, restarts, reboot and logs", cls: "adv",
   icon: PB.icon('<rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'),
@@ -26,7 +24,6 @@ PB.panel("machine", {
         kv.innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
       } catch (e) { kv.innerHTML = `<div><dt>Couldn't read the host</dt><dd>${esc(e.message)}</dd></div>`; }
     }
-    // ---- services: Moonraker's available_services + their state ----
     const svcs = host.querySelector(".pb-svcs");
     async function services() {
       if (pageId === null) return;

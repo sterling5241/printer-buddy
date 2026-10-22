@@ -1,5 +1,3 @@
-// System panel: the printer's boards (MCU firmware version, chip, load) and load charts for the host CPU, Klipper,
-// Moonraker and each MCU over the last few minutes. Also warns when a Raspberry Pi reports under-voltage / throttling.
 PB.panel("system", {
   title: "System", desc: "MCU boards (version, load) and host / Klipper / Moonraker load charts", cls: "adv", gear: true,
   icon: PB.icon('<path d="M3 12h4l3-8 4 16 3-8h4"/>'),
@@ -10,7 +8,7 @@ PB.panel("system", {
     const q = s => host.querySelector(s), chartEl = q(".pb-syschart");
     chartEl.style.height = `${cfg.height}px`; if (!cfg.chart) chartEl.hidden = true;
     let chart = null, timer = null, mcus = [], hist = {}, forId = null, prevCpu = null;
-    const KEEP = 72;   // 6 minutes at one sample every 5 s
+    const KEEP = 72;
     const push = (k, v) => { if (v == null || isNaN(v)) return; (hist[k] ||= []).push([Date.now(), Math.round(v * 10) / 10]); if (hist[k].length > KEEP) hist[k].shift(); };
     const load = st => st && st.mcu_task_avg != null ? ((st.mcu_task_avg + 3 * (st.mcu_task_stddev || 0)) / 0.0025) * 100 : null;
     const THROTTLE = { "Under-Voltage Detected": "Under-voltage now", "Frequency Capped": "CPU slowed", "Currently Throttled": "Throttled now",

@@ -1,8 +1,7 @@
-// Drag & drop: drop G-code anywhere on a printer page to upload it (into the folder open in the Files panel).
 (() => {
   const { el } = PB, { onPage, cur, send, live, dialog, pageHook } = PB.x;
   const drop = el("div", "pb-drop", `<div>Drop G-code to upload</div>`); drop.hidden = true; document.body.append(drop);
-  const own = e => e.target.closest?.("[data-drop]");   // panels with their own drop (Config files)
+  const own = e => e.target.closest?.("[data-drop]");
   const isFiles = e => [...(e.dataTransfer?.types || [])].includes("Files") && !own(e);
   let dragN = 0;
   addEventListener("dragenter", e => {
@@ -19,7 +18,7 @@
     if (all.length > ok.length) toast(`Skipped ${all.length - ok.length} file(s) that aren't G-code`);
     if (!ok.length) return;
     if (PB.uploadFiles) return PB.uploadFiles(ok);
-    (async () => {   // no Files panel on the page: upload to the top G-code folder
+    (async () => {
       const id = pageId;
       for (const f of ok) {
         try { await fetch(`/api/printers/${id}/files/upload?name=${encodeURIComponent(f.name)}`, { method: "POST", body: f })

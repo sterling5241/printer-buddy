@@ -1,7 +1,3 @@
-// Config files panel + full-screen editor (Fluidd-style layout, our own code). The panel is a file browser: folders + breadcrumbs,
-// Config / Config examples / Docs, sortable Name / Modified / Size, search, go to file, filters, Add menu, right-click menu,
-// ticks for bulk zip / delete, drag & drop to upload or move. Clicking a text file opens the full-screen editor (editor.js).
-// Parts: browse.js (the list), actions.js (menus, uploads, moves).
 PB.panel("config", {
   title: "Config files", desc: "printer.cfg and other config files; opens a full-screen editor", cls: "adv",
   icon: PB.icon('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>'),
@@ -41,12 +37,11 @@ PB.panel("config", {
       pop.style.top = `${Math.max(4, Math.min(r.bottom, innerHeight - pop.offsetHeight - 4))}px`;
       addEventListener("pointerdown", outside, true); addEventListener("keydown", onKey, true);
     }
-    // shared with browse.js / actions.js
     const c = {
       q, menu, root: "config", dir: "", dirs: [], files: [], rows: [], disk: null, err: "", loaded: false, picked: new Set(),
       full: n => (c.dir ? c.dir + "/" : "") + n, path: n => `${c.root}/${c.full(n)}`, ro: () => c.root !== "config",
     };
-    c.ed = PB.parts.cfgEditor(cfg, () => c.load());   // editor.js (+ highlight.js)
+    c.ed = PB.parts.cfgEditor(cfg, () => c.load());
     const br = PB.parts.cfgBrowse(c), act = PB.parts.cfgActions(c);
     q("[data-a=refresh]").onclick = () => c.load();
     PB.openConfig = p => c.ed.open(p);

@@ -1,4 +1,3 @@
-// Endstops panel: each endstop (and the probe) as open / TRIGGERED, refreshed live while the panel is on screen.
 PB.panel("endstops", {
   title: "Endstops", desc: "Live endstop / probe state (open or triggered)", cls: "adv", gear: true,
   icon: PB.icon('<path d="M4 20h16M8 20V9l4-5 4 5v11"/><circle cx="12" cy="13" r="2"/>'),

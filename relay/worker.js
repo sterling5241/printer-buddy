@@ -1,22 +1,4 @@
 import NEWS from "./news.json";
-// Printer Buddy share relay: a Cloudflare Worker for www.printerbuddy.stream
-//
-// Viewers open   https://www.printerbuddy.stream/share/user/<ID>/printer/<printer>/<code>
-// and the Worker fetches it through that box's tunnel:
-//                https://u<ID>.printerbuddy.stream/share/printer/<printer>/<code>
-// so viewers only ever see printerbuddy.stream, never the box's home address.
-//
-// Setup (once):
-//  1. Cloudflare dashboard > Workers & Pages > Create > Worker, name it "printer-buddy-share",
-//     replace its code with this file, Deploy.
-//  2. Worker > Settings > Domains & Routes > Add route:  www.printerbuddy.stream/*
-//     (and printerbuddy.stream/* if you want the bare domain too).
-//  3. DNS: make sure "www" exists and is proxied (orange cloud). If it points nowhere,
-//     add an AAAA record: name www, value 100::, proxied.
-//  4. Optional: Worker > Settings > Variables: SHARE_DOMAIN = printerbuddy.stream
-//     (otherwise it's taken from the address the viewer used).
-//
-// Automatic tunnel setup (/api/tunnel) needs a few more settings: see relay/README.md.
 
 const SHARE = /^\/share\/user\/(\d{6,10})\/(printer\/\d{1,9}\/[A-Za-z0-9_-]{20,100}(?:\/(?:status|snapshot|stream))?)\/?$/;
 
@@ -28,7 +10,6 @@ h1{margin:0 0 8px;font-size:26px}p{margin:0;color:#8E8A99}b{color:#FF8A1F}</styl
 <body><div><p>Printer <b>Buddy</b></p><h1>${title}</h1><p>${text}</p></div></body></html>`,
   { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
 
-// News for every Printer Buddy box (the bell on the home page). Edit relay/news.json; see relay/news.example.
 function newsApi() {
   const items = (Array.isArray(NEWS) ? NEWS : []).filter(n => n && n.id && n.title).slice(0, 50);
   return new Response(JSON.stringify({ items }), {
@@ -53,7 +34,6 @@ export default {
     const domain = (env.SHARE_DOMAIN || url.hostname).replace(/^www\./, "");
     const target = `https://u${m[1]}.${domain}/share/${m[2]}${url.search}`;
 
-    // pass along only harmless headers (no cookies or auth)
     const headers = new Headers();
     for (const h of ["accept", "accept-language", "user-agent", "range"]) {
       const v = request.headers.get(h);
@@ -69,7 +49,7 @@ export default {
     // 502/503/530 = the box or its tunnel is down (Cloudflare error 1033 comes back as 530)
     if ([502, 503, 504, 530].includes(res.status)) return offline(m[2]);
 
-    const out = new Response(res.body, res);   // streams through, so live video works
+    const out = new Response(res.body, res);
     out.headers.delete("set-cookie");
     out.headers.set("cache-control", "no-store");
     out.headers.set("x-robots-tag", "noindex");
@@ -77,14 +57,12 @@ export default {
     return out;
   },
 
-  // daily Discord summary (Worker > Settings > Triggers > Cron, e.g. "0 13 * * *")
   async scheduled(event, env, ctx) {
     ctx.waitUntil(dailySummary(env));
   },
 };
 
 function offline(path) {
-  // JSON for the share page's background requests, a page for people opening the link
   if (/\/(status|snapshot|stream)$/.test(path)) {
     return new Response(JSON.stringify({ error: "This printer is offline right now. Try again later." }),
       { status: 503, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -92,17 +70,12 @@ function offline(path) {
   return page("Printer is offline", "This printer's box isn't reachable right now. Try again in a little while.", 503);
 }
 
-// ---------------------------------------------------------------- automatic tunnels
 // A box asks for its tunnel:   POST   /api/tunnel  {"id": "1234567", "port": 8080, "key": "<box key, after the first time>"}
 //   -> creates tunnel "pb-u<id>" routing https://u<id>.<domain>/share/... to http://localhost:<port>,
 //      plus the DNS record, and returns {"token", "key", "hostname"}. Asking again (with the key) reuses
 //      the same tunnel and updates the port if it changed.
 // A box removes its tunnel:    DELETE /api/tunnel  {"id": "...", "key": "..."}
 // Only the box holding the key can change or delete its tunnel.
-//
-// Needs (Worker > Settings): secrets CF_API_TOKEN, DISCORD_WEBHOOK (optional); variables CF_ACCOUNT_ID,
-// CF_ZONE_ID, SHARE_DOMAIN, MAX_TUNNELS (optional, default 500), NEW_PER_IP_PER_DAY (optional, default 5);
-// KV binding BOXES.
 
 const json = (data, status = 200) => new Response(JSON.stringify(data),
   { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -190,7 +163,6 @@ async function tunnelApi(request, env, ctx, url) {
     const port = Number(b.port);
     if (!Number.isInteger(port) || port < 1 || port > 65535) return json({ error: "Bad port" }, 400);
 
-    // already set up: reuse, update the port if it changed
     if (box) {
       if (box.port !== port) {
         await routing(env, box.tunnel_id, host, port);
@@ -201,7 +173,6 @@ async function tunnelApi(request, env, ctx, url) {
       return json({ token: box.token, hostname: host });
     }
 
-    // new box: limits first
     const ip = request.headers.get("cf-connecting-ip") || "unknown";
     const day = new Date().toISOString().slice(0, 10);
     const ipKey = `ip:${ip}:${day}`;
@@ -232,17 +203,11 @@ async function tunnelApi(request, env, ctx, url) {
   }
 }
 
-// ---------------------------------------------------------------- AI training photos
 // A box that opted in ("Help improve the AI") sends one labelled photo:
 //   POST /api/contribute  {"id": "1234567", "label": "spaghetti", "source": "alert_yes",
 //                          "image": "<base64 JPEG>", "meta": {"model": "basic-v1", "score": 0.87, ...}}
 // The Worker commits it to the private data repo as incoming/<label>/<id>-<time>-<source>-<score>-...jpg
-// (you review it and move the good ones to photos/, which is what training uses)
 // (full details in the commit message). Boxes never get any GitHub access themselves.
-//
-// Needs: secret GITHUB_TOKEN (fine-grained, Contents: Read and write on the data repo only),
-// variable DATA_REPO (e.g. sterling5241/printer-buddy-data); optional CONTRIB_PER_BOX_PER_DAY (default 50),
-// CONTRIB_PER_IP_PER_DAY (default 200). Uses the same BOXES KV for the daily counters.
 
 const LABELS = ["ok", "spaghetti", "warping", "first_layer", "failure", "stringing", "blob", "crack"];
 const SOURCES = ["alert_yes", "alert_no", "print_ok", "print_failed", "user"];
@@ -264,7 +229,6 @@ async function contributeApi(request, env) {
   if (bytes.length < 1000 || bytes.length > 500_000) return json({ error: "image must be 1-500 KB" }, 400);
   if (bytes[0] !== 0xFF || bytes[1] !== 0xD8) return json({ error: "image must be a JPEG" }, 400);
 
-  // daily limits
   const day = new Date().toISOString().slice(0, 10);
   const ip = request.headers.get("cf-connecting-ip") || "unknown";
   const boxKey = `contrib:box:${id}:${day}`, ipKey = `contrib:ip:${ip}:${day}`;
@@ -309,7 +273,6 @@ async function contributeApi(request, env) {
   return json({ error: "GitHub was busy, try again later" }, 503);
 }
 
-// ---------------------------------------------------------------- was the AI right? (totals from shared photos)
 // stats:<model>              all-time {right, false_alarm, missed}
 // statsday:<YYYY-MM-DD>:<model>  same, for one day (kept 40 days) - used by the daily Discord summary
 const emptyStats = () => ({ right: 0, false_alarm: 0, missed: 0 });
@@ -352,7 +315,7 @@ async function dailySummary(env) {
     const t = all[m] || s, n = s.right + s.false_alarm + s.missed, tn = t.right + t.false_alarm + t.missed;
     return `**${m}**: ${pct(s)}% right over ${n} photos (${s.false_alarm} false alarms, ${s.missed} missed) - all time ${pct(t)}% over ${tn}`;
   });
-  if (!lines.length) return;   // nothing shared yesterday: stay quiet
+  if (!lines.length) return;
   await fetch(env.DISCORD_WEBHOOK, {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ content: `AI report for ${y}\n` + lines.join("\n") }),

@@ -1,4 +1,3 @@
-// Home page panels (all printers). Each gets update(listOfPrinters) whenever any printer changes.
 PB.homePanel("printers", {
   title: "Printers", desc: "Your printers as cards or a list (sort, search, groups)", single: true, flush: true,
   icon: PB.icon('<rect x="4" y="3" width="16" height="13" rx="2"/><path d="M4 12h16M8 20h8M12 16v4"/>'),
@@ -6,7 +5,7 @@ PB.homePanel("printers", {
     host.classList.add("pb-printers");
     const parts = ["#grid", "#noMatch", "#setupLine", "#empty"].map(s => $(s)).filter(Boolean);
     host.append(...parts);
-    return { destroy() { for (const n of parts) $("#home").after(n); } };   // keep them on the page even if the panel is removed
+    return { destroy() { for (const n of parts) $("#home").after(n); } };
   },
 });
 
