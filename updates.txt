@@ -4,4 +4,4 @@ ai lite v1.5
 notify stable v1.0
 streamer nightly 2026-10-22
 timelapse stable v1.0
-ui stable v1.1.2
+ui stable v1.1.3
