@@ -23,6 +23,7 @@ SUBSCRIBE = {
     "display_status": ["progress", "message"],
     "virtual_sdcard": ["progress", "is_active", "file_position", "file_size"],
     "webhooks": ["state", "state_message"],
+    "configfile": ["warnings"],
     "gcode_move": ["speed_factor", "extrude_factor", "homing_origin"],
     "toolhead": ["homed_axes", "position", "axis_minimum", "axis_maximum", "extruder",
                  "max_velocity", "max_accel", "square_corner_velocity", "minimum_cruise_ratio", "max_accel_to_decel"],
@@ -88,6 +89,8 @@ class MoonrakerClient:
         self.error: str | None = None
         self.klippy_state: str | None = None
         self.klippy_message: str | None = None
+        self.moonraker_warnings: list[str] = []
+        self.failed_components: list[str] = []
         self.status: dict = {}
         self.webcams: list[dict] = []
         self.extras: list[str] = []
@@ -156,11 +159,13 @@ class MoonrakerClient:
             except RPCError:
                 pass
             info = await self._call("server.info")
-            self._set(connection="online", error=None, klippy_state=info.get("klippy_state"))
+            self._set(connection="online", error=None, klippy_state=info.get("klippy_state"),
+                      moonraker_warnings=[str(w) for w in info.get("warnings") or []],
+                      failed_components=[str(c) for c in info.get("failed_components") or []])
             await self._load_webcams()
             if info.get("klippy_state") == "ready":
                 await self._subscribe()
-            elif info.get("klippy_state") in ("shutdown", "error"):
+            else:
                 await self._load_klippy_message()
             await reader
         finally:
@@ -230,11 +235,13 @@ class MoonrakerClient:
         elif method == "notify_klippy_ready":
             self._set(klippy_state="ready", klippy_message=None)
             asyncio.create_task(self._safe(self._subscribe()))
+            asyncio.create_task(self._safe(self._load_server_notes()))
         elif method == "notify_klippy_shutdown":
             self._set(klippy_state="shutdown")
             asyncio.create_task(self._safe(self._load_klippy_message()))
         elif method == "notify_klippy_disconnected":
-            self._set(klippy_state="disconnected")
+            self._set(klippy_state="disconnected", klippy_message=None)
+            asyncio.create_task(self._safe(self._load_server_notes()))
         elif method == "notify_gcode_response" and params:
             if self.on_gcode:
                 try:
@@ -255,7 +262,12 @@ class MoonrakerClient:
             res = await self._call("printer.info")
             self._set(klippy_state=res.get("state", self.klippy_state), klippy_message=res.get("state_message"))
         except RPCError:
-            pass
+            pass   # Klipper not connected: printer.info only works once it is
+
+    async def _load_server_notes(self):
+        info = await self._call("server.info")
+        self._set(moonraker_warnings=[str(w) for w in info.get("warnings") or []],
+                  failed_components=[str(c) for c in info.get("failed_components") or []])
 
     async def _subscribe(self):
         objects = dict(SUBSCRIBE)
@@ -499,6 +511,9 @@ class MoonrakerClient:
             "error": self.error,
             "klippy_state": self.klippy_state,
             "klippy_message": self.klippy_message if self.klippy_state != "ready" else None,
+            "klipper_warnings": [str(w.get("message") or w) for w in s.get("configfile", {}).get("warnings") or []] if live else [],
+            "moonraker_warnings": self.moonraker_warnings,
+            "failed_components": self.failed_components,
             "state": state,
             "filename": ps.get("filename") or None,
             "message": ps.get("message") or ds.get("message") or None,
