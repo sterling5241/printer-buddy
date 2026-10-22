@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
+# Printer Buddy's root helper: the only command the app may run with sudo (see install.sh install_helper).
 set -euo pipefail
-SERVICE=printer-buddy-streamer
+STREAMER=printer-buddy-streamer
 
 case "${1:-}" in
+  pkg)
+    case "${2:-}" in
+      ffmpeg|v4l-utils|ustreamer|python3-venv)
+        apt-get install -y -q "$2" || { apt-get update -q && apt-get install -y -q "$2"; } ;;
+      *) echo "not an allowed package: ${2:-}"; exit 2 ;;
+    esac ;;
   deps)
     case "${2:-}" in
       light|basic) apt-get install -y -q ustreamer v4l-utils ;;
@@ -22,7 +29,7 @@ case "${1:-}" in
     dir="${2:-}"; user="${3:-}"
     [ -d "$dir/streamer/streamer" ] && [ -x "$dir/.venv/bin/python" ] || { echo "no streamer in $dir"; exit 2; }
     uid="$(id -u "$user" 2>/dev/null)" && [ "$uid" != 0 ] || { echo "bad user"; exit 2; }
-    cat > "/etc/systemd/system/$SERVICE.service" <<UNIT
+    cat > "/etc/systemd/system/$STREAMER.service" <<UNIT
 [Unit]
 Description=Printer Buddy camera streamer
 After=network-online.target
@@ -40,8 +47,8 @@ RestartSec=5
 WantedBy=multi-user.target
 UNIT
     systemctl daemon-reload ;;
-  enable) systemctl enable -q --now "$SERVICE" ;;
-  restart) systemctl restart "$SERVICE" ;;
-  disable) systemctl disable -q --now "$SERVICE" 2>/dev/null || true ;;
-  *) echo "usage: $0 deps light|basic|full | unit <printer-buddy dir> <user> | enable | restart | disable"; exit 2 ;;
+  enable) systemctl enable -q --now "$STREAMER" ;;
+  restart) systemctl restart "$STREAMER" ;;
+  disable) systemctl disable -q --now "$STREAMER" 2>/dev/null || true ;;
+  *) echo "usage: $0 pkg <package> | deps light|basic|full | unit <printer-buddy dir> <user> | enable | restart | disable"; exit 2 ;;
 esac

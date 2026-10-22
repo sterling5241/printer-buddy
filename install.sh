@@ -10,9 +10,9 @@ UNIT_FILE="/etc/systemd/system/$SERVICE.service"
 RUN_USER="${SUDO_USER:-$USER}"
 ENV_FILE="$DIR/printer-buddy.env"
 BACKUP_DIR="$DIR/backups"
-PARTS_STATE="$DIR/data/parts"
 ASVC="$(getent passwd "$RUN_USER" | cut -d: -f6)/printer_data/moonraker.asvc"
-HELPER=/usr/local/lib/printer-buddy/streamer-root.sh
+HELPER=/usr/local/lib/printer-buddy/root.sh
+UPDATER="$DIR/app/core/updater.py"
 PORT_GIVEN=""
 INTERACTIVE=0
 
@@ -262,134 +262,22 @@ ai_model() {
   [ -n "$f" ] && basename "$(dirname "$f")"
 }
 
-ensure_ai() {
-  local kind; kind="$(part_value "${PARTS[1]}")"
-  [ "$kind" = basic ] || [ "$kind" = heavy ] || return 0
-  case "$(uname -m)" in
-    aarch64|arm64|x86_64|amd64) ;;
-    *) echo "AI detection needs a 64-bit system (this one is $(uname -m)). Skipping AI; everything else works."
-       echo "  On a Raspberry Pi, use Raspberry Pi OS (64-bit)."; return 0 ;;
-  esac
-  echo "Installing AI libraries..."
-  "$DIR/.venv/bin/pip" install -r "$DIR/requirements-ai.txt" -q \
-    || { echo "Couldn't install the AI libraries. Skipping AI; everything else works."; return 0; }
-  mkdir -p "$DIR/data/ai"
-  "$DIR/.venv/bin/python" "$DIR/app/ai/model_download.py" --kind "$kind" --dir "$DIR/data/ai" \
-    || echo "No AI model yet. AI stays off until one downloads (try 3) Update later)."
-  return 0
-}
+ensure_ai() { python3 "$UPDATER" ai; }
 
-fetch_part() {   # part, release asset, path inside the package, where it goes
-  local channel; channel="$(get_env PB_CHANNEL)"
-  python3 - "$@" "${channel:-stable}" "$PARTS_STATE" <<'PY' || { echo "Couldn't get the $1 part, kept what was there."; return 1; }
-import io, json, os, shutil, sys, tarfile, tempfile, urllib.request
-name, asset, inner, dest, channel, state = sys.argv[1:7]
-hdr = {"User-Agent": "printer-buddy", "Accept": "application/vnd.github+json"}
-api = "https://api.github.com/repos/sterling5241/printer-buddy/releases?per_page=100"
-rels = json.load(urllib.request.urlopen(urllib.request.Request(api, headers=hdr), timeout=30))
-want = (lambda t: t == f"{name}-nightly") if channel == "nightly" else (lambda t: t.startswith(f"{name}-v"))
-rel = next((r for r in rels if want(r["tag_name"]) and not r.get("draft")), None)
-if not rel:
-    sys.exit(f"no {channel} release of {name} yet")
-a = next((x for x in rel.get("assets", []) if x["name"] == asset), None)
-if not a:
-    sys.exit(f"{rel['tag_name']} has no {asset}")
-need = next((l.split(":", 1)[1] for l in (rel.get("body") or "").splitlines() if l.lower().startswith("needs:")), "")
-if channel != "nightly" and need.strip() and os.path.exists(dest):
-    import glob, subprocess
-    root = os.path.dirname(os.path.dirname(state))
-    env = {}
-    if os.path.exists(os.path.join(root, "printer-buddy.env")):
-        env = dict(l.strip().split("=", 1) for l in open(os.path.join(root, "printer-buddy.env")) if "=" in l)
-    git = lambda *a: subprocess.run(["git", "-C", root, *a], capture_output=True, text=True).stdout.strip()
-    nums = lambda v: [int(x) for x in v.lstrip("v").replace("-", ".").split(".") if x.isdigit()]
-    def have(c):   # None = off or not installed, so it doesn't count
-        if c == "core":
-            return "nightly" if git("rev-parse", "--abbrev-ref", "HEAD") == "nightly" else                 git("describe", "--tags", "--abbrev=0", "--match", "core-v*").split("core-", 1)[-1]
-        if c == "ai":
-            if env.get("PB_AI", "off") == "off":
-                return None
-            tags = sorted(json.load(open(m)).get("tag", "") for m in glob.glob(os.path.join(root, "data", "ai", "*", "model.json")))
-            return tags[-1].rsplit("-", 1)[-1] if tags else None
-        if c == "streamer" and env.get("PB_STREAM", "off") == "off":
-            return None
-        try:
-            t = open(os.path.join(state, c)).read().split()[0]
-        except (OSError, IndexError):
-            return None
-        return "nightly" if t.endswith("-nightly") else t.split("-", 1)[-1]
-    miss = []
-    for item in need.split(","):
-        bits = item.split()
-        if len(bits) == 2:
-            h = have(bits[0])
-            if h != "nightly" and h is not None and (not h or nums(bits[1]) > nums(h)):
-                miss.append(item.strip())
-    if miss:
-        print(f"{name}: {rel['tag_name']} needs {', '.join(miss)} first, kept what was there")
-        sys.exit(0)
-stamp = f"{rel['tag_name']} {a['updated_at']} {asset}"
-mark = os.path.join(state, name)
-if os.path.exists(dest) and os.path.exists(mark) and open(mark).read() == stamp:
-    sys.exit(0)
-data = urllib.request.urlopen(urllib.request.Request(a["browser_download_url"], headers=hdr), timeout=300).read()
-tmp = tempfile.mkdtemp()
-with tarfile.open(fileobj=io.BytesIO(data)) as t:
-    t.extractall(tmp)
-src = os.path.join(tmp, inner)
-if os.path.isdir(src):
-    shutil.rmtree(dest, ignore_errors=True)
-    shutil.copytree(src, dest)
-else:
-    os.makedirs(os.path.dirname(dest), exist_ok=True)
-    shutil.copyfile(src, dest)
-shutil.rmtree(tmp)
-os.makedirs(state, exist_ok=True)
-open(mark, "w").write(stamp)
-print(f"{name}: {rel['tag_name']}")
-PY
-}
-
-fetch_parts() {
-  local ui notify stream bad=0
-  ui="$(part_value "${PARTS[0]}")"; notify="$(part_value "${PARTS[3]}")"
-  fetch_part ui "print-buddy-ui-$ui.tar.gz" print-buddy-ui "$DIR/ui" || bad=1
-  fetch_part notify "print-buddy-notify-$notify.tar.gz" print-buddy-notify/pb_notify/__init__.py "$DIR/app/core/notify.py" || bad=1
-  fetch_part timelapse print-buddy-timelapse.tar.gz print-buddy-timelapse/pb_timelapse/__init__.py "$DIR/app/media/timelapse.py" || bad=1
-  stream="$(get_env PB_STREAM)"
-  if [ -n "$stream" ] && [ "$stream" != off ]; then
-    fetch_part streamer "print-buddy-streamer-$stream.tar.gz" print-buddy-streamer "$DIR/streamer" || bad=1
-  fi
-  return $bad
-}
+fetch_parts() { python3 "$UPDATER" parts; }
 
 install_helper() {
   sudo install -d -o root -g root -m 755 "$(dirname "$HELPER")" \
-    && sudo install -o root -g root -m 755 "$DIR/tools/streamer-root.sh" "$HELPER" || return 1
+    && sudo install -o root -g root -m 755 "$DIR/tools/root.sh" "$HELPER" || return 1
+  sudo rm -f "$(dirname "$HELPER")/streamer-root.sh"
   local rule="$RUN_USER ALL=(root) NOPASSWD: $HELPER"
   echo "$rule" | sudo tee /etc/sudoers.d/printer-buddy.tmp >/dev/null \
     && sudo visudo -cqf /etc/sudoers.d/printer-buddy.tmp \
     && sudo mv /etc/sudoers.d/printer-buddy.tmp /etc/sudoers.d/printer-buddy && sudo chmod 440 /etc/sudoers.d/printer-buddy \
-    || { sudo rm -f /etc/sudoers.d/printer-buddy.tmp; echo "Couldn't set up the sudo rule for the streamer."; return 1; }
+    || { sudo rm -f /etc/sudoers.d/printer-buddy.tmp; echo "Couldn't set up Printer Buddy's sudo rule."; return 1; }
 }
 
-ensure_streamer() {
-  local tier; tier="$(get_env PB_STREAM)"
-  if [ -z "$tier" ] || [ "$tier" = off ]; then
-    [ -f "$HELPER" ] && sudo -n "$HELPER" disable
-    return 0
-  fi
-  fetch_part streamer "print-buddy-streamer-$tier.tar.gz" print-buddy-streamer "$DIR/streamer" || return 1
-  if [ -f "$DIR/data/streamer.conf" ]; then
-    sed -i "s/^tier:.*/tier: $tier/" "$DIR/data/streamer.conf"
-  else
-    mkdir -p "$DIR/data" && sed "s/^tier:.*/tier: $tier/" "$DIR/streamer/streamer.conf.example" > "$DIR/data/streamer.conf"
-  fi
-  echo "Setting up the camera streamer ($tier)..."
-  sudo -n "$HELPER" deps "$tier" && sudo -n "$HELPER" unit "$DIR" "$RUN_USER" && sudo -n "$HELPER" enable && sudo -n "$HELPER" restart \
-    || { echo "Couldn't set up the camera streamer."; return 1; }
-  if [ -f "$ASVC" ] && ! grep -qx printer-buddy-streamer "$ASVC"; then echo printer-buddy-streamer >> "$ASVC"; fi
-}
+ensure_streamer() { python3 "$UPDATER" streamer; }
 
 moonraker_service() {
   [ -f "$ASVC" ] || return 0
@@ -431,20 +319,15 @@ do_install() {
 
 do_update() {
   echo; echo "Updating..."
-  local b; b="$(core_branch)"
-  git -C "$DIR" config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
-  git -C "$DIR" fetch --prune origin || { echo "Couldn't get the latest from GitHub. Nothing was changed."; return 1; }
-  git -C "$DIR" reset --hard && git -C "$DIR" checkout -q -B "$b" "origin/$b" && git -C "$DIR" branch -q -u "origin/$b"     || { echo "Update failed."; return 1; }
+  python3 "$UPDATER" core || return 1
   after_code_change || return 1
   echo "Updated to $(git -C "$DIR" log -1 --format='%h %s')"
   check_updates
 }
 
 after_code_change() {
-  fetch_parts
-  if [ -x "$DIR/.venv/bin/pip" ]; then "$DIR/.venv/bin/pip" install -r "$DIR/requirements.txt" -q || return 1; fi
-  [ -x "$DIR/.venv/bin/pip" ] && ensure_ai
-  installed && install_helper && ensure_streamer
+  installed && install_helper
+  python3 "$UPDATER" after || echo "Some parts didn't update, see above."
   if installed; then write_unit; hard_restart || return 1; fi
   return 0
 }

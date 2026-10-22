@@ -4,15 +4,19 @@ import json
 import logging
 import os
 import subprocess
+import sys
 import time
 import urllib.request
 from pathlib import Path
+
+from . import updater
 
 log = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = ROOT / "printer-buddy.env"
 STATE = ROOT / "data" / "parts"
+UPDATER = ROOT / "app" / "core" / "updater.py"
 UPDATES_URL = "https://github.com/sterling5241/printer-buddy/releases/download/updates/updates.txt"
 # part -> (env var holding its tier, tiers, file or folder it installs)
 PARTS = {
@@ -32,7 +36,7 @@ def ensure_parts():
         return
     log.warning("parts missing (%s), downloading them", ", ".join(missing))
     try:
-        subprocess.run(["bash", str(ROOT / "install.sh"), "--parts"], cwd=ROOT, timeout=600, check=False)
+        subprocess.run([sys.executable, str(UPDATER), "parts"], cwd=ROOT, timeout=600, check=False)
     except (OSError, subprocess.TimeoutExpired) as ex:
         log.error("couldn't download the parts (%s): run ./install.sh --parts", ex)
 
@@ -90,19 +94,8 @@ def _git(*args) -> str:
     return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=20).stdout.strip()
 
 
-CHANNEL_BRANCH = {"stable": "builds", "nightly": "nightly"}
-
-
-def core_branch() -> str:
-    """The branch core updates follow: the channel's, unless another branch was picked in the installer."""
-    cur = _git("rev-parse", "--abbrev-ref", "HEAD")
-    if cur in ("", "HEAD", "main", *CHANNEL_BRANCH.values()):
-        return CHANNEL_BRANCH.get(env_get("PB_CHANNEL", "stable"), "builds")
-    return cur
-
-
 def core() -> dict:
-    cur, want = _git("rev-parse", "--abbrev-ref", "HEAD"), core_branch()
+    cur, want = _git("rev-parse", "--abbrev-ref", "HEAD"), updater.core_branch()
     remote = _cached(f"core:{want}", 600, lambda: (_git("ls-remote", "origin", f"refs/heads/{want}").split() or [""])[0][:7])
     have = _git("rev-parse", "--short=7", "HEAD")
     ver = latest().get(("core", "stable")) if want == "builds" else None
@@ -117,20 +110,10 @@ def _newer(a: str, b: str) -> bool:
     return nums(a) > nums(b)
 
 
-def _installed(ai_tag: str | None) -> dict[str, str]:
+def _installed() -> dict[str, str]:
     """component -> installed version ("nightly", "v1.2", or "" if unknown). Turned-off parts are left out."""
-    have = {}
-    for name, (var, tiers, _) in PARTS.items():
-        if not (var and env_get(var, tiers[0]) == "off"):
-            tag, _ = _stamp(name)
-            have[name] = "nightly" if tag.endswith("-nightly") else tag.removeprefix(f"{name}-")
-    if _git("rev-parse", "--abbrev-ref", "HEAD") == "nightly":
-        have["core"] = "nightly"
-    else:
-        have["core"] = _git("describe", "--tags", "--abbrev=0", "--match", "core-v*").removeprefix("core-")
-    if ai_tag and env_get("PB_AI", "off") != "off":
-        have["ai"] = ai_tag.rsplit("-", 1)[-1]
-    return have
+    have = {c: updater.installed(c) for c in (*PARTS, "core", "ai")}
+    return {c: v for c, v in have.items() if v is not None}
 
 
 def _missing(needs: list, have: dict) -> list[str]:
@@ -148,7 +131,7 @@ def _stamp(name: str) -> tuple[str, str]:
 def components(ai_tag: str | None) -> dict:
     channel = env_get("PB_CHANNEL", "stable") or "stable"
     avail = latest()
-    have = _installed(ai_tag)
+    have = _installed()
     need = (lambda tag: _missing(avail.get(("needs", tag), []), have)) if channel == "stable" else (lambda tag: [])
     parts = []
     for name, (var, tiers, path) in PARTS.items():
@@ -184,20 +167,10 @@ def components(ai_tag: str | None) -> dict:
 
 def run(what: str) -> tuple[bool, str]:
     """core | parts | ai | streamer: do the update, return (ok, output)."""
-    if what == "core":
-        b = core_branch()
-        cmd = ["bash", "-c", 'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" && git fetch -q --prune origin'
-               f' && git reset -q --hard && git checkout -q -B {b} origin/{b} && git branch -q -u origin/{b}'
-               ' && bash install.sh --parts && .venv/bin/pip install -q -r requirements.txt']
-    elif what == "streamer":
-        cmd = ["bash", "install.sh", "--streamer"]
-    elif what == "parts":
-        cmd = ["bash", "install.sh", "--parts"]
-    elif what == "ai":
-        cmd = ["bash", "-c", '.venv/bin/pip install -q -r requirements-ai.txt && mkdir -p data/ai'
-               f' && .venv/bin/python app/ai/model_download.py --kind {env_get("PB_AI", "basic")} --dir data/ai']
-    else:
+    jobs = {"core": "update", "parts": "parts", "ai": "ai", "streamer": "streamer"}
+    if what not in jobs:
         return False, f"unknown: {what}"
+    cmd = [sys.executable, str(UPDATER), jobs[what]]
     try:
         p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=900)
     except (OSError, subprocess.TimeoutExpired) as ex:
