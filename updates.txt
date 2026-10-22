@@ -1,5 +1,6 @@
 ai basic v1.5
 ai heavy v1.5
+ai lite v1.5
 notify stable v1.0
 timelapse stable v1.0
-ui stable v1.0
+ui stable v1.1
