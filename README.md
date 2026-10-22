@@ -71,12 +71,12 @@ app/core/                SQLite store, stdlib async HTTP + WebSocket client, ntf
 app/printers/            Moonraker client, printer manager (events, fan-out), mDNS + subnet discovery
 app/ai/                  failure detection, photo collection, model downloads
 app/media/               timelapse recording
-ui/                      web UI (served at /static/): core/ builder, panels/ one folder per panel
 docs/                    AI.md
 docker/                  Dockerfile + docker-compose.yml
 relay/                   Cloudflare worker (share links + news)
 ```
-Each folder has a README.txt saying what's in it.
+Each folder has a README.txt saying what's in it. The web UI is its own repo,
+[print-buddy-ui](https://github.com/sterling5241/print-buddy-ui), fetched by the installer next to this one.
 
 ## API
 
@@ -85,12 +85,6 @@ Each folder has a README.txt saying what's in it.
 `POST /api/notify/test`
 
 ## Licenses
-
-### Bundled libraries (`ui/vendor/`)
-
-- [Apache ECharts](https://echarts.apache.org) - Apache-2.0, © The Apache Software Foundation
-- [ECharts GL](https://github.com/ecomfe/echarts-gl) - BSD-3-Clause, © 2017 Baidu Inc.
-- [three.js](https://threejs.org) - MIT, © 2010-2022 three.js authors
 
 ### Python packages
 

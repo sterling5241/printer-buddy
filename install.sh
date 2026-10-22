@@ -10,6 +10,8 @@ UNIT_FILE="/etc/systemd/system/$SERVICE.service"
 RUN_USER="${SUDO_USER:-$USER}"
 ENV_FILE="$DIR/printer-buddy.env"
 BACKUP_DIR="$DIR/backups"
+UI_REPO="https://github.com/sterling5241/print-buddy-ui.git"
+UI_DIR="$(dirname "$DIR")/print-buddy-ui"
 PORT_GIVEN=""
 INTERACTIVE=0
 
@@ -260,9 +262,18 @@ ensure_ai() {
   return 0
 }
 
+fetch_ui() {
+  if [ -d "$UI_DIR/.git" ]; then
+    git -C "$UI_DIR" fetch -q && git -C "$UI_DIR" reset -q --hard "origin/$(git -C "$UI_DIR" rev-parse --abbrev-ref HEAD)"
+  else
+    git -c credential.helper=store clone -q "$UI_REPO" "$UI_DIR" && git -C "$UI_DIR" config credential.helper store
+  fi || { echo "Couldn't get the UI from GitHub."; return 1; }
+}
+
 do_install() {
   echo; echo "Installing..."
   ensure_env
+  fetch_ui || return 1
   if ! python3 -c "import venv, ensurepip" 2>/dev/null; then
     echo "Installing python3-venv..."
     sudo apt-get update && sudo apt-get install -y python3-venv || { echo "Couldn't install python3-venv."; return 1; }
@@ -289,6 +300,7 @@ do_update() {
 }
 
 after_code_change() {
+  fetch_ui || return 1
   if [ -x "$DIR/.venv/bin/pip" ]; then "$DIR/.venv/bin/pip" install -r "$DIR/requirements.txt" -q || return 1; fi
   [ -x "$DIR/.venv/bin/pip" ] && ensure_ai
   if installed; then write_unit; hard_restart || return 1; fi

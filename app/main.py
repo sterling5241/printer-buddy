@@ -43,7 +43,7 @@ class _QuietShutdown(logging.Filter):
 
 
 logging.getLogger("uvicorn.error").addFilter(_QuietShutdown())
-STATIC = Path(__file__).resolve().parent.parent / "ui"
+STATIC = Path(os.getenv("PB_UI_DIR") or Path(__file__).resolve().parents[2] / "print-buddy-ui")
 
 store = Store(os.getenv("DB_PATH", "data/monitor.db"))
 manager = Manager(store, Notifier(store))
