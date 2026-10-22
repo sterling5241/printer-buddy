@@ -21,6 +21,7 @@
   .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; margin-bottom: 24px; }
   h1 { margin: 0; font-size: 24px; font-weight: 900; }
   h1 span { color: var(--orange); }
+  .brand-sub { color: var(--muted); font-size: 14px; font-weight: 700; margin-top: 2px; }
   button { font: inherit; font-weight: 700; min-height: 44px; padding: 0 16px; border-radius: 8px; border: 0;
            background: var(--card2); color: var(--text); cursor: pointer; }
   button.primary { background: var(--purple); color: #fff; font-weight: 900; }
@@ -341,7 +342,7 @@
 <body>
 <main>
   <div class="top">
-    <h1>Your <span>Printers</span></h1>
+    <div class="brand"><h1>Printer <span>Buddy</span></h1><div class="brand-sub">Printer Selection</div></div>
     <div class="row">
       <div class="viewbar">
         <div class="seg adv" role="group" aria-label="View">
@@ -649,6 +650,36 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 function toast(msg) {
   const t = $("#toast"); t.textContent = msg; t.style.display = "block";
   clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = "none", 4000);
+}
+// A thank-you burst for every photo given to the AI (skipped with reduced motion).
+function confetti() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const c = document.createElement("canvas"), g = c.getContext("2d"), dpr = devicePixelRatio || 1;
+  const w = innerWidth, h = innerHeight;
+  Object.assign(c.style, { position: "fixed", inset: "0", width: "100%", height: "100%", pointerEvents: "none", zIndex: 1000 });
+  c.width = w * dpr; c.height = h * dpr; g.scale(dpr, dpr); document.body.append(c);
+  const colors = ["#FF8A1F", "#C4A7FF", "#7C3AED", "#F4F2F8", "#FFC266"];
+  const bits = Array.from({ length: 160 }, (_, i) => {
+    const left = i % 2 === 0, a = (left ? -1 : 1) * (Math.PI / 4 + Math.random() * Math.PI / 6);
+    const v = 9 + Math.random() * 9;
+    return { x: left ? 0 : w, y: h * 0.75, vx: -Math.sin(a) * v, vy: -Math.cos(a) * v, r: Math.random() * Math.PI,
+             vr: (Math.random() - .5) * .3, s: 6 + Math.random() * 6, c: colors[i % colors.length] };
+  });
+  const start = performance.now();
+  let last = start;
+  (function frame(now) {
+    const t = now - start, k = Math.min(4, (now - last) / 16.7);   // same speed at any frame rate
+    last = now;
+    g.clearRect(0, 0, w, h);
+    g.globalAlpha = Math.max(0, Math.min(1, (3200 - t) / 800));
+    for (const b of bits) {
+      const drag = Math.pow(.99, k);
+      b.vy += .25 * k; b.vx *= drag; b.vy *= drag; b.x += b.vx * k; b.y += b.vy * k; b.r += b.vr * k;
+      g.save(); g.translate(b.x, b.y); g.rotate(b.r); g.fillStyle = b.c;
+      g.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2); g.restore();
+    }
+    if (t < 3200) requestAnimationFrame(frame); else c.remove();
+  })(start);
 }
 async function api(path, opts = {}) {
   const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
@@ -1534,6 +1565,7 @@ async function answerAlert(yes) {
   if (!iid) return;
   try {
     await api(`/api/ai/photos/${iid}`, { method: "POST", body: JSON.stringify({ label: yes ? "yes" : "ok" }) });
+    confetti();
     toast(yes ? "Thanks — saved as a real failure" : "Thanks — saved as a false alarm (very useful for training)");
     if (!$("#aiPanel").hidden) loadPhotos();
   } catch (e) { toast(e.message); }
@@ -1546,6 +1578,7 @@ $("#pgAiSave").onchange = async e => {
   if (!label) return;
   try {
     const r = await api(`/api/printers/${id}/ai/save`, { method: "POST", body: JSON.stringify({ label }) });
+    confetti();
     const name = label === "ok" ? "OK" : aiName(label);
     toast(r.status === "sent" ? `Sent to the AI as ${name}. Thanks!`
       : !r.sharing ? `Saved on this box as ${name}. Turn on "Help improve the AI" (AI settings) to send it.`
@@ -1588,7 +1621,7 @@ function drawPhotos() {
     : `<p class="muted" style="margin:0">No photos yet. They're collected during prints and AI alerts, or with "Save for AI…" on a printer's page.</p>`;
   for (const sel of $("#aiPhotos").querySelectorAll("[data-plabel]")) sel.onchange = async () => {
     if (!sel.value) return;
-    try { await api(`/api/ai/photos/${sel.dataset.plabel}`, { method: "POST", body: JSON.stringify({ label: sel.value }) }); loadPhotos(); }
+    try { await api(`/api/ai/photos/${sel.dataset.plabel}`, { method: "POST", body: JSON.stringify({ label: sel.value }) }); confetti(); loadPhotos(); }
     catch (e) { toast(e.message); }
   };
   for (const b of $("#aiPhotos").querySelectorAll("[data-pdel]")) b.onclick = async () => {
