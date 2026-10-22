@@ -37,10 +37,23 @@ The installer downloads the newest one for you when you pick **AI detection: bas
 
 - While a printer is **printing**, it checks the camera every 10 seconds. When it isn't printing, it doesn't watch,
   and the printer page says so.
-- It alerts when an alert label scores **60% or more for 3 checks in a row** (about 30 seconds), then waits
+- It alerts when an alert label scores **60% or more for 3 checks in a row**, then waits
   **10 minutes** before alerting again. All of these can be changed under **AI** in the dashboard.
+- Once a check scores that high, it checks **5 seconds sooner** (every 5 seconds instead of 10, never faster than every
+  2 seconds) until it alerts, then goes back to every 10 seconds. So a real failure is caught in about 20 seconds
+  instead of 30. It only speeds up again for a new failure, after a check has come back clean.
 - Each printer has its own mode in its menu and on its page: **Alert only** (default), **Alert + auto-pause**, or **Off**.
 - **Check now** on a printer's page scores the camera once, any time, without alerting or pausing. Handy for testing.
+- When an alert label reaches the threshold, a **red box** on the printer page's camera (and on the alert's
+  notification photo) shows where the AI thinks the problem is. The model only scores whole pictures, so the box
+  comes from greying out one patch of the picture at a time (a 6 x 6 grid, 25 patches, about 2 seconds on a Pi 4) and seeing where the score
+  drops most. It's a rough area, not an outline. When no one part of the picture explains the score (say the
+  spaghetti fills the whole view), no box is drawn. Photos kept for the AI are saved without the box.
+- Two box options in the printer page's AI watch panel, remembered per printer:
+    - **Box: always**: a box on every check, the likeliest spot even on a good print (the extra runs every check).
+    - **Box: on failure** (default): a box only at or above the threshold, so the extra runs only happen when a
+      failure is likely.
+    - With both off, the box is skipped completely: no extra runs, which helps older Pis. Alerts still work.
 - The AI judges what the camera sees: point it at **the print on the bed**, not just the nozzle.
 
 ## Help improve the AI (optional, off by default)

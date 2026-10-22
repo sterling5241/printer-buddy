@@ -7,6 +7,7 @@ import logging
 import os
 
 from .moonraker import MoonrakerClient
+from ..ai.detector import draw_box
 from ..core.net import http_get
 from ..core.notify import Notifier
 from ..core.store import Store
@@ -241,7 +242,8 @@ class Manager:
         if pid in self.rows:
             self._broadcast("printer", self.view(pid))
 
-    async def ai_alert(self, pid: int, label: str, score: float, image: bytes | None, mode: str):
+    async def ai_alert(self, pid: int, label: str, score: float, image: bytes | None, mode: str,
+                       box: list | None = None):
         """The AI saw a failure that held long enough: pause (if set) and tell the user."""
         c, row = self.clients.get(pid), self.rows.get(pid)
         if not c or not row:
@@ -267,6 +269,11 @@ class Manager:
         title = f"{row['name']}: possible {nice} ({score * 100:.0f}%)"
         parts = [v.get("filename") or "unknown file", f"{v['progress'] * 100:.0f}% done",
                  "print paused - check it and resume or cancel" if paused else "check the print"]
+        if image and box:   # only the notification gets the box; the saved AI photo stays clean
+            try:
+                image = draw_box(image, box, f"{nice} {score * 100:.0f}%")
+            except Exception as e:
+                log.info("AI: couldn't draw the box for printer %s: %s", pid, e)
         await self.notifier.send(title, " · ".join(parts), image)
 
     def _on_gcode(self, client: MoonrakerClient, line: str):

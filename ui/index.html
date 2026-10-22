@@ -219,6 +219,12 @@
   .pg-cambox { flex: 999 1 640px; min-width: 0; border-radius: 12px; overflow: hidden; background: var(--card); border: 1px solid var(--line); }
   .pg-cam { position: relative; aspect-ratio: 16 / 9; background: #000; }
   .pg-cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .pg-cam .ai-probe { position: absolute; inset: 0; width: 100%; height: 100%; visibility: hidden; pointer-events: none; }
+  .pg-cam .ai-probe i { position: absolute; }
+  .pg-cam .ai-box { position: absolute; border: 3px solid #ff2828; border-radius: 4px; box-shadow: 0 0 0 1px rgba(0,0,0,.5); pointer-events: none; }
+  .pg-cam .ai-box span { position: absolute; left: -3px; bottom: 100%; background: #ff2828; color: #fff; font-size: 12px; font-weight: 700; padding: 2px 6px; border-radius: 4px 4px 0 0; white-space: nowrap; }
+  .pg-cam .ai-box.low span { bottom: auto; top: 100%; border-radius: 0 0 4px 4px; }
+  :is(#pgAiBoxAlways, #pgAiBoxFail)[aria-pressed="true"] { background: rgba(255, 40, 40, .18); border-color: #ff2828; color: #ff6b61; }
   .pg-full { position: absolute; right: 12px; top: 12px; width: 44px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(11,11,13,.82); }
   .pg-side { flex: 1 1 340px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); padding: 22px; display: flex; flex-direction: column; gap: 20px; }
   .pg-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
@@ -500,6 +506,8 @@
         <div class="head"><strong>AI watch</strong>
           <div class="ctl2">
             <button type="button" id="pgAiCheck" title="Score the camera once right now. Never alerts or pauses.">Check now</button>
+            <button type="button" id="pgAiBoxAlways" aria-pressed="false" title="Draw the failure box on every check, even when the AI sees no failure (26 extra model runs each check)">Box: always</button>
+            <button type="button" id="pgAiBoxFail" aria-pressed="true" title="Draw the failure box only at or above the alert threshold, so the extra model runs only happen when a failure is likely. With both box options off, the box is skipped completely, saving CPU on older Pis.">Box: on failure</button>
             <select id="pgAiSave" aria-label="Save this camera view for the AI" title="Save the camera view right now as a training photo">
               <option value="">Save for AI…</option><option value="ok">as OK (no problem)</option><option value="spaghetti">as spaghetti</option>
               <option value="warping">as warping</option><option value="first_layer">as first layer</option><option value="failure">as other failure</option>
@@ -1515,11 +1523,40 @@ function aiBadge(el, p) {
   b.textContent = a.score == null ? "AI watching" : `AI ${Math.round(s * 100)}%`;
   b.title = a.top ? `Highest: ${aiName(a.top)} ${Math.round(s * 100)}%` : "Waiting for the first check";
 }
+// Red box on the printer page's camera where the AI thinks the problem is (main camera only:
+// that's the one it watches). The box comes in the camera's own picture; a hidden copy of the
+// picture's flip/turn finds where that lands on screen.
+function drawAIBox(p) {
+  const cam = $("#pgCam"), img = $("#pgImg"), a = p?.ai;
+  const test = p && aiTest.get(p.id), fresh = !!test && Date.now() / 1000 - test.at < 120;
+  const src = a?.watching ? a : fresh ? test : null;
+  const shown = !img.hidden && +img.dataset.camIdx === mainCam(p) && img.naturalWidth;
+  let probe = cam.querySelector(".ai-probe"), mark = cam.querySelector(".ai-box");
+  if (!src?.box || !shown || a?.mode === "off") { probe?.remove(); mark?.remove(); return; }
+  if (!probe) { probe = document.createElement("div"); probe.className = "ai-probe"; probe.innerHTML = "<i></i>"; cam.append(probe); }
+  if (!mark) { mark = document.createElement("div"); mark.className = "ai-box"; mark.innerHTML = "<span></span>"; cam.append(mark); }
+  for (const k of ["inset", "left", "top", "width", "height", "transform"]) probe.style[k] = img.style[k];
+  const ew = probe.offsetWidth, eh = probe.offsetHeight, nw = img.naturalWidth, nh = img.naturalHeight;
+  const s = (getComputedStyle(img).objectFit === "cover" ? Math.max : Math.min)(ew / nw, eh / nh);
+  const cw = nw * s, ch = nh * s, ox = (ew - cw) / 2, oy = (eh - ch) / 2, [x0, y0, x1, y1] = src.box;
+  Object.assign(probe.firstChild.style, { left: `${ox + x0 * cw}px`, top: `${oy + y0 * ch}px`, width: `${(x1 - x0) * cw}px`, height: `${(y1 - y0) * ch}px` });
+  const r = probe.firstChild.getBoundingClientRect(), c = cam.getBoundingClientRect();
+  const left = Math.max(r.left, c.left), top = Math.max(r.top, c.top), right = Math.min(r.right, c.right), bottom = Math.min(r.bottom, c.bottom);
+  Object.assign(mark.style, { left: `${left - c.left}px`, top: `${top - c.top}px`, width: `${Math.max(0, right - left)}px`, height: `${Math.max(0, bottom - top)}px` });
+  mark.classList.toggle("low", top - c.top < 22);
+  mark.firstChild.textContent = `${aiName(src.top)} ${Math.round(src.score * 100)}%`;
+}
+$("#pgImg").addEventListener("load", () => drawAIBox(printers.get(pageId)));
 function renderPageAI(p) {
   const box = $("#pgAi"), a = p.ai;
   box.hidden = !a;
+  drawAIBox(p);
   if (!a) return;
   if (document.activeElement !== $("#pgAiMode")) $("#pgAiMode").value = a.mode;
+  const bm = a.box_mode || "failure";
+  $("#pgAiBoxAlways").setAttribute("aria-pressed", String(bm === "always"));
+  $("#pgAiBoxFail").setAttribute("aria-pressed", String(bm !== "off"));
+  $("#pgAiBoxFail").disabled = bm === "always";   // always already includes failures
   const m = aiCfg?.model || {}, kinds = m.kinds || {};
   const test = aiTest.get(p.id), fresh = !!test && Date.now() / 1000 - test.at < 120;
   const shown = a.watching ? a.scores : fresh ? test.scores : null;   // never show old scores as if live
@@ -1540,7 +1577,11 @@ function renderPageAI(p) {
     note.className = "note hot";
     note.textContent = `Possible ${aiName(a.top)} at ${fmtClock(new Date(a.alerted_at * 1000))}` + (a.mode === "pause" ? " — paused the print." : " — check the print.");
   }
-  else if (a.watching) note.textContent = `Watching. Checks every ${aiCfg?.ai_interval ?? 10}s. Alerts after ${aiCfg?.ai_hold ?? 3} checks in a row at ${Math.round(aiThr() * 100)}% or more` + (a.streak ? ` (${a.streak} so far).` : ".");
+  else if (a.watching) {
+    const every = aiCfg?.ai_interval ?? 10, fast = Math.max(2, every - 5);
+    note.textContent = `Watching. Checks every ${a.fast ? fast : every}s. Alerts after ${aiCfg?.ai_hold ?? 3} checks in a row at ${Math.round(aiThr() * 100)}% or more`
+      + (a.streak ? ` (${a.streak} so far${a.fast ? "; checking faster until it's sure" : ""}).` : ".");
+  }
   else {
     const why = a.mode === "off" ? "AI is off for this printer." : `Not watching — ${p.name} isn't printing. It starts by itself when a print starts.`;
     note.textContent = fresh
@@ -1629,6 +1670,18 @@ function drawPhotos() {
     catch (e) { toast(e.message); }
   };
 }
+async function setAIBox(mode) {
+  const p = printers.get(pageId); if (!p?.ai) return;
+  try {
+    const r = await api(`/api/printers/${p.id}/ai/overlay`, { method: "POST", body: JSON.stringify({ mode }) });
+    p.ai.box_mode = r.box_mode; renderPage();
+    toast({ always: "Failure box on every check. Press Check now to see it right away.",
+            failure: "Failure box only when a failure is likely",
+            off: "Failure box off: no extra model runs" }[r.box_mode]);
+  } catch (e) { toast(e.message); }
+}
+$("#pgAiBoxAlways").onclick = () => setAIBox(printers.get(pageId)?.ai?.box_mode === "always" ? "failure" : "always");
+$("#pgAiBoxFail").onclick = () => setAIBox(printers.get(pageId)?.ai?.box_mode === "off" ? "failure" : "off");
 $("#pgAiCheck").onclick = async () => {
   const btn = $("#pgAiCheck"), id = pageId;
   btn.disabled = true; btn.textContent = "Checking…";

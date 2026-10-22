@@ -585,6 +585,17 @@ async def ai_check(request: Request):
         return err(str(e), 409)
 
 
+async def ai_overlay(request: Request):
+    pid = _pid(request)
+    if pid is None:
+        return err("not found", 404)
+    mode = (await body(request)).get("mode")
+    if mode not in ai_mod.BOX_MODES:
+        return err("mode must be one of: " + ", ".join(ai_mod.BOX_MODES), 400)
+    manager.ai.set_box_mode(pid, mode)
+    return JSONResponse({"box_mode": manager.ai.box_mode(pid)})
+
+
 async def ai_photos(request: Request):
     out = manager.collect.summary()
     for it in out["items"]:
@@ -1283,6 +1294,7 @@ _app = Starlette(routes=[
     Route("/api/ai/reload", ai_reload, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/check", ai_check, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/save", ai_save, methods=["POST"]),
+    Route("/api/printers/{pid:int}/ai/overlay", ai_overlay, methods=["POST"]),
     Route("/api/ai/photos", ai_photos),
     Route("/api/ai/photos/{iid}.jpg", ai_photo_image),
     Route("/api/ai/photos/{iid}", ai_photo_label, methods=["POST"]),

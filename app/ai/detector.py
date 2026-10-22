@@ -24,6 +24,8 @@ DEFAULTS = {"ai_threshold": 0.6, "ai_interval": 10, "ai_hold": 3, "ai_cooldown":
 CHOICES = {"ai_threshold": (0.4, 0.5, 0.6, 0.7, 0.8), "ai_interval": (5, 10, 20, 30),
            "ai_hold": (1, 2, 3, 5), "ai_cooldown": (5, 10, 20, 30)}
 MODES = ("off", "alert", "pause")      # per printer; default "alert"
+SUSPECT_SPEEDUP = 5.   # s taken off the interval while a failure holds, until it alerts
+MIN_INTERVAL = 2.
 DEFAULT_MODE = "alert"
 
 
@@ -54,7 +56,7 @@ class Model:
         self.kinds = self.meta["kinds"]
         self.tag = self.meta.get("tag") or folder.name
 
-    def score(self, jpeg: bytes, flip_h=False, flip_v=False, rotation=0) -> dict[str, float]:
+    def _input(self, jpeg: bytes, flip_h=False, flip_v=False, rotation=0):
         from PIL import Image, ImageOps
         im = Image.open(io.BytesIO(jpeg)).convert("RGB")
         # show the model the print the way the app shows it (upright)
@@ -66,9 +68,104 @@ class Model:
             im = ImageOps.flip(im)
         im = im.resize((self.size, self.size), Image.BILINEAR)
         x = self.np.asarray(im, dtype=self.np.float32).transpose(2, 0, 1) / 255.0
-        x = ((x - self.mean) / self.std)[None].astype(self.np.float32)
-        out = self.sess.run([self.meta["output"]["name"]], {self.meta["input"]["name"]: x})[0][0]
+        return ((x - self.mean) / self.std)[None].astype(self.np.float32)
+
+    def _run(self, x):
+        return self.sess.run([self.meta["output"]["name"]], {self.meta["input"]["name"]: x})[0][0]
+
+    def score(self, jpeg: bytes, flip_h=False, flip_v=False, rotation=0) -> dict[str, float]:
+        out = self._run(self._input(jpeg, flip_h, flip_v, rotation))
         return {l: round(float(s), 4) for l, s in zip(self.labels, out)}
+
+    def locate(self, jpeg: bytes, label: str, flip_h=False, flip_v=False, rotation=0,
+               force=False) -> list[float] | None:
+        """Where in the camera picture LABEL's score comes from, as [x0, y0, x1, y1] (0-1, of the
+        picture as the camera sends it), or None if no one part of the picture explains it.
+
+        The model only scores whole pictures, so this greys out one patch at a time and sees how much
+        the score drops (occlusion). 25 extra runs: only call it when a score is already high.
+        """
+        np = self.np
+        x = self._input(jpeg, flip_h, flip_v, rotation)
+        li = self.labels.index(label)
+        # in log-odds: a score stuck near 100% still moves when part of the picture is hidden
+        logit = lambda v: float(np.log(np.clip(v, 1e-6, 1 - 1e-6) / (1 - np.clip(v, 1e-6, 1 - 1e-6))))
+        base = logit(self._run(x)[li])
+        grid, k = LOCATE_GRID, LOCATE_PATCH
+        cell = self.size / grid
+        heat, change, cover = np.zeros((grid, grid)), np.zeros((grid, grid)), np.zeros((grid, grid))
+        for r in range(grid - k + 1):
+            for c in range(grid - k + 1):
+                y = x.copy()
+                y[..., round(r * cell):round((r + k) * cell), round(c * cell):round((c + k) * cell)] = 0.   # = mean colour
+                diff = base - logit(self._run(y)[li])
+                heat[r:r + k, c:c + k] += max(0., diff)
+                change[r:r + k, c:c + k] += abs(diff)
+                cover[r:r + k, c:c + k] += 1
+        heat /= cover
+        if force and heat.max() < 1e-3:
+            # nothing raises the score (a good print): where the model looks hardest instead
+            heat = change / cover
+        best = np.unravel_index(int(heat.argmax()), heat.shape)
+        if heat[best] < LOCATE_MIN_DROP and not force:
+            return None
+        # the cells joined to the hottest one that are at least half as hot
+        keep, todo = set(), [best]
+        while todo:
+            r, c = todo.pop()
+            if (r, c) in keep or not (0 <= r < grid and 0 <= c < grid) or heat[r, c] < heat[best] / 2:
+                continue
+            keep.add((r, c))
+            todo += [(r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)]
+        rows, cols = [r for r, _ in keep], [c for _, c in keep]
+        box = [min(cols) / grid, min(rows) / grid, (max(cols) + 1) / grid, (max(rows) + 1) / grid]
+        if (box[2] - box[0]) * (box[3] - box[1]) > LOCATE_MAX_AREA and not force:   # all over the picture
+            return None
+        return _to_camera(box, flip_h, flip_v, rotation)
+
+
+LOCATE_GRID = 6          # cells per side; patches are LOCATE_PATCH x LOCATE_PATCH cells
+LOCATE_PATCH = 2
+LOCATE_MIN_DROP = 0.5    # log-odds the best patch must take off the score (90% -> 85%, 99.9% -> 99.8%)
+LOCATE_MAX_AREA = 0.6    # a box over more of the picture than this isn't shown
+BOX_MODES = ("always", "failure", "off")   # off skips locating (its extra model runs) altogether
+DEFAULT_BOX = "failure"
+
+
+def _to_camera(box, flip_h, flip_v, rotation):
+    """A box on the upright picture the model saw -> the same box on the camera's own picture."""
+    def back(u, v):
+        if flip_v:
+            v = 1 - v
+        if flip_h:
+            u = 1 - u
+        r = int(rotation) % 360   # the picture was turned r degrees clockwise
+        if r == 90:
+            u, v = v, 1 - u
+        elif r == 180:
+            u, v = 1 - u, 1 - v
+        elif r == 270:
+            u, v = 1 - v, u
+        return u, v
+    (ax, ay), (bx, by) = back(box[0], box[1]), back(box[2], box[3])
+    return [round(float(v), 4) for v in (min(ax, bx), min(ay, by), max(ax, bx), max(ay, by))]
+
+
+def draw_box(jpeg: bytes, box: list[float], text: str) -> bytes:
+    """The camera picture with a red box (and TEXT) drawn on it, for notifications."""
+    from PIL import Image, ImageDraw
+    im = Image.open(io.BytesIO(jpeg)).convert("RGB")
+    w, h = im.size
+    d = ImageDraw.Draw(im)
+    x0, y0, x1, y1 = box[0] * w, box[1] * h, box[2] * w, box[3] * h
+    d.rectangle([x0, y0, x1, y1], outline=(255, 40, 40), width=max(2, round(min(w, h) / 120)))
+    tw, th = d.textbbox((0, 0), text)[2:]
+    ty = y0 - th - 6 if y0 >= th + 6 else y1 + 2
+    d.rectangle([x0, ty, x0 + tw + 8, ty + th + 4], fill=(255, 40, 40))
+    d.text((x0 + 4, ty + 2), text, fill=(255, 255, 255))
+    out = io.BytesIO()
+    im.save(out, "JPEG", quality=88)
+    return out.getvalue()
 
 
 class AI:
@@ -76,7 +173,7 @@ class AI:
                  snapshot: Callable[[int], Awaitable[bytes | None]],
                  transform: Callable[[int], tuple[bool, bool, int]],
                  mode_of: Callable[[int], str],
-                 on_alert: Callable[[int, str, float, bytes | None, str], Awaitable[None]],
+                 on_alert: Callable[[int, str, float, bytes | None, str, list | None], Awaitable[None]],
                  on_update: Callable[[int], None]):
         self.store = store
         self.root = Path(data_dir) / "ai"
@@ -86,6 +183,7 @@ class AI:
         self.error: str | None = None
         self.tasks: dict[int, asyncio.Task] = {}
         self.state: dict[int, dict] = {}
+        self.box: dict[int, str] = {}      # failure box per printer: always / failure / off (BOX_MODES)
 
     # model ----------------------------------------------------------------
     def load(self):
@@ -126,8 +224,9 @@ class AI:
             return None
         st = self.state.get(pid, {})
         return {"mode": self.mode_of(pid), "watching": pid in self.tasks,
-                "score": st.get("score"), "top": st.get("top"), "scores": st.get("scores"),
+                "score": st.get("score"), "top": st.get("top"), "scores": st.get("scores"), "box": st.get("box"),
                 "at": st.get("at"), "streak": st.get("streak", 0), "alerted_at": st.get("alerted_at"),
+                "fast": st.get("streak", 0) > 0 and not st.get("prompted"), "box_mode": self.box_mode(pid),
                 "alert_item": st.get("alert_item")}   # photo the "was it really a failure?" question is about
 
     def on_change(self, pid: int, prev: dict, v: dict):
@@ -170,14 +269,30 @@ class AI:
         scores = await asyncio.to_thread(m.score, img, *self.transform(pid))
         alerts = {l: v for l, v in scores.items() if m.kinds.get(l) == "alert"}
         top = max(alerts, key=alerts.get) if alerts else None
-        return {"scores": scores, "top": top, "score": alerts.get(top, 0.0), "at": time.time()}
+        score = alerts.get(top, 0.0)
+        box = await self._locate(pid, img, top, score)
+        return {"scores": scores, "top": top, "score": score, "box": box, "at": time.time()}
+
+    async def _locate(self, pid: int, img: bytes, top: str | None, score: float) -> list[float] | None:
+        """Box around the problem: in "failure" mode only for an alert score at or over the threshold,
+        in "always" mode on every check (the likeliest place, even for a good print), never in "off"
+        mode, which skips the extra model runs."""
+        mode = self.box_mode(pid)
+        force = mode == "always"
+        if not top or mode == "off" or (score < float(self.settings()["ai_threshold"]) and not force):
+            return None
+        try:
+            return await asyncio.to_thread(self.model.locate, img, top, *self.transform(pid), force)
+        except Exception as e:
+            log.info("AI: couldn't locate %s on printer %s: %s", top, pid, e)
+            return None
 
     async def _watch(self, pid: int):
         try:
             while True:
                 s = self.settings()
                 await self._check(pid, s)
-                await asyncio.sleep(float(s["ai_interval"]))
+                await asyncio.sleep(self.next_interval(pid, s))
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -185,6 +300,27 @@ class AI:
         finally:
             if self.tasks.get(pid) is asyncio.current_task():
                 self.tasks.pop(pid, None)
+
+    def box_mode(self, pid: int) -> str:
+        if pid not in self.box:
+            m = (self.store.get(pid) or {}).get("aibox")
+            self.box[pid] = m if m in BOX_MODES else DEFAULT_BOX
+        return self.box[pid]
+
+    def set_box_mode(self, pid: int, mode: str):
+        self.store.update(pid, aibox=mode)
+        self.box[pid] = mode
+        self.on_update(pid)
+
+    def next_interval(self, pid: int, s: dict) -> float:
+        """Seconds to the next check: SUSPECT_SPEEDUP sooner while a failure is building
+        towards an alert (the streak has started), so it prompts sooner. Once it has prompted,
+        back to the normal pace until a clean check."""
+        interval = float(s["ai_interval"])
+        st = self.state.get(pid, {})
+        if st.get("streak", 0) > 0 and not st.get("prompted"):
+            return max(MIN_INTERVAL, interval - SUSPECT_SPEEDUP)
+        return interval
 
     async def _check(self, pid: int, s: dict):
         m = self.model
@@ -199,14 +335,17 @@ class AI:
         alerts = {l: v for l, v in scores.items() if m.kinds.get(l) == "alert"}
         top = max(alerts, key=alerts.get) if alerts else None
         score = alerts.get(top, 0.0)
+        box = await self._locate(pid, img, top, score)
         st = self.state.setdefault(pid, {})
-        st.update(scores=scores, top=top, score=score, at=time.time())
+        st.update(scores=scores, top=top, score=score, box=box, at=time.time())
         st["streak"] = st.get("streak", 0) + 1 if score >= float(s["ai_threshold"]) else 0
+        if not st["streak"]:
+            st["prompted"] = False
         cooled = time.time() - (st.get("alerted_at") or 0) >= float(s["ai_cooldown"]) * 60
         if st["streak"] >= int(s["ai_hold"]) and cooled:
-            st["alerted_at"], st["streak"] = time.time(), 0
+            st["alerted_at"], st["streak"], st["prompted"] = time.time(), 0, True
             mode = self.mode_of(pid)
             log.info("AI: printer %s %s %.0f%% for %s checks -> %s", pid, top, score * 100, s["ai_hold"], mode)
             if mode != "off":
-                await self.on_alert(pid, top, score, img, mode)
+                await self.on_alert(pid, top, score, img, mode, box)
         self.on_update(pid)
