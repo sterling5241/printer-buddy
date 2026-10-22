@@ -403,6 +403,13 @@ moonraker_service() {
 do_install() {
   echo; echo "Installing..."
   ensure_env
+  local b; b="$(core_branch)"
+  if [ "$(branch)" != "$b" ] && git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    echo "Switching to the $b branch for the ${b/builds/stable} channel..."
+    git -C "$DIR" config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+    git -C "$DIR" fetch -q origin && git -C "$DIR" checkout -q -B "$b" "origin/$b" && git -C "$DIR" branch -q -u "origin/$b" \
+      || echo "Couldn't switch to $b, staying on $(branch)."
+  fi
   fetch_parts || return 1
   if ! python3 -c "import venv, ensurepip" 2>/dev/null; then
     echo "Installing python3-venv..."
