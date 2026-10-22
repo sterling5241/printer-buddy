@@ -19,13 +19,15 @@ PARTS = {
     "ui": ("PB_UI", ("basic", "advanced"), ROOT / "ui"),
     "notify": ("PB_NOTIFY", ("basic", "advanced"), ROOT / "app" / "core" / "notify.py"),
     "timelapse": (None, (), ROOT / "app" / "media" / "timelapse.py"),
+    "streamer": ("PB_STREAM", ("off", "light", "basic", "full"), ROOT / "streamer"),
 }
+REQUIRED = ("ui", "notify", "timelapse")
 AI_KINDS = ("off", "basic", "heavy")
 _cache: dict = {}
 
 
 def ensure_parts():
-    missing = [n for n, (_, _, path) in PARTS.items() if not path.exists()]
+    missing = [n for n in REQUIRED if not PARTS[n][2].exists()]
     if not missing:
         return
     log.warning("parts missing (%s), downloading them", ", ".join(missing))
@@ -114,6 +116,9 @@ def components(ai_tag: str | None) -> dict:
     parts = []
     for name, (var, tiers, path) in PARTS.items():
         tag, when = _stamp(name)
+        if var and env_get(var, tiers[0]) == "off":
+            parts.append({"name": name, "installed": "off", "latest": None, "update": False, "tier": "off", "tiers": list(tiers)})
+            continue
         if channel == "nightly":
             new = avail.get((name, "nightly"))
             update = bool(new) and (tag != f"{name}-nightly" or when[:10] < new)
@@ -134,10 +139,12 @@ def components(ai_tag: str | None) -> dict:
 
 
 def run(what: str) -> tuple[bool, str]:
-    """core | parts | ai: do the update, return (ok, output)."""
+    """core | parts | ai | streamer: do the update, return (ok, output)."""
     if what == "core":
         cmd = ["bash", "-c", 'git fetch -q && git reset -q --hard && git reset -q --hard "origin/$(git rev-parse --abbrev-ref HEAD)"'
                ' && bash install.sh --parts && .venv/bin/pip install -q -r requirements.txt']
+    elif what == "streamer":
+        cmd = ["bash", "install.sh", "--streamer"]
     elif what == "parts":
         cmd = ["bash", "install.sh", "--parts"]
     elif what == "ai":

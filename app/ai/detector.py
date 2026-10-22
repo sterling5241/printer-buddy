@@ -22,7 +22,11 @@ DEFAULT_MODE = "alert"
 
 
 def enabled() -> bool:
-    return os.getenv("PB_AI", "off").strip().lower() == "basic"
+    return kind() in ("basic", "heavy")
+
+
+def kind() -> str:
+    return os.getenv("PB_AI", "off").strip().lower()
 
 
 class Model:
@@ -177,17 +181,17 @@ class AI:
         self.model, self.error = None, None
         if not enabled():
             return
-        folders = sorted((p.parent for p in self.root.glob("*/model.json")),
+        folders = sorted((p.parent for p in self.root.glob(f"{kind()}-*/model.json")),
                          key=lambda p: json.load(open(p / "model.json")).get("created", ""))
         if not folders:
-            self.error = "no model installed - run the installer (AI detection: basic)"
+            self.error = f"no {kind()} model installed - run the installer (AI detection)"
             log.warning("AI: %s", self.error)
             return
         try:
             self.model = Model(folders[-1])
             log.info("AI: loaded model %s (%s)", self.model.tag, ", ".join(self.model.labels))
         except ImportError:
-            self.error = "onnxruntime/numpy/Pillow not installed - run the installer (AI detection: basic)"
+            self.error = "onnxruntime/numpy/Pillow not installed - run the installer (AI detection)"
             log.warning("AI: %s", self.error)
         except Exception as e:
             self.error = f"couldn't load the model: {e}"
@@ -241,7 +245,7 @@ class AI:
 
     async def check_now(self, pid: int) -> dict:
         if not enabled():
-            raise RuntimeError("AI detection is off (installer: AI detection = basic)")
+            raise RuntimeError("AI detection is off (installer: AI detection = basic or heavy)")
         m = self.model
         if not m:
             raise RuntimeError(self.error or "No AI model loaded")

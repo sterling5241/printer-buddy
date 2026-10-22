@@ -12,6 +12,7 @@ ENV_FILE="$DIR/printer-buddy.env"
 BACKUP_DIR="$DIR/backups"
 PARTS_STATE="$DIR/data/parts"
 ASVC="$(getent passwd "$RUN_USER" | cut -d: -f6)/printer_data/moonraker.asvc"
+HELPER=/usr/local/lib/printer-buddy/streamer-root.sh
 PORT_GIVEN=""
 INTERACTIVE=0
 
@@ -22,6 +23,7 @@ PARTS=(
   "video|PB_VIDEO|Video|snapshots live timelapse"
   "notify|PB_NOTIFY|Notifications|basic advanced"
   "remote|PB_REMOTE|Remote access|off on"
+  "stream|PB_STREAM|Camera streamer|off light basic full"
   "channel|PB_CHANNEL|Release channel|stable nightly"
 )
 declare -A DESC=(
@@ -37,10 +39,14 @@ declare -A DESC=(
   [notify.advanced]="Basic + more services and progress updates"
   [remote.off]="only on your home network"
   [remote.on]="reach it from anywhere, with a login"
+  [stream.off]="use the printer's own camera service"
+  [stream.light]="1 camera, MJPEG (ustreamer)"
+  [stream.basic]="every USB / Pi camera, MJPEG (ustreamer)"
+  [stream.full]="+ network cameras, WebRTC (go2rtc); needs more CPU"
   [channel.stable]="tested releases (v1.x)"
   [channel.nightly]="newest builds, may have bugs"
 )
-BUILT=" ui.basic ui.advanced ai.off ai.basic video.snapshots notify.basic notify.advanced video.live video.timelapse remote.off remote.on channel.stable channel.nightly "
+BUILT=" ui.basic ui.advanced ai.off ai.basic ai.heavy video.snapshots notify.basic notify.advanced video.live video.timelapse remote.off remote.on stream.off stream.light stream.basic stream.full channel.stable channel.nightly "
 
 W=55
 hr()    { printf '|%s|\n' "$(printf '%*s' $((W + 2)) '' | tr ' ' '-')"; }
@@ -245,12 +251,13 @@ ensure_ffmpeg() {
 }
 
 ai_model() {
-  local f; f="$(ls -1t "$DIR"/data/ai/*/model.json 2>/dev/null | head -n1)"
+  local f; f="$(ls -1t "$DIR"/data/ai/"$(part_value "${PARTS[1]}")"-*/model.json 2>/dev/null | head -n1)"
   [ -n "$f" ] && basename "$(dirname "$f")"
 }
 
 ensure_ai() {
-  [ "$(part_value "${PARTS[1]}")" = "basic" ] || return 0
+  local kind; kind="$(part_value "${PARTS[1]}")"
+  [ "$kind" = basic ] || [ "$kind" = heavy ] || return 0
   case "$(uname -m)" in
     aarch64|arm64|x86_64|amd64) ;;
     *) echo "AI detection needs a 64-bit system (this one is $(uname -m)). Skipping AI; everything else works."
@@ -260,7 +267,7 @@ ensure_ai() {
   "$DIR/.venv/bin/pip" install -r "$DIR/requirements-ai.txt" -q \
     || { echo "Couldn't install the AI libraries. Skipping AI; everything else works."; return 0; }
   mkdir -p "$DIR/data/ai"
-  "$DIR/.venv/bin/python" "$DIR/app/ai/model_download.py" --dir "$DIR/data/ai" \
+  "$DIR/.venv/bin/python" "$DIR/app/ai/model_download.py" --kind "$kind" --dir "$DIR/data/ai" \
     || echo "No AI model yet. AI stays off until one downloads (try 3) Update later)."
   return 0
 }
@@ -280,7 +287,7 @@ if not rel:
 a = next((x for x in rel.get("assets", []) if x["name"] == asset), None)
 if not a:
     sys.exit(f"{rel['tag_name']} has no {asset}")
-stamp = f"{rel['tag_name']} {a['updated_at']}"
+stamp = f"{rel['tag_name']} {a['updated_at']} {asset}"
 mark = os.path.join(state, name)
 if os.path.exists(dest) and os.path.exists(mark) and open(mark).read() == stamp:
     sys.exit(0)
@@ -303,12 +310,44 @@ PY
 }
 
 fetch_parts() {
-  local ui notify bad=0
+  local ui notify stream bad=0
   ui="$(part_value "${PARTS[0]}")"; notify="$(part_value "${PARTS[3]}")"
   fetch_part ui "print-buddy-ui-$ui.tar.gz" print-buddy-ui "$DIR/ui" || bad=1
   fetch_part notify "print-buddy-notify-$notify.tar.gz" print-buddy-notify/pb_notify/__init__.py "$DIR/app/core/notify.py" || bad=1
   fetch_part timelapse print-buddy-timelapse.tar.gz print-buddy-timelapse/pb_timelapse/__init__.py "$DIR/app/media/timelapse.py" || bad=1
+  stream="$(get_env PB_STREAM)"
+  if [ -n "$stream" ] && [ "$stream" != off ]; then
+    fetch_part streamer "print-buddy-streamer-$stream.tar.gz" print-buddy-streamer "$DIR/streamer" || bad=1
+  fi
   return $bad
+}
+
+install_helper() {
+  sudo install -d -o root -g root -m 755 "$(dirname "$HELPER")" \
+    && sudo install -o root -g root -m 755 "$DIR/tools/streamer-root.sh" "$HELPER" || return 1
+  local rule="$RUN_USER ALL=(root) NOPASSWD: $HELPER"
+  echo "$rule" | sudo tee /etc/sudoers.d/printer-buddy.tmp >/dev/null \
+    && sudo visudo -cqf /etc/sudoers.d/printer-buddy.tmp \
+    && sudo mv /etc/sudoers.d/printer-buddy.tmp /etc/sudoers.d/printer-buddy && sudo chmod 440 /etc/sudoers.d/printer-buddy \
+    || { sudo rm -f /etc/sudoers.d/printer-buddy.tmp; echo "Couldn't set up the sudo rule for the streamer."; return 1; }
+}
+
+ensure_streamer() {
+  local tier; tier="$(get_env PB_STREAM)"
+  if [ -z "$tier" ] || [ "$tier" = off ]; then
+    [ -f "$HELPER" ] && sudo -n "$HELPER" disable
+    return 0
+  fi
+  fetch_part streamer "print-buddy-streamer-$tier.tar.gz" print-buddy-streamer "$DIR/streamer" || return 1
+  if [ -f "$DIR/data/streamer.conf" ]; then
+    sed -i "s/^tier:.*/tier: $tier/" "$DIR/data/streamer.conf"
+  else
+    mkdir -p "$DIR/data" && sed "s/^tier:.*/tier: $tier/" "$DIR/streamer/streamer.conf.example" > "$DIR/data/streamer.conf"
+  fi
+  echo "Setting up the camera streamer ($tier)..."
+  sudo -n "$HELPER" deps "$tier" && sudo -n "$HELPER" unit "$DIR" "$RUN_USER" && sudo -n "$HELPER" enable && sudo -n "$HELPER" restart \
+    || { echo "Couldn't set up the camera streamer."; return 1; }
+  if [ -f "$ASVC" ] && ! grep -qx printer-buddy-streamer "$ASVC"; then echo printer-buddy-streamer >> "$ASVC"; fi
 }
 
 moonraker_service() {
@@ -337,6 +376,7 @@ do_install() {
   write_unit
   sudo systemctl daemon-reload && sudo systemctl enable -q "$SERVICE" || return 1
   moonraker_service add
+  install_helper && ensure_streamer
   hard_restart || return 1
   echo "Printer Buddy is running: $(url)  (open dashboards reload themselves)"
 }
@@ -354,6 +394,7 @@ after_code_change() {
   fetch_parts
   if [ -x "$DIR/.venv/bin/pip" ]; then "$DIR/.venv/bin/pip" install -r "$DIR/requirements.txt" -q || return 1; fi
   [ -x "$DIR/.venv/bin/pip" ] && ensure_ai
+  installed && install_helper && ensure_streamer
   if installed; then write_unit; hard_restart || return 1; fi
   return 0
 }
@@ -543,7 +584,7 @@ setup_lines() {
   for part in "${PARTS[@]}"; do
     IFS='|' read -r key var name choices <<<"$part"
     v="$(part_value "$part")"; note=""; built "$key.$v" || note="(coming soon)"
-    if [ "$key" = "ai" ] && [ "$v" = "basic" ]; then
+    if [ "$key" = "ai" ] && [ "$v" != "off" ]; then
       local m; m="$(ai_model)"; note="${m:+(model $m)}"; note="${note:-(no model yet)}"
     fi
     row "$(printf '%-15s %-11s %s' "$name" "$v" "$note")"
@@ -604,7 +645,7 @@ setup_menu() {
     c="$(ask "Pick a part: ")"
     case "$c" in
       b|back|"")
-        if [ $changed -eq 1 ] && installed; then fetch_parts; ensure_ffmpeg; ensure_ai; hard_restart && echo "Restarted with the new setup."; sleep 1; fi
+        if [ $changed -eq 1 ] && installed; then fetch_parts; ensure_ffmpeg; ensure_ai; install_helper && ensure_streamer; hard_restart && echo "Restarted with the new setup."; sleep 1; fi
         return ;;
     esac
     [[ "$c" =~ ^[0-9]+$ ]] && [ "$c" -ge 1 ] && [ "$c" -le ${#PARTS[@]} ] || continue
@@ -648,13 +689,14 @@ declare -A GIVEN=()
 while [ $# -gt 0 ]; do
   case "$1" in
     -y|--yes) shift ;;
-    -h|--help) echo "Usage: ./install.sh [-y] [--port N] [--ui basic|advanced] [--ai off|basic|heavy] [--video snapshots|live|timelapse] [--notify basic|advanced] [--remote off|on] [--channel stable|nightly] [--parts]"; exit 0 ;;
+    -h|--help) echo "Usage: ./install.sh [-y] [--port N] [--ui basic|advanced] [--ai off|basic|heavy] [--video snapshots|live|timelapse] [--notify basic|advanced] [--remote off|on] [--stream off|light|basic|full] [--channel stable|nightly] [--parts] [--streamer]"; exit 0 ;;
     --parts) ensure_env; fetch_parts; exit $? ;;
+    --streamer) ensure_env; ensure_streamer; exit $? ;;
     --port)
       [ $# -ge 2 ] || { echo "--port needs a number"; exit 1; }
       valid_port "$2" || { echo "--port must be a number from 1024 to 65535"; exit 1; }
       PORT_GIVEN="$2"; shift 2 ;;
-    --ui|--ai|--video|--notify|--remote|--channel)
+    --ui|--ai|--video|--notify|--remote|--stream|--channel)
       [ $# -ge 2 ] || { echo "$1 needs a value"; exit 1; }
       GIVEN[${1#--}]="${2,,}"; shift 2 ;;
     *) echo "Unknown option: $1 (try --help)"; exit 1 ;;

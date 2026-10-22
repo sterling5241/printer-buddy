@@ -650,17 +650,18 @@ async def components_action(request: Request):
         var, tiers, _ = comp.PARTS.get(b.get("part"), (None, (), None))
         if not var or b["tier"] not in tiers:
             return err("bad part or tier")
-        comp.env_set(var, b["tier"]); what = "parts"
+        comp.env_set(var, b["tier"]); what = "streamer" if b["part"] == "streamer" else "parts"
     elif "ai" in b:
         if b["ai"] not in comp.AI_KINDS:
             return err("bad AI choice")
         comp.env_set("PB_AI", b["ai"]); what = "ai" if b["ai"] != "off" else None
-    if what not in ("core", "parts", "ai", None):
-        return err("update must be core, parts or ai")
+    if what not in ("core", "parts", "ai", "streamer", None):
+        return err("update must be core, parts, ai or streamer")
     ok, out = await asyncio.to_thread(comp.run, what) if what else (True, "")
-    if ok:
+    restart = ok and what != "streamer"
+    if restart:
         asyncio.get_running_loop().call_later(1.5, os.kill, os.getpid(), signal.SIGTERM)
-    return JSONResponse({"ok": ok, "output": out, "restarting": ok})
+    return JSONResponse({"ok": ok, "output": out, "restarting": restart})
 
 
 async def ai_reload(request: Request):
@@ -1209,7 +1210,7 @@ SETUP = {
     "notify": ("PB_NOTIFY", ("basic", "advanced")),
     "remote": ("PB_REMOTE", ("off", "on")),
 }
-BUILT = {"ui.basic", "ui.advanced", "ai.off", "ai.basic", "video.snapshots", "notify.basic", "notify.advanced", "video.live", "video.timelapse", "remote.off", "remote.on"}
+BUILT = {"ui.basic", "ui.advanced", "ai.off", "ai.basic", "ai.heavy", "video.snapshots", "notify.basic", "notify.advanced", "video.live", "video.timelapse", "remote.off", "remote.on"}
 
 
 def setup() -> dict:
