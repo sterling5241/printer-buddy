@@ -528,15 +528,23 @@ async def notices(request: Request):
 _news = {"at": 0.0, "items": []}
 
 
+def _fetch_json(url: str) -> tuple[int, dict]:
+    import urllib.request
+    req = urllib.request.Request(url, headers={"User-Agent": "printer-buddy", "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=8) as r:
+        return r.status, json.loads(r.read(2_000_000))
+
+
 async def news(request: Request):
     if time.time() - _news["at"] > 6 * 3600 or request.query_params.get("refresh") == "1":
         domain = os.getenv("PB_SHARE_DOMAIN", "").strip().strip("/") or "printerbuddy.stream"
         try:
-            status, data = await get_json(f"https://www.{domain}/api/news", timeout=8)
+            status, data = await asyncio.to_thread(_fetch_json, f"https://www.{domain}/api/news")
             if status == 200 and isinstance(data, dict) and isinstance(data.get("items"), list):
                 _news["items"] = [n for n in data["items"] if isinstance(n, dict) and n.get("id") and n.get("title")][:50]
             _news["at"] = time.time()
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning("news: %s", e)
             _news["at"] = time.time() - 5.5 * 3600
     return JSONResponse({"items": _news["items"]})
 
