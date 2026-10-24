@@ -19,6 +19,9 @@ MODES = ("off", "alert", "pause")
 SUSPECT_SPEEDUP = 5.   # s taken off the interval while a failure holds, until it alerts
 MIN_INTERVAL = 2.
 DEFAULT_MODE = "alert"
+# only in onnxruntime-gpu builds (updater installs it for heavy when nvidia-smi works)
+GPU_PROVIDERS = {"CUDAExecutionProvider": "GPU (CUDA)", "DmlExecutionProvider": "GPU (DirectML)"}
+HISTORY_MAX = 4320   # checks kept per print for the score history chart (12h at 10s)
 
 
 def enabled() -> bool:
@@ -42,7 +45,10 @@ class Model:
         self.np = np
         opts = ort.SessionOptions()
         opts.intra_op_num_threads = 2
-        self.sess = ort.InferenceSession(str(path), opts, providers=["CPUExecutionProvider"])
+        avail = ort.get_available_providers()
+        wanted = [p for p in GPU_PROVIDERS if p in avail] + ["CPUExecutionProvider"]
+        self.sess = ort.InferenceSession(str(path), opts, providers=wanted)
+        self.provider = GPU_PROVIDERS.get(self.sess.get_providers()[0], "CPU")
         inp = self.meta["input"]
         self.size = int(inp["shape"][2])
         self.mean = np.array(inp["mean"], dtype=np.float32).reshape(3, 1, 1)
@@ -201,7 +207,8 @@ class AI:
             return
         try:
             self.model = Model(folders[-1])
-            log.info("AI: loaded model %s (%s)", self.model.tag, ", ".join(self.model.labels))
+            log.info("AI: loaded model %s on %s (%s)", self.model.tag, self.model.provider,
+                     ", ".join(self.model.labels))
         except ImportError:
             self.error = "onnxruntime/numpy/Pillow not installed - run the installer (AI detection)"
             log.warning("AI: %s", self.error)
@@ -212,7 +219,8 @@ class AI:
     def info(self) -> dict:
         m = self.model
         return {"enabled": enabled(), "loaded": bool(m), "error": self.error,
-                "tag": m.tag if m else None, "labels": m.labels if m else [],
+                "tag": m.tag if m else None, "provider": m.provider if m else None,
+                "labels": m.labels if m else [],
                 "kinds": m.kinds if m else {}, "default_threshold": m.meta.get("default_threshold") if m else None}
 
     def settings(self) -> dict:
@@ -365,12 +373,17 @@ class AI:
         box = await self._locate(pid, crop_img, region, top, score)
         st = self.state.setdefault(pid, {})
         st.update(scores=scores, top=top, score=score, box=box, at=time.time())
+        hist = st.setdefault("history", [])
+        hist.append([round(st["at"]), score, top or "", 0])
+        if len(hist) > HISTORY_MAX:
+            del hist[:len(hist) - HISTORY_MAX]
         st["streak"] = st.get("streak", 0) + 1 if score >= float(s["ai_threshold"]) else 0
         if not st["streak"]:
             st["prompted"] = False
         cooled = time.time() - (st.get("alerted_at") or 0) >= float(s["ai_cooldown"]) * 60
         if st["streak"] >= int(s["ai_hold"]) and cooled:
             st["alerted_at"], st["streak"], st["prompted"] = time.time(), 0, True
+            hist[-1][3] = 1
             mode = self.mode_of(pid)
             log.info("AI: printer %s %s %.0f%% for %s checks -> %s", pid, top, score * 100, s["ai_hold"], mode)
             if mode != "off":

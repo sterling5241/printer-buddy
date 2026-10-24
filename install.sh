@@ -651,7 +651,7 @@ bambu_add() {
   [ -n "$host" ] || { echo "  Nothing added."; return 1; }
   read -r -p "  Serial number: " serial </dev/tty || true
   serial="$(tr -d '[:space:]' <<<"${serial^^}")"
-  [ ${#serial} -ge 10 ] || { echo "  That doesn't look like a serial number. Nothing added."; return 1; }
+  [[ "$serial" =~ ^[A-Z0-9]{8,}$ ]] || { echo "  That doesn't look like a serial number. Nothing added."; return 1; }
   read -r -p "  Access code: " code </dev/tty || true
   code="$(tr -d '[:space:]' <<<"$code")"
   [ -n "$code" ] || { echo "  Nothing added."; return 1; }

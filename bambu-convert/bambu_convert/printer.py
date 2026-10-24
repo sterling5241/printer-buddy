@@ -10,13 +10,28 @@ from .mqtt import MQTT
 
 log = logging.getLogger("bambu.printer")
 
-# serial prefix -> (model, bed x, bed y, max z, chamber sensor)
+# printer_type -> (name, bed x, bed y, max z, nozzles, chamber sensor, aux fan, chamber fan, bed max temp)
+# TODO: bed sizes of X2D / A2L / H2C / H2S need checking
 MODELS = {
-    "00M": ("X1 Carbon", 256, 256, 256, True), "00W": ("X1", 256, 256, 256, True), "03W": ("X1E", 256, 256, 256, True),
-    "01S": ("P1P", 256, 256, 256, False), "01P": ("P1S", 256, 256, 256, False),
-    "030": ("A1 mini", 180, 180, 180, False), "039": ("A1", 256, 256, 256, False),
-    "094": ("H2D", 325, 320, 325, True),
+    "BL-P001": ("X1 Carbon", 256, 256, 256, 1, True, True, True, 100),
+    "BL-P002": ("X1", 256, 256, 256, 1, True, True, True, 100),
+    "C13": ("X1E", 256, 256, 256, 1, True, True, True, 110),
+    "C11": ("P1P", 256, 256, 256, 1, False, True, True, 100),
+    "C12": ("P1S", 256, 256, 256, 1, False, True, True, 100),
+    "N1": ("A1 mini", 180, 180, 180, 1, False, False, False, 80),
+    "N2S": ("A1", 256, 256, 256, 1, False, False, False, 100),
+    "N6": ("X2D", 256, 256, 256, 2, True, True, True, 100),
+    "N7": ("P2S", 256, 256, 256, 1, True, True, True, 100),
+    "N9": ("A2L", 256, 256, 256, 1, False, False, False, 80),
+    "O1C": ("H2C", 325, 320, 325, 2, True, True, True, 100),
+    "O1C2": ("H2C", 325, 320, 325, 2, True, True, True, 100),
+    "O1D": ("H2D", 325, 320, 325, 2, True, True, True, 100),
+    "O1E": ("H2D Pro", 325, 320, 325, 2, True, True, True, 100),
+    "O1S": ("H2S", 340, 320, 340, 1, True, True, True, 100),
 }
+SERIALS = {"00M": "BL-P001", "00W": "BL-P002", "03W": "C13", "01S": "C11", "01P": "C12", "030": "N1", "039": "N2S",
+           "094": "O1D"}
+UNKNOWN = ("Bambu Lab", 256, 256, 256, 1, True, True, True, 100)
 STATES = {"IDLE": "standby", "PREPARE": "printing", "SLICING": "printing", "RUNNING": "printing",
           "PAUSE": "paused", "FINISH": "complete", "FAILED": "error"}
 CANCELLED = 50348044
@@ -44,8 +59,6 @@ class Bambu:
     def __init__(self, cfg: dict):
         self.name = cfg.get("name") or "Bambu"
         self.host, self.serial, self.code = cfg["host"], cfg["serial"].strip().upper(), str(cfg["access_code"]).strip()
-        model = MODELS.get(self.serial[:3], ("Bambu Lab", 256, 256, 256, True))
-        self.model, self.size, self.has_chamber = model[0], model[1:4], model[4]
         self.report: dict = {}
         self.connected = False
         self.error: str | None = None
@@ -63,6 +76,40 @@ class Bambu:
         self._paused_total = 0.0
         self._last_state = "standby"
         self.job_ended: tuple | None = None
+        self._ended: str | None = None
+
+    @property
+    def spec(self) -> tuple:
+        return MODELS.get(str(self.report.get("printer_type") or SERIALS.get(self.serial[:3], "")), UNKNOWN)
+
+    @property
+    def model(self) -> str:
+        return self.spec[0]
+
+    @property
+    def new_protocol(self) -> bool:
+        return bool(((self.report.get("device") or {}).get("extruder") or {}).get("info"))
+
+    def nozzles(self) -> list[tuple[float, float]]:
+        """[(temperature, target)] per nozzle; newer printers pack each as target << 16 | current."""
+        info = ((self.report.get("device") or {}).get("extruder") or {}).get("info")
+        if info:
+            out = []
+            for n in sorted(info, key=lambda n: n.get("id", 0)):
+                t = int(_num(n.get("temp")))
+                out.append((float(t & 0xFFFF), float(t >> 16)))
+            return out
+        return [(_num(self.report.get("nozzle_temper")), _num(self.report.get("nozzle_target_temper")))]
+
+    def active_nozzle(self) -> int:
+        state = ((self.report.get("device") or {}).get("extruder") or {}).get("state")
+        return (int(_num(state)) >> 4) & 15 if state is not None else 0
+
+    def chamber(self) -> float | None:
+        ctc = (((self.report.get("device") or {}).get("ctc") or {}).get("info") or {}).get("temp")
+        if ctc is not None:
+            return float(int(_num(ctc)) & 0xFFFF)
+        return _num(self.report.get("chamber_temper")) if self.spec[5] and "chamber_temper" in self.report else None
 
     # -------------------------------------------------------------- connection
 
@@ -122,8 +169,8 @@ class Bambu:
         p = msg.get("print")
         if isinstance(p, dict):
             if p.get("result") in ("fail", "failed") and p.get("command") != "push_status":
-                self._gcode(f"!! Printer refused {p.get('command')}: {p.get('reason') or p.get('result')}"
-                            " (turn on LAN only + Developer mode on the printer)")
+                self._gcode(f"!! Printer refused {p.get('command')}: {p.get('reason')}" if p.get("reason") else
+                            f"!! Printer refused {p.get('command')} (turn on LAN only + Developer mode on the printer)")
             if p.get("command") in (None, "push_status"):
                 _merge(self.report, p)
                 ipcam = (self.report.get("ipcam") or {}).get("rtsp_url") or ""
@@ -150,10 +197,13 @@ class Bambu:
         s = STATES.get(str(self.report.get("gcode_state", "IDLE")).upper(), "standby")
         if s == "error" and int(_num(self.report.get("print_error"))) == CANCELLED:
             return "cancelled"
-        return s
+        # a stopped print drops straight to IDLE; Klipper keeps showing the end state until the next print
+        return self._ended if s == "standby" and self._ended else s
 
     def _track_job(self):
         s, now = self.state(), time.time()
+        if s in ("printing", "paused"):
+            self._ended = None
         if s in ("printing", "paused") and self._job_started is None:
             elapsed = 0.0
             remaining = _num(self.report.get("mc_remaining_time")) * 60
@@ -167,9 +217,14 @@ class Bambu:
             self._paused_total += now - self._paused_at
             self._paused_at = None
         if s not in ("printing", "paused") and self._last_state in ("printing", "paused"):
-            self.job_ended = (self.filename(), self.print_duration(), s)
+            end = "cancelled" if s == "standby" else s
+            self.job_ended = (self.filename(), self.print_duration(), end)
+            self._ended = end
             self._job_started = None
         self._last_state = s
+
+    def job_start(self) -> float | None:
+        return self._job_started
 
     def print_duration(self) -> float:
         if self._job_started is None:
@@ -191,17 +246,19 @@ class Bambu:
         r, s = self.report, self.state()
         pct = _num(r.get("mc_percent")) / 100
         printing = s in ("printing", "paused")
-        nozzle, nozzle_t = _num(r.get("nozzle_temper")), _num(r.get("nozzle_target_temper"))
         bed, bed_t = _num(r.get("bed_temper")), _num(r.get("bed_target_temper"))
-        x, y, z = self.size
+        name, x, y, z, _, _, aux, chamber_fan, _ = self.spec
+        nozzles = self.nozzles()
+        names = ["extruder"] + [f"extruder{i}" for i in range(1, len(nozzles))]
+        chamber = self.chamber()
         speed = SPEEDS.get(int(_num(r.get("spd_lvl"), 2)), 100) / 100
         fw = next((m.get("sw_ver") for m in r.get("_modules", []) if m.get("name") == "ota"), "") or ""
         layer, layers = int(_num(r.get("layer_num"))), int(_num(r.get("total_layer_num")))
         message = ""
         if s == "error":
             message = f"print failed (error {int(_num(r.get('print_error'))):08X})"
-        heaters = ["extruder", "heater_bed"]
-        sensors = heaters + (["temperature_sensor Chamber"] if self.has_chamber else [])
+        heaters = names + ["heater_bed"]
+        sensors = heaters + (["temperature_sensor Chamber"] if chamber is not None else [])
         o = {
             "webhooks": {"state": "ready" if self.connected else "shutdown",
                          "state_message": "Printer is ready" if self.connected else f"Bambu printer not reachable: {self.error}"},
@@ -215,15 +272,14 @@ class Bambu:
             "idle_timeout": {"state": "Printing" if s == "printing" else "Ready" if printing else "Idle",
                              "printing_time": self.print_duration()},
             "pause_resume": {"is_paused": s == "paused"},
-            "extruder": {"temperature": nozzle, "target": nozzle_t, "power": 1.0 if nozzle_t > nozzle + 2 else 0.0,
-                         "can_extrude": nozzle >= 170, "pressure_advance": 0.0, "smooth_time": 0.04},
             "heater_bed": {"temperature": bed, "target": bed_t, "power": 1.0 if bed_t > bed + 2 else 0.0},
             "heaters": {"available_heaters": heaters, "available_sensors": sensors, "available_monitors": []},
             "gcode_move": {"speed_factor": speed, "extrude_factor": 1.0, "homing_origin": [0.0, 0.0, 0.0, 0.0],
                            "position": [0.0, 0.0, 0.0, 0.0], "gcode_position": [0.0, 0.0, 0.0, 0.0],
                            "absolute_coordinates": True, "absolute_extrude": True, "speed": 0.0},
             "toolhead": {"homed_axes": "", "position": [0.0, 0.0, 0.0, 0.0], "axis_minimum": [0.0, 0.0, 0.0, 0.0],
-                         "axis_maximum": [float(x), float(y), float(z), 0.0], "extruder": "extruder",
+                         "axis_maximum": [float(x), float(y), float(z), 0.0],
+                         "extruder": names[min(self.active_nozzle(), len(names) - 1)],
                          "max_velocity": 500.0, "max_accel": 20000.0, "square_corner_velocity": 5.0,
                          "minimum_cruise_ratio": 0.5, "max_accel_to_decel": 10000.0, "print_time": 0.0,
                          "estimated_print_time": 0.0, "stalls": 0},
@@ -236,29 +292,40 @@ class Bambu:
             "configfile": {"warnings": [], "save_config_pending": False, "save_config_pending_items": {},
                            "settings": self._settings(), "config": {}},
         }
-        if self.has_chamber:
-            c = _num(r.get("chamber_temper"))
-            o["temperature_sensor Chamber"] = {"temperature": c, "measured_min_temp": c, "measured_max_temp": c}
-        for name, (field, _) in FANS.items():
-            if field in r:
-                o[name] = {"speed": round(_num(r.get(field)) / 15, 2), "rpm": None}
-        # TODO: second nozzle on H2D (extruder1) once its report format is checked on a real printer
+        for n, (temp, target) in zip(names, nozzles):
+            o[n] = {"temperature": temp, "target": target, "power": 1.0 if target > temp + 2 else 0.0,
+                    "can_extrude": temp >= 170, "pressure_advance": 0.0, "smooth_time": 0.04}
+        if chamber is not None:
+            o["temperature_sensor Chamber"] = {"temperature": chamber, "measured_min_temp": chamber,
+                                               "measured_max_temp": chamber}
+        gear = int(_num(r.get("fan_gear"), -1))
+        for fan, (field, idx) in FANS.items():
+            if (idx == 2 and not aux) or (idx == 3 and not chamber_fan):
+                continue
+            if gear >= 0 and idx:
+                o[fan] = {"speed": round(((gear >> (8 * (idx - 1))) & 255) / 255, 2), "rpm": None}
+            elif field in r:
+                o[fan] = {"speed": round(_num(r.get(field)) / 15, 2), "rpm": None}
         return o
 
     def _settings(self) -> dict:
-        x, y, z = self.size
-        return {
-            "printer": {"kinematics": "corexy" if not self.model.startswith("A1") else "cartesian",
+        name, x, y, z, count, _, _, _, bed_max = self.spec
+        nozzle = {"min_temp": 0, "max_temp": 300, "min_extrude_temp": 170, "nozzle_diameter": 0.4,
+                  "filament_diameter": 1.75}
+        out = {
+            "printer": {"kinematics": "cartesian" if name.startswith(("A1", "A2")) else "corexy",
                         "max_velocity": 500, "max_accel": 20000},
-            "extruder": {"min_temp": 0, "max_temp": 300, "min_extrude_temp": 170, "nozzle_diameter": 0.4,
-                         "filament_diameter": 1.75},
-            "heater_bed": {"min_temp": 0, "max_temp": 120},
+            "extruder": dict(nozzle),
+            "heater_bed": {"min_temp": 0, "max_temp": bed_max},
             "stepper_x": {"position_min": 0, "position_max": x}, "stepper_y": {"position_min": 0, "position_max": y},
             "stepper_z": {"position_min": 0, "position_max": z},
             "virtual_sdcard": {"path": "/sdcard"}, "pause_resume": {}, "display_status": {},
             "output_pin chamber_light": {"pwm": False},
             "fan": {}, "fan_generic aux": {}, "fan_generic chamber": {}, "heater_fan hotend": {},
         }
+        for i in range(1, max(count, len(self.nozzles()))):
+            out[f"extruder{i}"] = dict(nozzle)
+        return out
 
     # -------------------------------------------------------------- commands
 
@@ -278,6 +345,13 @@ class Bambu:
     async def speed(self, percent: float):
         level = min(SPEEDS, key=lambda k: abs(SPEEDS[k] - percent))
         await self._send({"print": {"command": "print_speed", "param": str(level)}})
+
+    async def nozzle_temp(self, index: int, target: float):
+        if self.new_protocol:
+            await self._send({"print": {"command": "set_nozzle_temp", "extruder_index": index,
+                                        "target_temp": int(target)}})
+        else:
+            await self.gcode(f"M104 S{target:g}")
 
     async def gcode(self, line: str):
         await self._send({"print": {"command": "gcode_line", "param": line.rstrip("\n") + "\n"}})

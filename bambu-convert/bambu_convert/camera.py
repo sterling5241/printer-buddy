@@ -88,6 +88,8 @@ class Camera:
             while time.monotonic() - self._wanted < IDLE_STOP:
                 head = await asyncio.wait_for(r.readexactly(16), 15)
                 size = struct.unpack("<I", head[:4])[0]
+                if size > 4_000_000:
+                    raise ConnectionError("camera refused the access code")
                 data = await asyncio.wait_for(r.readexactly(size), 15)
                 if data[:2] == b"\xff\xd8" and data[-2:] == b"\xff\xd9":
                     await self._publish(data)
@@ -100,14 +102,16 @@ class Camera:
             raise RuntimeError("ffmpeg is needed for this printer's camera (RTSP)")
         url = self.rtsp_url.replace("rtsps://", f"rtsps://bblp:{self.code}@", 1)
         proc = await asyncio.create_subprocess_exec(
-            ffmpeg, "-loglevel", "error", "-rtsp_transport", "tcp", "-i", url, "-an", "-r", "5", "-q:v", "5",
-            "-f", "image2pipe", "-vcodec", "mjpeg", "-", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+            ffmpeg, "-loglevel", "error", "-tls_verify", "0", "-rtsp_transport", "tcp", "-i", url, "-an", "-r", "5",
+            "-q:v", "5", "-f", "image2pipe", "-vcodec", "mjpeg", "-",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         buf = b""
         try:
             while time.monotonic() - self._wanted < IDLE_STOP:
                 chunk = await asyncio.wait_for(proc.stdout.read(65536), 15)
                 if not chunk:
-                    break
+                    err = (await proc.stderr.read()).decode(errors="replace").strip().splitlines()
+                    raise RuntimeError(f"ffmpeg: {err[-1] if err else 'stream ended'}")
                 buf += chunk
                 while (end := buf.find(b"\xff\xd9")) != -1:
                     start = buf.find(b"\xff\xd8")

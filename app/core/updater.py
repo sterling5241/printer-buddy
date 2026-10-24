@@ -214,6 +214,11 @@ def pip() -> bool:
     return run(VENV / "pip", "install", "-q", "-r", ROOT / "requirements.txt")
 
 
+def nvidia_gpu() -> bool:
+    exe = shutil.which("nvidia-smi")
+    return bool(exe) and subprocess.run([exe], capture_output=True).returncode == 0
+
+
 def ensure_ai() -> bool:
     kind = env("PB_AI")
     if kind == "off" or not (VENV / "pip").exists():
@@ -221,8 +226,13 @@ def ensure_ai() -> bool:
     if platform.machine() not in ("aarch64", "arm64", "x86_64", "amd64"):
         say(f"AI detection needs a 64-bit system (this one is {platform.machine()}). Skipping AI; everything else works.")
         return True
-    say("Installing AI libraries...")
-    if not run(VENV / "pip", "install", "-q", "-r", ROOT / "requirements-ai.txt"):
+    gpu = kind == "heavy" and nvidia_gpu()
+    say("Installing AI libraries..." + (" (NVIDIA GPU found)" if gpu else ""))
+    if gpu:
+        # onnxruntime and onnxruntime-gpu can't be installed together
+        run(VENV / "pip", "uninstall", "-q", "-y", "onnxruntime")
+    reqs = "requirements-ai-gpu.txt" if gpu else "requirements-ai.txt"
+    if not run(VENV / "pip", "install", "-q", "-r", ROOT / reqs):
         say("Couldn't install the AI libraries. Skipping AI; everything else works.")
         return True
     (ROOT / "data" / "ai").mkdir(parents=True, exist_ok=True)

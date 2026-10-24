@@ -1,0 +1,4 @@
+# AI detection on an NVIDIA GPU. The updater picks this file by itself for PB_AI=heavy when nvidia-smi works.
+onnxruntime-gpu>=1.17
+numpy>=1.24
+Pillow>=10.0

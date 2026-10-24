@@ -1,3 +1,4 @@
+import calendar
 import ftplib
 import io
 import posixpath
@@ -56,7 +57,7 @@ class Files:
                 if name in (".", "..") or not name:
                     continue
                 mod = facts.get("modify")
-                ts = time.mktime(time.strptime(mod[:14], "%Y%m%d%H%M%S")) if mod else 0.0
+                ts = float(calendar.timegm(time.strptime(mod[:14], "%Y%m%d%H%M%S"))) if mod else 0.0
                 item = {"name": name, "modified": ts, "size": int(facts.get("size", 0) or 0)}
                 (dirs if facts.get("type") == "dir" else files).append(item)
         return dirs, files

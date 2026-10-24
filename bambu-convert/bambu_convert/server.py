@@ -174,7 +174,7 @@ class Bridge:
                 self.history["next"] += 1
                 job = {"job_id": jid, "exists": True, "end_time": None, "filament_used": 0.0,
                        "filename": self.p.filename(), "metadata": self.meta.get(self.p.filename(), {}).get("meta", {}),
-                       "print_duration": 0.0, "status": "in_progress", "start_time": time.time(),
+                       "print_duration": 0.0, "status": "in_progress", "start_time": self.p.job_start() or time.time(),
                        "total_duration": 0.0, "user": None, "auxiliary_data": []}
                 jobs.append(job)
                 del jobs[:-1000]
@@ -342,9 +342,12 @@ class Bridge:
             elif cmd == "SET_HEATER_TEMPERATURE":
                 heater = args.get("HEATER", "").lower()
                 target = float(args.get("TARGET") or 0)
-                if heater not in ("extruder", "heater_bed"):
+                if heater == "heater_bed":
+                    await self.p.gcode(f"M140 S{target:g}")
+                elif re.fullmatch(r"extruder\d*", heater):
+                    await self.p.nozzle_temp(int(heater[8:] or 0), target)
+                else:
                     raise RPCError(400, f"unknown heater {heater}")
-                await self.p.gcode(f"{'M104' if heater == 'extruder' else 'M140'} S{target:g}")
             elif cmd == "M220":
                 m = re.search(r"S(\d+)", line, re.I)
                 await self.p.speed(float(m.group(1)) if m else 100)
@@ -383,7 +386,7 @@ class Bridge:
         if method == "printer.info":
             return {"state": "ready" if p.connected else "startup",
                     "state_message": "Printer is ready" if p.connected else f"Bambu printer not reachable: {p.error}",
-                    "hostname": p.host, "software_version": f"Bambu Lab {p.model}", "cpu_info": p.model,
+                    "hostname": p.name, "software_version": f"Bambu Lab {p.model}", "cpu_info": p.model,
                     "klipper_path": "", "python_path": "", "log_file": "", "config_file": "", "app": "Klipper"}
         if method == "server.connection.identify":
             return {"connection_id": client.id}
@@ -430,14 +433,26 @@ class Bridge:
             return [{"name": "gcodes", "path": "/sdcard", "permissions": "rw"},
                     {"name": "config", "path": "/config", "permissions": "r"}]
         if method == "server.files.list":
-            return await self.list_files() if params.get("root", "gcodes") == "gcodes" else []
+            if params.get("root", "gcodes") != "gcodes":
+                return []
+            try:
+                return await self.list_files()
+            except RPCError as e:
+                log.warning("%s: %s", p.name, e)
+                return []
         if method == "server.files.get_directory":
             path = str(params.get("path") or "gcodes").strip("/")
             if path.split("/")[0] != "gcodes":
                 return {"dirs": [], "files": [], "disk_usage": {"total": 0, "used": 0, "free": 0},
                         "root_info": {"name": path.split("/")[0], "permissions": "r"}}
             _, rest = self._split(path)
-            dirs, files = await self._ftp(p.files.listdir, "/" + rest)
+            try:
+                dirs, files = await self._ftp(p.files.listdir, "/" + rest)
+            except RPCError as e:
+                if rest:
+                    raise
+                log.warning("%s: %s", p.name, e)
+                dirs, files = [], []
             sd = p.report.get("sdcard")
             return {"dirs": [{"dirname": d["name"], "modified": d["modified"], "size": 0, "permissions": "rw"}
                              for d in dirs if not d["name"].startswith(".")],
@@ -515,6 +530,18 @@ class Bridge:
             return {"username": "_TRUSTED_USER_", "source": "moonraker", "created_on": 0, "groups": ["admin"]}
         if method == "server.job_queue.status":
             return {"queued_jobs": [], "queue_state": "ready"}
+        if method == "access.users.list":
+            return {"users": [{"username": "_TRUSTED_USER_", "source": "moonraker", "created_on": 0}]}
+        if method == "access.get_api_key":
+            return "bambu"
+        if method == "server.announcements.dismiss":
+            return {"entry_id": params.get("entry_id")}
+        if method == "server.logs.rollover":
+            return {"rolled_over": [], "failed": {}}
+        if method == "machine.device_power.status":
+            return {}
+        if method in ("machine.services.restart", "machine.services.start", "machine.services.stop"):
+            return "ok"
         raise RPCError(404, f"Method not found: {method}")
 
     def _database(self, action: str, params: dict):
