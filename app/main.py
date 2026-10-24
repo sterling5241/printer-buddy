@@ -583,6 +583,22 @@ async def ai_overlay(request: Request):
     return JSONResponse({"box_mode": manager.ai.box_mode(pid)})
 
 
+async def ai_area(request: Request):
+    pid = _pid(request)
+    if pid is None:
+        return err("not found", 404)
+    area = (await body(request)).get("area")
+    if area is not None:
+        try:
+            area = [min(1., max(0., float(v))) for v in area]
+        except (TypeError, ValueError):
+            area = []
+        if len(area) != 4 or area[2] - area[0] < 0.05 or area[3] - area[1] < 0.05:
+            return err("area must be [x0, y0, x1, y1] between 0 and 1, or null", 400)
+    manager.ai.set_area(pid, area)
+    return JSONResponse({"area": manager.ai.area(pid)})
+
+
 async def ai_photos(request: Request):
     out = manager.collect.summary()
     for it in out["items"]:
@@ -1329,6 +1345,7 @@ _app = Starlette(routes=[
     Route("/api/printers/{pid:int}/ai/check", ai_check, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/save", ai_save, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/overlay", ai_overlay, methods=["POST"]),
+    Route("/api/printers/{pid:int}/ai/area", ai_area, methods=["POST"]),
     Route("/api/ai/photos", ai_photos),
     Route("/api/ai/photos/{iid}.jpg", ai_photo_image),
     Route("/api/ai/photos/{iid}", ai_photo_label, methods=["POST"]),
