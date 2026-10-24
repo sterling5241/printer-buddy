@@ -49,6 +49,8 @@ class Store:
                 self.db.execute("ALTER TABLE printers ADD COLUMN ai TEXT")
             if "aibox" not in cols:
                 self.db.execute("ALTER TABLE printers ADD COLUMN aibox TEXT")
+            if "aiarea" not in cols:
+                self.db.execute("ALTER TABLE printers ADD COLUMN aiarea TEXT")
 
     def list(self) -> list[dict]:
         return [dict(r) for r in self.db.execute("SELECT * FROM printers ORDER BY id")]
@@ -69,7 +71,7 @@ class Store:
         return self.get(cur.lastrowid)
 
     def update(self, pid: int, **fields):
-        allowed = {k: v for k, v in fields.items() if k in ("name", "api_key", "grp", "position", "cam", "notify", "ai", "aibox")}
+        allowed = {k: v for k, v in fields.items() if k in ("name", "api_key", "grp", "position", "cam", "notify", "ai", "aibox", "aiarea")}
         if not allowed:
             return
         sets = ", ".join(f"{k}=?" for k in allowed)

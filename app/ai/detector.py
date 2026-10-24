@@ -124,6 +124,7 @@ LOCATE_MIN_DROP = 0.5    # log-odds the best patch must take off the score (90% 
 LOCATE_MAX_AREA = 0.6
 BOX_MODES = ("always", "failure", "off")
 DEFAULT_BOX = "failure"
+AREA_MARGIN = 0.05
 
 
 def _to_camera(box, flip_h, flip_v, rotation):
@@ -142,6 +143,16 @@ def _to_camera(box, flip_h, flip_v, rotation):
         return u, v
     (ax, ay), (bx, by) = back(box[0], box[1]), back(box[2], box[3])
     return [round(float(v), 4) for v in (min(ax, bx), min(ay, by), max(ax, bx), max(ay, by))]
+
+
+def crop(jpeg: bytes, area: list[float]) -> bytes:
+    from PIL import Image
+    im = Image.open(io.BytesIO(jpeg)).convert("RGB")
+    w, h = im.size
+    im = im.crop((round(area[0] * w), round(area[1] * h), round(area[2] * w), round(area[3] * h)))
+    out = io.BytesIO()
+    im.save(out, "JPEG", quality=92)
+    return out.getvalue()
 
 
 def draw_box(jpeg: bytes, box: list[float], text: str) -> bytes:
@@ -176,6 +187,7 @@ class AI:
         self.tasks: dict[int, asyncio.Task] = {}
         self.state: dict[int, dict] = {}
         self.box: dict[int, str] = {}
+        self.areas: dict[int, list | None] = {}
 
     def load(self):
         self.model, self.error = None, None
@@ -215,6 +227,7 @@ class AI:
                 "score": st.get("score"), "top": st.get("top"), "scores": st.get("scores"), "box": st.get("box"),
                 "at": st.get("at"), "streak": st.get("streak", 0), "alerted_at": st.get("alerted_at"),
                 "fast": st.get("streak", 0) > 0 and not st.get("prompted"), "box_mode": self.box_mode(pid),
+                "area": self.area(pid),
                 "alert_item": st.get("alert_item")}
 
     def on_change(self, pid: int, prev: dict, v: dict):
@@ -252,23 +265,42 @@ class AI:
         img = await self.snapshot(pid)
         if not img:
             raise RuntimeError("Couldn't get a picture from this printer's camera")
+        img, region = await self._crop(pid, img)
         scores = await asyncio.to_thread(m.score, img, *self.transform(pid))
         alerts = {l: v for l, v in scores.items() if m.kinds.get(l) == "alert"}
         top = max(alerts, key=alerts.get) if alerts else None
         score = alerts.get(top, 0.0)
-        box = await self._locate(pid, img, top, score)
+        box = await self._locate(pid, img, region, top, score)
         return {"scores": scores, "top": top, "score": score, "box": box, "at": time.time()}
 
-    async def _locate(self, pid: int, img: bytes, top: str | None, score: float) -> list[float] | None:
+    async def _crop(self, pid: int, img: bytes) -> tuple[bytes, list[float] | None]:
+        a = self.area(pid)
+        if not a:
+            return img, None
+        region = [max(0., a[0] - AREA_MARGIN), max(0., a[1] - AREA_MARGIN),
+                  min(1., a[2] + AREA_MARGIN), min(1., a[3] + AREA_MARGIN)]
+        try:
+            return await asyncio.to_thread(crop, img, region), region
+        except Exception as e:
+            log.info("AI: couldn't crop printer %s snapshot: %s", pid, e)
+            return img, None
+
+    async def _locate(self, pid: int, img: bytes, region: list[float] | None, top: str | None,
+                      score: float) -> list[float] | None:
         mode = self.box_mode(pid)
         force = mode == "always"
         if not top or mode == "off" or (score < float(self.settings()["ai_threshold"]) and not force):
             return None
         try:
-            return await asyncio.to_thread(self.model.locate, img, top, *self.transform(pid), force)
+            box = await asyncio.to_thread(self.model.locate, img, top, *self.transform(pid), force)
         except Exception as e:
             log.info("AI: couldn't locate %s on printer %s: %s", top, pid, e)
             return None
+        if not box or not region:
+            return box
+        w, h = region[2] - region[0], region[3] - region[1]
+        return [round(region[0] + box[0] * w, 4), round(region[1] + box[1] * h, 4),
+                round(region[0] + box[2] * w, 4), round(region[1] + box[3] * h, 4)]
 
     async def _watch(self, pid: int):
         try:
@@ -295,6 +327,17 @@ class AI:
         self.box[pid] = mode
         self.on_update(pid)
 
+    def area(self, pid: int) -> list[float] | None:
+        if pid not in self.areas:
+            a = (self.store.get(pid) or {}).get("aiarea")
+            self.areas[pid] = json.loads(a) if a else None
+        return self.areas[pid]
+
+    def set_area(self, pid: int, area: list[float] | None):
+        self.store.update(pid, aiarea=json.dumps(area) if area else None)
+        self.areas[pid] = area
+        self.on_update(pid)
+
     def next_interval(self, pid: int, s: dict) -> float:
         """Seconds to the next check: SUSPECT_SPEEDUP sooner while a failure is building
         towards an alert (the streak has started), so it prompts sooner. Once it has prompted,
@@ -310,15 +353,16 @@ class AI:
         img = await self.snapshot(pid)
         if not m or not img:
             return
+        crop_img, region = await self._crop(pid, img)
         try:
-            scores = await asyncio.to_thread(m.score, img, *self.transform(pid))
+            scores = await asyncio.to_thread(m.score, crop_img, *self.transform(pid))
         except Exception as e:
             log.info("AI: couldn't score printer %s snapshot: %s", pid, e)
             return
         alerts = {l: v for l, v in scores.items() if m.kinds.get(l) == "alert"}
         top = max(alerts, key=alerts.get) if alerts else None
         score = alerts.get(top, 0.0)
-        box = await self._locate(pid, img, top, score)
+        box = await self._locate(pid, crop_img, region, top, score)
         st = self.state.setdefault(pid, {})
         st.update(scores=scores, top=top, score=score, box=box, at=time.time())
         st["streak"] = st.get("streak", 0) + 1 if score >= float(s["ai_threshold"]) else 0
