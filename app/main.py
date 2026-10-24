@@ -1234,13 +1234,13 @@ async def test_notification(request: Request):
 
 
 SETUP = {
-    "ui": ("PB_UI", ("basic", "advanced")),
+    "ui": ("PB_UI", ("advanced",)),
     "ai": ("PB_AI", ("off", "basic", "heavy")),
     "video": ("PB_VIDEO", ("snapshots", "live", "timelapse")),
     "notify": ("PB_NOTIFY", ("basic", "advanced")),
     "remote": ("PB_REMOTE", ("off", "on")),
 }
-BUILT = {"ui.basic", "ui.advanced", "ai.off", "ai.basic", "ai.heavy", "video.snapshots", "notify.basic", "notify.advanced", "video.live", "video.timelapse", "remote.off", "remote.on"}
+BUILT = {"ui.advanced", "ai.off", "ai.basic", "ai.heavy", "video.snapshots", "notify.basic", "notify.advanced", "video.live", "video.timelapse", "remote.off", "remote.on"}
 
 
 def setup() -> dict:

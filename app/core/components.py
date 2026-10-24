@@ -20,7 +20,7 @@ UPDATER = ROOT / "app" / "core" / "updater.py"
 UPDATES_URL = "https://github.com/sterling5241/printer-buddy/releases/download/updates/updates.txt"
 # part -> (env var holding its tier, tiers, file or folder it installs)
 PARTS = {
-    "ui": ("PB_UI", ("basic", "advanced"), ROOT / "ui"),
+    "ui": ("PB_UI", ("advanced",), ROOT / "ui"),
     "notify": ("PB_NOTIFY", ("basic", "advanced"), ROOT / "app" / "core" / "notify.py"),
     "timelapse": (None, (), ROOT / "app" / "media" / "timelapse.py"),
     "streamer": ("PB_STREAM", ("off", "light", "basic", "full"), ROOT / "streamer"),

@@ -13,6 +13,7 @@ BACKUP_DIR="$DIR/backups"
 ASVC="$(getent passwd "$RUN_USER" | cut -d: -f6)/printer_data/moonraker.asvc"
 HELPER=/usr/local/lib/printer-buddy/root.sh
 UPDATER="$DIR/app/core/updater.py"
+PRINTER_STREAMER=https://raw.githubusercontent.com/sterling5241/print-buddy-streamer/main/install-printer.sh
 PORT_GIVEN=""
 INTERACTIVE=0
 
@@ -46,7 +47,7 @@ declare -A DESC=(
   [channel.stable]="tested releases (v1.x)"
   [channel.nightly]="newest builds, may have bugs"
 )
-BUILT=" ui.basic ui.advanced ai.off ai.basic ai.heavy video.snapshots notify.basic notify.advanced video.live video.timelapse remote.off remote.on stream.off stream.light stream.basic stream.full channel.stable channel.nightly "
+BUILT=" ui.advanced ai.off ai.basic ai.heavy video.snapshots notify.basic notify.advanced video.live video.timelapse remote.off remote.on stream.off stream.light stream.basic stream.full channel.stable channel.nightly "
 
 W=55
 hr()    { printf '|%s|\n' "$(printf '%*s' $((W + 2)) '' | tr ' ' '-')"; }
@@ -67,8 +68,10 @@ set_env() {
 built() { case "$BUILT" in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 part_value() {
   local key var name choices; IFS='|' read -r key var name choices <<<"$1"
-  local v; v="$(get_env "$var")"
-  case " $choices " in *" $v "*) echo "$v" ;; *) echo "${choices%% *}" ;; esac
+  local v c; v="$(get_env "$var")"
+  case " $choices " in *" $v "*) built "$key.$v" && { echo "$v"; return; } ;; esac
+  for c in $choices; do built "$key.$c" && { echo "$c"; return; }; done
+  echo "${choices%% *}"
 }
 
 installed() { [ -f "$UNIT_FILE" ]; }
@@ -161,16 +164,14 @@ change_port() {
   if installed; then hard_restart && echo "Printer Buddy is now at $(url)"; fi
   if [ -n "$(get_env PB_TUNNEL_KEY)" ]; then
     echo "Updating your share-link tunnel to the new port..."
-    tunnel_call POST >/dev/null && echo "Tunnel updated." || echo "Couldn't update the tunnel; try Remote access > 1) Set up automatically."
+    tunnel_call POST >/dev/null && echo "Tunnel updated." || echo "Couldn't update the tunnel; turn Remote access off and on again in Change setup."
   elif [ "$(tunnel_state)" != "not set up" ]; then
-    echo "Your share-link tunnel still points at the old port. Run Remote access > 1) Set up automatically to update it."
+    echo "Your share-link tunnel still points at the old port. Turn Remote access off and on again in Change setup to update it."
   fi
 }
 
 UPDATE_INFO=""
-NEED_LOGIN=0
 check_updates() {
-  NEED_LOGIN=0
   git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1 || { UPDATE_INFO=""; return; }
   local out
   if out=$(GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true timeout 15 git -C "$DIR" fetch -q 2>&1); then
@@ -179,33 +180,13 @@ check_updates() {
     elif [ "$behind" = "0" ]; then UPDATE_INFO="up to date"
     else UPDATE_INFO="$behind update(s) available"; fi
   elif printf '%s' "$out" | grep -qiE "username|authentication|403|401|terminal prompts disabled|could not read"; then
-    UPDATE_INFO="GitHub login needed"; NEED_LOGIN=1
+    UPDATE_INFO="GitHub login needed"
   else UPDATE_INFO="couldn't check for updates"; fi
-}
-
-github_login() {
-  local remote host; remote="$(git -C "$DIR" remote get-url origin 2>/dev/null)"
-  case "$remote" in https://*) ;; *) echo "This copy doesn't use an https:// GitHub address, so there's nothing to save."; return 1 ;; esac
-  host="${remote#https://}"; host="${host%%/*}"; host="${host#*@}"
-  echo; echo "Log in to $host so Printer Buddy can check for and download updates."
-  echo "Paste a GitHub token (a read-only one for this repo is enough)."
-  local user="x-access-token" token   # GitHub only checks the token; the username can be anything
-  read -r -s -p "  Token (hidden): " token </dev/tty || return 1; echo
-  [ -n "$token" ] || { echo "Nothing saved."; return 1; }
-  git -C "$DIR" config credential.helper store
-  printf 'protocol=https\nhost=%s\nusername=%s\npassword=%s\n\n' "$host" "$user" "$token" | git -C "$DIR" credential approve
-  check_updates
-  if [ $NEED_LOGIN -eq 1 ]; then
-    printf 'protocol=https\nhost=%s\nusername=%s\npassword=%s\n\n' "$host" "$user" "$token" | git -C "$DIR" credential reject
-    echo "GitHub didn't accept that login, so it wasn't saved. Check the username and token and try again (menu option 8)."
-    return 1
-  fi
-  echo "Saved. Update checks and updates won't ask again on this box."
 }
 
 version() { git -C "$DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown"; }
 branch() { git -C "$DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"; }
-# the branch updates follow: the channel's, unless another branch was picked with G) Switch branch
+# the branch updates follow: the channel's, unless another branch was picked
 core_branch() {
   case "$(branch)" in
     nightly|builds|main|HEAD|unknown) [ "$(get_env PB_CHANNEL)" = nightly ] && echo nightly || echo builds ;;
@@ -332,42 +313,6 @@ after_code_change() {
   return 0
 }
 
-switch_branch() {
-  git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1 || { echo "This copy isn't a git checkout, so it can't switch branch."; return 1; }
-  echo; echo "Getting the branch list from GitHub..."
-  # a one-branch clone only knows its own branch; make it see (and track) all of them
-  git -C "$DIR" config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
-  GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true timeout 30 git -C "$DIR" fetch -q --prune origin \
-    || { echo "Couldn't get the branches (no internet, or GitHub login needed: menu option 8)."; return 1; }
-  local cur list b c i=0
-  cur="$(branch)"
-  mapfile -t list < <(git -C "$DIR" for-each-ref --format='%(refname:strip=3)' refs/remotes/origin | grep -vx HEAD)
-  [ ${#list[@]} -gt 0 ] || { echo "No branches found on GitHub."; return 1; }
-  echo
-  for b in "${list[@]}"; do
-    i=$((i + 1))
-    if [ "$b" = "$cur" ]; then echo "  $i) $b   <- current"; else echo "  $i) $b"; fi
-  done
-  echo
-  c="$(ask "Switch to (number, Enter = cancel): ")"
-  [ -n "$c" ] || { echo "Cancelled. Nothing changed."; return 0; }
-  if ! [[ "$c" =~ ^[0-9]+$ ]] || [ "$c" -lt 1 ] || [ "$c" -gt ${#list[@]} ]; then echo "That's not a number from the list. Nothing changed."; return 1; fi
-  b="${list[$((c - 1))]}"
-  [ "$b" != "$cur" ] || { echo "Already on $b. Use 3) Update to get its latest."; return 0; }
-  echo "Switching to $b..."
-  git -C "$DIR" reset -q --hard
-  git -C "$DIR" checkout -q -B "$b" "origin/$b" && git -C "$DIR" branch -q --set-upstream-to "origin/$b" "$b" \
-    || { echo "Switching failed. Nothing else was changed."; return 1; }
-  after_code_change || return 1
-  echo "Now on $b: $(git -C "$DIR" log -1 --format='%h %s')"
-  check_updates
-}
-
-restart_service() {
-  installed || { echo "Not installed yet; pick Install first."; return 1; }
-  hard_restart && echo "Restarted."
-}
-
 show_logs() {
   installed || { echo "Not installed yet."; return 1; }
   journalctl -u "$SERVICE" -n 80 --no-pager 2>/dev/null || sudo journalctl -u "$SERVICE" -n 80 --no-pager
@@ -442,9 +387,6 @@ start_tunnel() {
   else
     echo "cloudflared didn't accept that token. Nothing else was changed."; return 1
   fi
-  if [ "$(part_value "${PARTS[4]}")" != "on" ]; then
-    yesno "Remote access is off in your setup, so share links won't work. Turn it on now?" && { set_env PB_REMOTE on; installed && hard_restart; }
-  fi
   return 0
 }
 tunnel_api() { local a; a="$(get_env PB_TUNNEL_API)"; echo "${a:-https://www.$(share_domain)/api/tunnel}"; }
@@ -486,30 +428,16 @@ remove_tunnel() {
       if tunnel_call DELETE >/dev/null; then set_env PB_TUNNEL_KEY ""; echo "Tunnel removed."; return 0; fi
       [ $i -lt 3 ] && { echo "Retrying in 20 s..."; sleep 20; }
     done
-    echo "The server still has it. Try 2) Remove tunnel again in a few minutes."; return 1
+    echo "The server still has it. Open Change setup and press B in a few minutes to try again."; return 1
   fi
 }
-remote_menu() {
-  local c
-  while true; do
-    clear 2>/dev/null || true
-    top; center "REMOTE ACCESS / SHARE LINKS"; hr
-    row "Remote access:  $(part_value "${PARTS[4]}")"
-    row "Tunnel:         $(tunnel_state)"
-    row "Your ID:        $(user_id)"
-    row "Links look like:"
-    row "  https://www.$(share_domain)/share/user/$(user_id)/..."
-    hr
-    row "1) Set up automatically"
-    row "2) Remove tunnel"
-    row ""; row "B) Back"; bottom
-    c="$(ask "Perform action: ")"
-    case "$c" in
-      1) auto_tunnel; pause ;;
-      2) remove_tunnel; pause ;;
-      b|back|"") return ;;
-    esac
-  done
+sync_tunnel() {
+  local key; key="$(get_env PB_TUNNEL_KEY)"
+  if [ "$(part_value "${PARTS[4]}")" = on ]; then
+    [ "$(tunnel_state)" = "not set up" ] && { auto_tunnel; pause; }
+  elif [ "$(tunnel_state)" != "not set up" ] || [ -n "$key" ]; then
+    remove_tunnel; pause
+  fi
 }
 
 setup_lines() {
@@ -528,8 +456,8 @@ main_menu() {
   local first=1 c
   INTERACTIVE=1
   ensure_env
+  for part in "${PARTS[@]}"; do set_env "$(cut -d'|' -f2 <<<"$part")" "$(part_value "$part")"; done
   echo "Checking for updates..."; check_updates
-  if [ $NEED_LOGIN -eq 1 ] && yesno "This copy needs a GitHub login to get updates. Log in now?"; then github_login; pause; fi
   while true; do
     clear 2>/dev/null || true
     top; center "PRINTER BUDDY"; hr
@@ -537,12 +465,11 @@ main_menu() {
     if [ "$st" = "running" ]; then row "Service:  ● running   $(url)"; else row "Service:  ○ $st"; fi
     row "Version:  $(version) on $(branch)${UPDATE_INFO:+ ($UPDATE_INFO)}"
     hr; setup_lines; hr
-    if installed; then row "$(printf '%-28s%s' '1) Reinstall' '5) Restart service')"; else row "$(printf '%-28s%s' '1) Install' '5) Restart service')"; fi
+    if installed; then row "$(printf '%-28s%s' '1) Reinstall' '')"; else row "$(printf '%-28s%s' '1) Install' '')"; fi
     row "$(printf '%-28s%s' '2) Change setup' '6) Show logs')"
-    row "$(printf '%-28s%s' '3) Update' '7) Remove')"
-    row "$(printf '%-28s%s' '4) Backup / restore data' '8) GitHub login')"
-    row "$(printf '%-28s%s' '9) Remote / share links' 'P) Change port')"
-    row "$(printf '%-28s%s' 'G) Switch branch' '')"
+    row "$(printf '%-28s%s' '3) Update' '7) Uninstall')"
+    row "$(printf '%-28s%s' '4) Backup / restore data' '')"
+    row "$(printf '%-28s%s' 'P) Change port' '')"
     row ""; row "Q) Quit"; bottom
     c="$(ask "Perform action: ")"
     case "$c" in
@@ -550,13 +477,9 @@ main_menu() {
       2) setup_menu ;;
       3) do_update; pause ;;
       4) backup_menu ;;
-      5) restart_service; pause ;;
       6) show_logs; pause ;;
       7) do_remove; pause ;;
-      8) github_login; pause ;;
-      9) remote_menu ;;
       p|port) change_port; pause ;;
-      g|branch) switch_branch; pause ;;
       q|quit|exit) echo "Bye."; exit 0 ;;
       *) ;;
     esac
@@ -579,24 +502,80 @@ setup_menu() {
     case "$c" in
       b|back|"")
         if [ $changed -eq 1 ] && installed; then fetch_parts; ensure_ffmpeg; ensure_ai; install_helper && ensure_streamer; hard_restart && echo "Restarted with the new setup."; sleep 1; fi
+        sync_tunnel
         return ;;
     esac
     [[ "$c" =~ ^[0-9]+$ ]] && [ "$c" -ge 1 ] && [ "$c" -le ${#PARTS[@]} ] || continue
     part="${PARTS[$((c - 1))]}"
     IFS='|' read -r key var name choices <<<"$part"
+    if [ "$key" = stream ]; then stream_setup && changed=1; continue; fi
     local opts; read -r -a opts <<<"$choices"
     local cur; cur="$(part_value "$part")"
     echo; echo "$name:"
     local j=1 o mark note
     for o in "${opts[@]}"; do
       mark=""; [ "$o" = "$cur" ] && mark="  <- current"
-      note=""; built "$key.$o" || note=" (not built yet)"
-      printf "  %d) %-10s %s%s%s\n" "$j" "$o" "${DESC[$key.$o]}" "$note" "$mark"; j=$((j + 1))
+      if built "$key.$o"; then printf "  %d) %-10s %s%s\n" "$j" "$o" "${DESC[$key.$o]}" "$mark"
+      else printf "  \e[2m%d) %-10s %s (coming soon)\e[0m\n" "$j" "$o" "${DESC[$key.$o]}"; fi
+      j=$((j + 1))
     done
     local a; a="$(ask "  Choice (Enter to keep ${cur}): ")"
     if [[ "$a" =~ ^[0-9]+$ ]] && [ "$a" -ge 1 ] && [ "$a" -le ${#opts[@]} ]; then a="${opts[$((a - 1))]}"; fi
-    case " $choices " in *" $a "*) [ "$a" != "$cur" ] && { set_env "$var" "$a"; changed=1; } ;; esac
+    case " $choices " in
+      *" $a "*)
+        if ! built "$key.$a"; then echo "  $a is coming soon."; sleep 1
+        elif [ "$a" != "$cur" ]; then set_env "$var" "$a"; changed=1; fi ;;
+    esac
   done
+}
+
+stream_setup() {
+  local cur w t tier; cur="$(part_value "${PARTS[5]}")"
+  echo; echo "Camera streamer: where is the camera plugged in?"
+  echo "  1) No camera, or use the printer's own camera service"
+  echo "  2) This box"
+  echo "  3) The printer"
+  w="$(ask "  Choice (Enter to keep $cur): ")"
+  case "$w" in
+    1) [ "$cur" != off ] && { set_env PB_STREAM off; return 0; }; return 1 ;;
+    2|3) ;;
+    *) return 1 ;;
+  esac
+  echo; echo "What camera?"
+  echo "  1) USB camera(s)"
+  echo "  2) Pi camera (ribbon cable)"
+  echo "  3) Network camera (rtsp:// or http://)"
+  case "$(ask "  Choice: ")" in 1) t=usb ;; 2) t=pi ;; 3) t=network ;; *) return 1 ;; esac
+  if [ "$w" = 3 ]; then printer_streamer "$t"; pause; return 1; fi
+  tier=basic; [ "$t" = network ] && tier=full
+  [ "$tier" != "$cur" ] || return 1
+  set_env PB_STREAM "$tier"
+  [ "$t" = network ] && echo "Add the camera's address as device: in data/streamer.conf after the install." && pause
+  return 0
+}
+
+printer_streamer() {
+  local t="$1" url="" cmd host user
+  if [ "$t" = network ]; then
+    read -r -p "  Camera address (rtsp://... or http://...): " url </dev/tty || true
+    [ -n "$url" ] || { echo "Nothing changed."; return 1; }
+  fi
+  cmd="curl -fsSL $PRINTER_STREAMER | bash -s -- $t${url:+ '$url'}"
+  echo; echo "How do you want to install it on the printer?"
+  echo "  1) Copy and paste a command into the printer's SSH"
+  echo "  2) Guided SSH install from here"
+  case "$(ask "  Choice: ")" in
+    1) echo; echo "SSH into the printer and run:"; echo; echo "  $cmd"; echo ;;
+    2)
+      command -v ssh >/dev/null || { echo "This box has no ssh. Use 1) instead."; return 1; }
+      read -r -p "  Printer address (IP): " host </dev/tty || true
+      [ -n "$host" ] || { echo "Nothing changed."; return 1; }
+      read -r -p "  Printer login user [pi]: " user </dev/tty || true
+      user="${user:-pi}"
+      echo "Connecting to $user@$host (it asks for the printer's password)..."
+      ssh -t "$user@$host" "$cmd" || echo "The install on the printer didn't finish, see above." ;;
+    *) echo "Nothing changed." ;;
+  esac
 }
 
 backup_menu() {
@@ -639,7 +618,7 @@ ensure_env
 for part in "${PARTS[@]}"; do
   IFS='|' read -r key var name choices <<<"$part"
   if [ -n "${GIVEN[$key]:-}" ]; then
-    case " $choices " in *" ${GIVEN[$key]} "*) set_env "$var" "${GIVEN[$key]}" ;; *) echo "--$key must be one of: $choices"; exit 1 ;; esac
+    case " $choices " in *" ${GIVEN[$key]} "*) built "$key.${GIVEN[$key]}" || { echo "--$key ${GIVEN[$key]} is coming soon"; exit 1; }; set_env "$var" "${GIVEN[$key]}" ;; *) echo "--$key must be one of: $choices"; exit 1 ;; esac
   else
     set_env "$var" "$(part_value "$part")"
   fi
