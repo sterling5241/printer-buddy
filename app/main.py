@@ -572,6 +572,13 @@ async def ai_check(request: Request):
         return err(str(e), 409)
 
 
+async def ai_history(request: Request):
+    pid = _pid(request)
+    if pid is None:
+        return err("not found", 404)
+    return JSONResponse({"history": manager.ai.state.get(pid, {}).get("history", [])})
+
+
 async def ai_overlay(request: Request):
     pid = _pid(request)
     if pid is None:
@@ -1343,6 +1350,7 @@ _app = Starlette(routes=[
     Route("/api/system", system_list),
     Route("/api/system", system_action, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/check", ai_check, methods=["POST"]),
+    Route("/api/printers/{pid:int}/ai/history", ai_history),
     Route("/api/printers/{pid:int}/ai/save", ai_save, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/overlay", ai_overlay, methods=["POST"]),
     Route("/api/printers/{pid:int}/ai/area", ai_area, methods=["POST"]),
