@@ -1,3 +1,0 @@
-2026-10-23 21:29:30,125 INFO root: Fake X1C (127.0.0.1) -> Moonraker on port 7130
-2026-10-23 21:29:32,210 INFO bambu.printer: Fake X1C: [WinError 1225] The remote computer refused the network connection
-2026-10-23 21:29:34,258 INFO bambu.printer: Fake X1C: connected to 127.0.0.1

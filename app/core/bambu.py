@@ -34,7 +34,7 @@ class BambuBridge:
             self._proc = await asyncio.create_subprocess_exec(
                 sys.executable, "-m", "bambu_convert", "-c", str(self.conf), cwd=ROOT / "bambu-convert")
             code = await self._proc.wait()
-            log.warning("bambu-convert stopped (exit %s), restarting in 10s", code)
+            (log.info if code < 0 else log.warning)("bambu-convert stopped (exit %s), restarting in 10s", code)
             await asyncio.sleep(10)
 
     async def stop(self):

@@ -105,6 +105,23 @@ class Bambu:
         state = ((self.report.get("device") or {}).get("extruder") or {}).get("state")
         return (int(_num(state)) >> 4) & 15 if state is not None else 0
 
+    def trays(self) -> list[dict]:
+        """AMS slots in unit order; "tray" is the printer's own slot number (unit * 4 + slot, AMS HT: its unit id)."""
+        out = []
+        for u, unit in enumerate((self.report.get("ams") or {}).get("ams") or []):
+            uid = int(_num(unit.get("id"), u))
+            for t in unit.get("tray") or []:
+                sid = int(_num(t.get("id")))
+                color = str(t.get("tray_color") or "")[:6].lower()
+                out.append({"unit": u, "unit_id": uid, "slot": sid, "tray": uid * 4 + sid if uid < 128 else uid,
+                            "type": str(t.get("tray_type") or ""), "name": str(t.get("tray_sub_brands") or ""),
+                            "color": color, "temp": int(_num(t.get("nozzle_temp_max"))),
+                            "remain": int(_num(t.get("remain"), -1))})
+        return out
+
+    def ams_units(self) -> list[dict]:
+        return list((self.report.get("ams") or {}).get("ams") or [])
+
     def chamber(self) -> float | None:
         ctc = (((self.report.get("device") or {}).get("ctc") or {}).get("info") or {}).get("temp")
         if ctc is not None:
@@ -299,6 +316,7 @@ class Bambu:
             o["temperature_sensor Chamber"] = {"temperature": chamber, "measured_min_temp": chamber,
                                                "measured_max_temp": chamber}
         gear = int(_num(r.get("fan_gear"), -1))
+        o.update(self._mmu(s))
         for fan, (field, idx) in FANS.items():
             if (idx == 2 and not aux) or (idx == 3 and not chamber_fan):
                 continue
@@ -307,6 +325,89 @@ class Bambu:
             elif field in r:
                 o[fan] = {"speed": round(_num(r.get(field)) / 15, 2), "rpm": None}
         return o
+
+    def _mmu(self, state: str) -> dict:
+        """The AMS as a Happy Hare MMU, which Fluidd and Mainsail already show."""
+        trays, units = self.trays(), self.ams_units()
+        if not trays:
+            return {}
+        out = {}
+        now = int(_num((self.report.get("ams") or {}).get("tray_now"), 255))
+        gate = next((g for g, t in enumerate(trays) if t["tray"] == now), -2 if now == 254 else -1)
+        lite = self.model.startswith(("A1", "A2"))
+        machine = {"num_units": len(units)}
+        first = 0
+        for u, unit in enumerate(units):
+            uid = int(_num(unit.get("id"), u))
+            count = sum(1 for t in trays if t["unit"] == u)
+            sensor = None
+            if unit.get("humidity_raw") is not None or unit.get("temp") is not None:
+                sensor = f"temperature_sensor AMS_{u + 1}"
+                out[sensor] = {"temperature": _num(unit.get("temp")),
+                               "humidity": _num(unit.get("humidity_raw"), _num(unit.get("humidity")))}
+            machine[f"unit_{u}"] = {
+                "name": "AMS HT" if uid >= 128 else "AMS lite" if lite else f"AMS {u + 1}",
+                "vendor": "HappyHare", "version": "1.0", "num_gates": count, "first_gate": first,
+                "selector_type": "VirtualSelector", "variable_rotation_distances": False,
+                "variable_bowden_lengths": False, "require_bowden_move": False, "filament_always_gripped": True,
+                "can_crossload": False, "has_bypass": False, "multi_gear": True,
+                **({"environment_sensor": sensor} if sensor else {})}
+            first += count
+        n = len(trays)
+        print_state = {"printing": "printing", "paused": "paused", "complete": "complete",
+                       "cancelled": "cancelled", "error": "error"}.get(state, "ready")
+        loaded = gate >= 0
+        out["mmu_machine"] = machine
+        out["mmu"] = {
+            "enabled": True, "num_gates": n, "is_homed": True, "is_locked": False, "is_paused": state == "paused",
+            "is_in_print": state in ("printing", "paused"), "print_state": print_state,
+            "unit": trays[gate]["unit"] if loaded else -1, "tool": gate, "gate": gate,
+            "active_filament": {"filament_name": (trays[gate]["name"] or trays[gate]["type"]) if loaded else ""},
+            "num_toolchanges": 0, "last_tool": -1, "next_tool": -1, "toolchange_purge_volume": 0,
+            "last_toolchange": "", "filament": "Loaded" if gate != -1 else "Unloaded", "filament_position": 0,
+            "filament_pos": 10 if gate != -1 else 0, "filament_direction": 0, "action": "Idle",
+            "has_bypass": True, "sync_drive": False, "servo": "Unknown", "grip": "Unknown",
+            "spoolman_support": "off", "sensors": {}, "endless_spool_enabled": 0, "clog_detection_enabled": 0,
+            "gate_status": [1 if t["type"] else 0 for t in trays],
+            "gate_filament_name": [t["name"] or t["type"] for t in trays],
+            "gate_material": [t["type"] for t in trays],
+            "gate_color": [t["color"] if t["type"] else "" for t in trays],
+            "gate_color_rgb": [[int(t["color"][i:i + 2] or "0", 16) / 255 for i in (0, 2, 4)]
+                               if len(t["color"]) == 6 else [0.0, 0.0, 0.0] for t in trays],
+            "gate_temperature": [t["temp"] for t in trays], "gate_spool_id": [-1] * n,
+            "gate_speed_override": [100] * n, "gate_remaining": [t["remain"] for t in trays],
+            "tool_extrusion_multipliers": [1.0] * n, "tool_speed_multipliers": [1.0] * n,
+            "ttg_map": list(range(n)), "endless_spool_groups": list(range(n)),
+            "slicer_tool_map": {"tools": {}, "referenced_tools": [], "initial_tool": None, "purge_volumes": [],
+                                "total_toolchanges": None, "skip_automap": False},
+        }
+        return out
+
+    def ams_mapping(self, filaments: list[dict]) -> list[int]:
+        """For each filament in the 3mf (slicer order) the AMS slot to use: same material, closest colour, -1 if unused."""
+        trays = [t for t in self.trays() if t["type"]]
+        if not trays:
+            return []
+
+        def rgb(c: str) -> tuple:
+            c = (c or "").lstrip("#")[:6]
+            try:
+                return tuple(int(c[i:i + 2], 16) for i in (0, 2, 4))
+            except ValueError:
+                return (128, 128, 128)
+
+        mapping, taken = [], set()
+        for f in filaments:
+            if not f.get("used", True):
+                mapping.append(-1)
+                continue
+            want, kind = rgb(f.get("color")), str(f.get("type") or "").upper()
+            pool = [t for t in trays if t["type"].upper() == kind] or trays
+            pool = [t for t in pool if t["tray"] not in taken] or pool
+            best = min(pool, key=lambda t: sum((a - b) ** 2 for a, b in zip(rgb(t["color"]), want)))
+            taken.add(best["tray"])
+            mapping.append(best["tray"])
+        return mapping
 
     def _settings(self) -> dict:
         name, x, y, z, count, _, _, _, bed_max = self.spec
@@ -346,6 +447,27 @@ class Bambu:
         level = min(SPEEDS, key=lambda k: abs(SPEEDS[k] - percent))
         await self._send({"print": {"command": "print_speed", "param": str(level)}})
 
+    async def ams_load(self, gate: int):
+        trays = self.trays()
+        if not 0 <= gate < len(trays):
+            raise ValueError(f"no AMS slot {gate}")
+        t = trays[gate]
+        if not t["type"]:
+            raise ValueError(f"AMS slot {gate} is empty")
+        temp = t["temp"] or 220
+        await self._send({"print": {"command": "ams_change_filament", "ams_id": t["unit_id"], "slot_id": t["slot"],
+                                    "target": t["tray"], "curr_temp": temp, "tar_temp": temp}})
+
+    async def ams_unload(self):
+        trays = self.trays()
+        if not trays:
+            raise ValueError("no AMS")
+        now = int(_num((self.report.get("ams") or {}).get("tray_now"), 255))
+        t = next((t for t in trays if t["tray"] == now), trays[0])
+        temp = t["temp"] or 220
+        await self._send({"print": {"command": "ams_change_filament", "ams_id": t["unit_id"], "slot_id": 255,
+                                    "target": 255, "curr_temp": temp, "tar_temp": temp}})
+
     async def nozzle_temp(self, index: int, target: float):
         if self.new_protocol:
             await self._send({"print": {"command": "set_nozzle_temp", "extruder_index": index,
@@ -356,15 +478,17 @@ class Bambu:
     async def gcode(self, line: str):
         await self._send({"print": {"command": "gcode_line", "param": line.rstrip("\n") + "\n"}})
 
-    async def start(self, path: str, plate: int = 1):
+    async def start(self, path: str, plate: int = 1, filaments: list[dict] | None = None):
         path = path.lstrip("/")
         if path.lower().endswith(".3mf"):
-            name = path.rsplit("/", 1)[-1]
+            # H2 printers take ftp:///, the rest file:///sdcard/ (same as Bambu Studio / ha-bambulab)
+            h2 = str(self.report.get("printer_type", "")).startswith("O1") or self.serial.startswith("094")
+            mapping = self.ams_mapping(filaments or [{}])
             await self._send({"print": {
                 "command": "project_file", "param": f"Metadata/plate_{plate}.gcode", "project_id": "0",
-                "profile_id": "0", "task_id": "0", "subtask_id": "0", "subtask_name": name.rsplit(".", 2)[0],
-                "url": f"file:///sdcard/{path}", "md5": "", "timelapse": False, "bed_type": "auto",
-                "bed_levelling": True, "flow_cali": False, "vibration_cali": False, "layer_inspect": False,
-                "use_ams": bool((self.report.get("ams") or {}).get("ams")), "ams_mapping": []}})
+                "profile_id": "0", "task_id": "0", "subtask_id": "0", "subtask_name": path.rsplit("/", 1)[-1],
+                "url": f"ftp:///{path}" if h2 else f"file:///sdcard/{path}", "timelapse": False,
+                "bed_type": "auto", "bed_leveling": True, "flow_cali": True, "vibration_cali": True,
+                "layer_inspect": True, "use_ams": bool(mapping), "ams_mapping": mapping or [0]}})
         else:
             await self._send({"print": {"command": "gcode_file", "param": f"/sdcard/{path}"}})

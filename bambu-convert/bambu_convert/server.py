@@ -254,9 +254,14 @@ class Bridge:
         out: dict = {}
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             names = set(z.namelist())
+            plates = sorted(int(m.group(1)) for n in names if (m := re.fullmatch(r"Metadata/plate_(\d+)\.gcode", n)))
+            plate_no = plates[0] if plates else 1
+            out["bambu_plate"] = plate_no
             if "Metadata/slice_info.config" in names:
                 root = ET.fromstring(z.read("Metadata/slice_info.config"))
-                plate = root.find("plate")
+                plate = next((pl for pl in root.findall("plate")
+                              if any(m.get("key") == "index" and m.get("value") == str(plate_no)
+                                     for m in pl.findall("metadata"))), root.find("plate"))
                 if plate is not None:
                     md = {m.get("key"): m.get("value") for m in plate.findall("metadata")}
                     if md.get("prediction"):
@@ -266,11 +271,15 @@ class Bridge:
                     used = [float(fl.get("used_m") or 0) for fl in plate.findall("filament")]
                     if used:
                         out["filament_total"] = sum(used) * 1000
+                        out["bambu_filaments"] = [
+                            {"type": fl.get("type") or "", "color": fl.get("color") or "",
+                             "used": float(fl.get("used_g") or fl.get("used_m") or 0) > 0}
+                            for fl in plate.findall("filament")]
                     types = [fl.get("type") for fl in plate.findall("filament") if fl.get("type")]
                     if types:
                         out["filament_type"] = ";".join(types)
             thumbs = []
-            for src in ("Metadata/plate_1_small.png", "Metadata/plate_1.png"):
+            for src in (f"Metadata/plate_{plate_no}_small.png", f"Metadata/plate_{plate_no}.png"):
                 if src in names:
                     png = z.read(src)
                     w, h = _png_size(png)
@@ -298,8 +307,19 @@ class Bridge:
         item = self._item(rel, len(data))
         await self._files_changed("create_file", item)
         if start:
-            await self.p.start(rel)
+            await self.start_print(rel)
         return {"item": item, "print_started": start, "print_queued": False, "action": "create_file"}
+
+    async def start_print(self, path: str):
+        path = path.strip("/")
+        meta = {}
+        if path.lower().endswith(".3mf"):
+            try:
+                meta = await self.metadata(path)
+            except RPCError as e:
+                log.info("%s: starting %s without its metadata (%s)", self.p.name, path, e)
+        filaments = meta.get("bambu_filaments")
+        await self.p.start(path, int(meta.get("bambu_plate") or 1), filaments if isinstance(filaments, list) else None)
 
     async def download(self, rel: str) -> bytes:
         if rel.startswith(".thumbs/"):
@@ -348,6 +368,21 @@ class Bridge:
                     await self.p.nozzle_temp(int(heater[8:] or 0), target)
                 else:
                     raise RPCError(400, f"unknown heater {heater}")
+            elif cmd in ("MMU_CHANGE_TOOL", "MMU_LOAD") or re.fullmatch(r"T\d+", cmd):
+                if args.get("BYPASS") == "1":
+                    raise RPCError(400, "loading the external spool isn't supported on a Bambu printer")
+                gate = cmd[1:] if cmd.startswith("T") and cmd[1:].isdigit() else args.get("TOOL") or args.get("GATE")
+                try:
+                    await self.p.ams_load(int(gate))
+                except (TypeError, ValueError) as e:
+                    raise RPCError(400, str(e) if gate is not None else f"{cmd} needs TOOL=") from e
+            elif cmd in ("MMU_EJECT", "MMU_UNLOAD"):
+                try:
+                    await self.p.ams_unload()
+                except ValueError as e:
+                    raise RPCError(400, str(e)) from e
+            elif cmd in ("MMU_SELECT", "MMU_CHECK_GATES", "MMU_STATS"):
+                pass
             elif cmd == "M220":
                 m = re.search(r"S(\d+)", line, re.I)
                 await self.p.speed(float(m.group(1)) if m else 100)
@@ -402,7 +437,7 @@ class Bridge:
                     "SET_PIN": "PIN=chamber_light VALUE=0|1", "SET_FAN_SPEED": "FAN=Aux|Chamber SPEED=0..1",
                     "M220": "Print speed (silent / standard / sport / ludicrous)"}
         if method == "printer.print.start":
-            await p.start(str(params.get("filename", "")))
+            await self.start_print(str(params.get("filename", "")))
             return "ok"
         if method == "printer.print.pause":
             await p.pause()
