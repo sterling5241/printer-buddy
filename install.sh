@@ -465,20 +465,19 @@ main_menu() {
     if [ "$st" = "running" ]; then row "Service:  ● running   $(url)"; else row "Service:  ○ $st"; fi
     row "Version:  $(version) on $(branch)${UPDATE_INFO:+ ($UPDATE_INFO)}"
     hr; setup_lines; hr
-    if installed; then row "$(printf '%-28s%s' '1) Reinstall' '')"; else row "$(printf '%-28s%s' '1) Install' '')"; fi
-    row "$(printf '%-28s%s' '2) Change setup' '6) Show logs')"
-    row "$(printf '%-28s%s' '3) Update' '7) Uninstall')"
-    row "$(printf '%-28s%s' '4) Backup / restore data' '')"
-    row "$(printf '%-28s%s' 'P) Change port' '')"
-    row ""; row "Q) Quit"; bottom
+    if installed; then row "$(printf '%-28s%s' '1) Reinstall' '4) Backup / restore data')"; else row "$(printf '%-28s%s' '1) Install' '4) Backup / restore data')"; fi
+    row "$(printf '%-28s%s' '2) Change setup' '5) Show logs')"
+    row "$(printf '%-28s%s' '3) Update' '6) Uninstall')"
+    row "$(printf '%-28s%s' 'P) Change port' 'Q) Quit')"
+    bottom
     c="$(ask "Perform action: ")"
     case "$c" in
       1) do_install; pause ;;
       2) setup_menu ;;
       3) do_update; pause ;;
       4) backup_menu ;;
-      6) show_logs; pause ;;
-      7) do_remove; pause ;;
+      5) show_logs; pause ;;
+      6) do_remove; pause ;;
       p|port) change_port; pause ;;
       q|quit|exit) echo "Bye."; exit 0 ;;
       *) ;;
