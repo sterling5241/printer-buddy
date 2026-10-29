@@ -23,7 +23,7 @@ PARTS = {
     "ui": ("PB_UI", ("advanced",), ROOT / "ui"),
     "notify": ("PB_NOTIFY", ("basic", "advanced"), ROOT / "app" / "core" / "notify.py"),
     "timelapse": (None, (), ROOT / "app" / "media" / "timelapse.py"),
-    "streamer": ("PB_STREAM", ("off", "light", "basic", "full"), ROOT / "streamer"),
+    "streamer": ("PB_STREAM", ("off", "light", "basic", "advanced"), ROOT / "streamer"),
 }
 REQUIRED = ("ui", "notify", "timelapse")
 AI_KINDS = ("off", "basic", "heavy")

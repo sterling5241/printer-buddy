@@ -35,7 +35,7 @@ HDR = {"User-Agent": "printer-buddy", "Accept": "application/vnd.github+json"}
 CHANNEL_BRANCH = {"stable": "builds", "nightly": "nightly"}
 # setting -> choices (first one is the default)
 CHOICES = {"PB_UI": ("advanced",), "PB_NOTIFY": ("basic", "advanced"), "PB_AI": ("off", "basic", "heavy"),
-           "PB_VIDEO": ("snapshots", "live", "timelapse"), "PB_STREAM": ("off", "light", "basic", "full"),
+           "PB_VIDEO": ("snapshots", "live", "timelapse"), "PB_STREAM": ("off", "light", "basic", "advanced"),
            "PB_CHANNEL": ("stable", "nightly")}
 _releases: list | None = None
 
